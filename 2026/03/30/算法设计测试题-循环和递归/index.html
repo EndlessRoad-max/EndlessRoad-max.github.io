@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  
+  <title>算法设计测试题-循环和递归 | Hexo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <meta name="description" content="核心算法复习笔记 (Algorithm Review Notes)本文档根据课程手写笔记整理，涵盖递归、分治、迭代与倒推等核心算法思想，并附带所有经典例题的伪代码与时间复杂度分析。 1. 欧几里得算法 (求最大公约数)【所属模块】 算法基本工具 - 递归与分治  题目描述: 给定两个正整数 $a$ 和 $b$，求它们的最大公约数 (GCD)。  核心思路 (降维): 利用带余除法的性质，大数的公约">
+<meta property="og:type" content="article">
+<meta property="og:title" content="算法设计测试题-循环和递归">
+<meta property="og:url" content="http://example.com/2026/03/30/%E7%AE%97%E6%B3%95%E8%AE%BE%E8%AE%A1%E6%B5%8B%E8%AF%95%E9%A2%98-%E5%BE%AA%E7%8E%AF%E5%92%8C%E9%80%92%E5%BD%92/index.html">
+<meta property="og:site_name" content="Hexo">
+<meta property="og:description" content="核心算法复习笔记 (Algorithm Review Notes)本文档根据课程手写笔记整理，涵盖递归、分治、迭代与倒推等核心算法思想，并附带所有经典例题的伪代码与时间复杂度分析。 1. 欧几里得算法 (求最大公约数)【所属模块】 算法基本工具 - 递归与分治  题目描述: 给定两个正整数 $a$ 和 $b$，求它们的最大公约数 (GCD)。  核心思路 (降维): 利用带余除法的性质，大数的公约">
+<meta property="og:locale" content="en_US">
+<meta property="article:published_time" content="2026-03-30T14:32:13.000Z">
+<meta property="article:modified_time" content="2026-03-30T14:38:07.176Z">
+<meta property="article:author" content="John Doe">
+<meta property="article:tag" content="算法">
+<meta property="article:tag" content="迭代">
+<meta property="article:tag" content="递归">
+<meta name="twitter:card" content="summary">
+  
+    <link rel="alternate" href="/atom.xml" title="Hexo" type="application/atom+xml">
+  
+  
+    <link rel="shortcut icon" href="/favicon.png">
+  
+  
+  
+<link rel="stylesheet" href="/css/style.css">
+
+  
+    
+<link rel="stylesheet" href="/fancybox/jquery.fancybox.min.css">
+
+  
+  
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fork-awesome@1.2.0/css/fork-awesome.min.css">
+
+<meta name="generator" content="Hexo 8.1.1"></head>
+
+<body>
+  <div id="container">
+    <div id="wrap">
+      <header id="header">
+  <div id="banner"></div>
+  <div id="header-outer" class="outer">
+    <div id="header-title" class="inner">
+      <h1 id="logo-wrap">
+        <a href="/" id="logo">Hexo</a>
+      </h1>
+      
+    </div>
+    <div id="header-inner" class="inner">
+      <nav id="main-nav">
+        <a id="main-nav-toggle" class="nav-icon"><span class="fa fa-bars"></span></a>
+        
+          <a class="main-nav-link" href="/">Home</a>
+        
+          <a class="main-nav-link" href="/archives">Archives</a>
+        
+          <a class="main-nav-link" href="/categories/%E6%AF%8F%E5%91%A8%E8%AE%A1%E5%88%92/">Weekly</a>
+        
+      </nav>
+      <nav id="sub-nav">
+        
+        
+          <a class="nav-icon" href="/atom.xml" title="RSS Feed"><span class="fa fa-rss"></span></a>
+        
+        <a class="nav-icon nav-search-btn" title="Search"><span class="fa fa-search"></span></a>
+      </nav>
+      <div id="search-form-wrap">
+        <form action="//google.com/search" method="get" accept-charset="UTF-8" class="search-form"><input type="search" name="q" class="search-form-input" placeholder="Search"><button type="submit" class="search-form-submit">&#xF002;</button><input type="hidden" name="sitesearch" value="http://example.com"></form>
+      </div>
+    </div>
+  </div>
+</header>
+
+      <div class="outer">
+        <section id="main"><article id="post-算法设计测试题-循环和递归" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
+  <div class="article-meta">
+    <a href="/2026/03/30/%E7%AE%97%E6%B3%95%E8%AE%BE%E8%AE%A1%E6%B5%8B%E8%AF%95%E9%A2%98-%E5%BE%AA%E7%8E%AF%E5%92%8C%E9%80%92%E5%BD%92/" class="article-date">
+  <time class="dt-published" datetime="2026-03-30T14:32:13.000Z" itemprop="datePublished">2026-03-30</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="p-name article-title" itemprop="headline name">
+      算法设计测试题-循环和递归
+    </h1>
+  
+
+      </header>
+    
+    <div class="e-content article-entry" itemprop="articleBody">
+      
+        <h1 id="核心算法复习笔记-Algorithm-Review-Notes"><a href="#核心算法复习笔记-Algorithm-Review-Notes" class="headerlink" title="核心算法复习笔记 (Algorithm Review Notes)"></a>核心算法复习笔记 (Algorithm Review Notes)</h1><p>本文档根据课程手写笔记整理，涵盖递归、分治、迭代与倒推等核心算法思想，并附带所有经典例题的伪代码与时间复杂度分析。</p>
+<h2 id="1-欧几里得算法-求最大公约数"><a href="#1-欧几里得算法-求最大公约数" class="headerlink" title="1. 欧几里得算法 (求最大公约数)"></a>1. 欧几里得算法 (求最大公约数)</h2><p><strong>【所属模块】</strong> 算法基本工具 - 递归与分治</p>
+<ul>
+<li><p><strong>题目描述:</strong> 给定两个正整数 $a$ 和 $b$，求它们的最大公约数 (GCD)。</p>
+</li>
+<li><p><strong>核心思路 (降维):</strong> 利用带余除法的性质，大数的公约数问题可以转化为小数的公约数问题。不断用除数去对余数取模，直到余数为 0，此时的除数就是最大公约数。</p>
+</li>
+<li><p><strong>核心递归公式:</strong></p>
+<p>$$\gcd(a, b) &#x3D; \gcd(b, a \bmod b)$$</p>
+</li>
+<li><p><strong>时间复杂度:</strong> $O(\log(\min(a, b)))$。这是极度高效的算法，因为每次取模运算都会使数字规模至少减半。</p>
+</li>
+<li><p><strong>伪代码 (Pseudocode):</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">Function GCD(a, b)</span><br><span class="line">    if b == 0 then</span><br><span class="line">        return a</span><br><span class="line">    else</span><br><span class="line">        return GCD(b, a mod b)</span><br><span class="line">    end if</span><br><span class="line">End Function</span><br></pre></td></tr></table></figure></li>
+</ul>
+<h2 id="2-Hanoi塔问题-汉诺塔"><a href="#2-Hanoi塔问题-汉诺塔" class="headerlink" title="2. Hanoi塔问题 (汉诺塔)"></a>2. Hanoi塔问题 (汉诺塔)</h2><p><strong>【所属模块】</strong> 算法基本工具 - 递归与分治</p>
+<ul>
+<li><p><strong>题目描述:</strong> 有 A、B、C 三根柱子。A 柱上按大小顺序叠放着 $n$ 个盘子。要求将这 $n$ 个盘子全部移到 C 柱上，移动过程中可借助 B 柱。规则：每次只能移动一个盘子，且大盘子不能压在小盘子上面。求移动步骤。</p>
+</li>
+<li><p><strong>核心思路 (自顶向下):</strong> 将问题降维。把上面 $n-1$ 个盘子看作一个整体。</p>
+<ol>
+<li>将上面 $n-1$ 个盘子从 A 移到 B（借助 C）。</li>
+<li>将最底下的最大盘子从 A 移到 C。</li>
+<li>将 B 上的 $n-1$ 个盘子移到 C（借助 A）。</li>
+</ol>
+</li>
+<li><p><strong>核心递归公式:</strong> 设移动 $n$ 个盘子的总步数为 $T(n)$。</p>
+<p>$$T(n) &#x3D; 2T(n-1) + 1$$</p>
+</li>
+<li><p><strong>时间复杂度:</strong> $O(2^n)$。典型的指数级时间复杂度。当盘子数量 $n$ 稍大时，计算时间会呈爆炸式增长。</p>
+</li>
+<li><p><strong>伪代码 (Pseudocode):</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">Procedure Hanoi(n, A, B, C)</span><br><span class="line">    if n == 1 then</span><br><span class="line">        Print(&quot;Move disk 1 from&quot;, A, &quot;to&quot;, C)</span><br><span class="line">    else</span><br><span class="line">        Hanoi(n-1, A, C, B)  // 步骤1：将 n-1 个盘子移到辅助柱 B</span><br><span class="line">        Print(&quot;Move disk&quot;, n, &quot;from&quot;, A, &quot;to&quot;, C) // 步骤2：移动最大盘</span><br><span class="line">        Hanoi(n-1, B, A, C)  // 步骤3：将 B 上的盘子移到目标柱 C</span><br><span class="line">    end if</span><br><span class="line">End Procedure</span><br></pre></td></tr></table></figure></li>
+</ul>
+<h2 id="3-整数划分问题-Integer-Partition"><a href="#3-整数划分问题-Integer-Partition" class="headerlink" title="3. 整数划分问题 (Integer Partition)"></a>3. 整数划分问题 (Integer Partition)</h2><p><strong>【所属模块】</strong> 算法基本工具 - 递归&#x2F;动态规划</p>
+<ul>
+<li><p><strong>题目描述:</strong> 将正整数 $n$ 表示为一系列正整数之和：$n &#x3D; n_1 + n_2 + \dots + n_k$（其中 $n_1 \ge n_2 \ge \dots \ge n_k \ge 1$）。求正整数 $n$ 的不同划分个数。</p>
+</li>
+<li><p><strong>核心思路:</strong> 引入变量 $m$ 表示**“最大加数不超过 $m$”**。定义函数 $q(n, m)$。根据 $n$ 和 $m$ 的大小关系，分类讨论是否在划分中包含数字 $m$，从而建立递归树。</p>
+</li>
+<li><p><strong>核心递归公式 (4个分支):</strong></p>
+<p>$$q(n, m) &#x3D;   \begin{cases}   1, &amp; \text{if } n&#x3D;1 \text{ or } m&#x3D;1 \quad \text{(边界条件)} \  q(n, n), &amp; \text{if } n &lt; m \quad \text{(加数不可能超过总数)} \  1 + q(n, m-1), &amp; \text{if } n &#x3D; m \quad \text{(包含m本身1种 + 不包含m)} \  q(n-m, m) + q(n, m-1), &amp; \text{if } n &gt; m \quad \text{(包含m + 不包含m)}  \end{cases}$$</p>
+</li>
+<li><p><strong>时间复杂度:</strong> $O(2^n)$ <strong>(纯递归实现)</strong>。存在大量重复计算。如果使用“备忘录”或<strong>动态规划</strong>优化，时间复杂度可降至 $O(n \times m)$。</p>
+</li>
+<li><p><strong>伪代码 (Pseudocode):</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">Function Partition(n, m)</span><br><span class="line">    if n == 1 or m == 1 then </span><br><span class="line">        return 1</span><br><span class="line">    else if n &lt; m then </span><br><span class="line">        return Partition(n, n)</span><br><span class="line">    else if n == m then </span><br><span class="line">        return 1 + Partition(n, m-1)</span><br><span class="line">    else </span><br><span class="line">        return Partition(n-m, m) + Partition(n, m-1)</span><br><span class="line">    end if</span><br><span class="line">End Function</span><br></pre></td></tr></table></figure></li>
+</ul>
+<h2 id="4-兔子繁殖问题-斐波那契数列"><a href="#4-兔子繁殖问题-斐波那契数列" class="headerlink" title="4. 兔子繁殖问题 (斐波那契数列)"></a>4. 兔子繁殖问题 (斐波那契数列)</h2><p><strong>【所属模块】</strong> 迭代算法 - 递推法</p>
+<ul>
+<li><p><strong>题目描述:</strong> 第1个月初放进去1对小兔子，兔子1个月长成，再过1个月开始每个月生1对小兔子。求第 $n$ 个月共有多少对兔子。</p>
+</li>
+<li><p><strong>核心思路 (自底向上):</strong> 从第3个月开始，当月的兔子总数等于“上个月存活的老兔子”加上“上上个月出生的具备生育能力的兔子”新生出的小兔子。</p>
+</li>
+<li><p><strong>核心递推公式:</strong></p>
+<p>$$F(n) &#x3D; F(n-1) + F(n-2) \quad (n \ge 3)$$</p>
+<p>初始状态: $F(1) &#x3D; 1, F(2) &#x3D; 1$</p>
+</li>
+<li><p><strong>时间复杂度:</strong> $O(n)$ <strong>(迭代法)</strong>。只需一个循环即可推导完成。若使用纯递归则复杂度高达 $O(2^n)$。</p>
+</li>
+<li><p><strong>伪代码 (迭代版最优解):</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">Function Fibonacci(n)</span><br><span class="line">    if n &lt;= 2 then return 1</span><br><span class="line"></span><br><span class="line">    a = 1</span><br><span class="line">    b = 1</span><br><span class="line">    for i from 3 to n do</span><br><span class="line">        temp = a + b</span><br><span class="line">        a = b</span><br><span class="line">        b = temp</span><br><span class="line">    end for</span><br><span class="line"></span><br><span class="line">    return b</span><br><span class="line">End Function</span><br></pre></td></tr></table></figure></li>
+</ul>
+<h2 id="5-小猴子吃桃问题"><a href="#5-小猴子吃桃问题" class="headerlink" title="5. 小猴子吃桃问题"></a>5. 小猴子吃桃问题</h2><p><strong>【所属模块】</strong> 迭代算法 - 倒推法</p>
+<ul>
+<li><p><strong>题目描述:</strong> 猴子第一天摘下若干个桃子，当即吃了一半，还不过瘾，又多吃了一个。第二天早上又将剩下的桃子吃掉一半，又多吃了一个。以后每天都吃了前一天剩下的一半零一个。到第 $n$ 天早上想再吃时，见只剩下一个桃子了。求第一天共摘了多少。</p>
+</li>
+<li><p><strong>核心思路 (由果索因):</strong> 已知第 $n$ 天剩 1 个。第 $i$ 天的数量是第 $i+1$ 天的数量加 1 后再乘以 2。从最后一天往前推即可。</p>
+</li>
+<li><p><strong>核心倒推公式:</strong></p>
+<p>$$x_{i} &#x3D; (x_{i+1} + 1) \times 2$$</p>
+</li>
+<li><p><strong>时间复杂度:</strong> $O(n)$。只需要一个简单的线性循环，运行 $n-1$ 次。</p>
+</li>
+<li><p><strong>伪代码 (Pseudocode):</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">Function MonkeyPeach(n)</span><br><span class="line">    peaches = 1  // 第n天的桃子数</span><br><span class="line"></span><br><span class="line">    for i from n-1 down to 1 do</span><br><span class="line">        peaches = (peaches + 1) * 2</span><br><span class="line">    end for</span><br><span class="line"></span><br><span class="line">    return peaches</span><br><span class="line">End Function</span><br></pre></td></tr></table></figure></li>
+</ul>
+<h2 id="6-车辆穿越沙漠问题-探险家问题"><a href="#6-车辆穿越沙漠问题-探险家问题" class="headerlink" title="6. 车辆穿越沙漠问题 (探险家问题)"></a>6. 车辆穿越沙漠问题 (探险家问题)</h2><p><strong>【所属模块】</strong> 迭代算法 - 倒推法</p>
+<ul>
+<li><p><strong>题目描述:</strong> 一辆汽车油箱容量为 $C$，耗油量为 1单位&#x2F;km。要穿越距离为 $D$ 的沙漠，途中没有加油站。汽车必须利用自身运油在沿途建立储油点。问：起点最少需要准备多少油？</p>
+</li>
+<li><p><strong>核心思路 (由果索因):</strong> 从<strong>终点</strong>开始往回倒推。要达到极值，汽车到达终点时油箱必须刚好耗尽。离终点越远，为了向前运油，汽车在两个储油点之间往返的趟数就越多。</p>
+</li>
+<li><p><strong>核心迭代规律:</strong> 从终点往起点数，对于第 $i$ 个<strong>完整的</strong>储油段：</p>
+<ul>
+<li>往返趟数：$Trips_i &#x3D; 2i - 1$</li>
+<li>该段距离：$d_i &#x3D; \frac{C}{2i - 1}$</li>
+<li>该点需备总油量：$F_i &#x3D; i \times C$</li>
+</ul>
+</li>
+<li><p><strong>时间复杂度:</strong> $O(K)$，其中 $K$ 为建立的储油点个数。因为 $K$ 大致与 $D&#x2F;C$ 成正比，所以也可以认为是 $O(D&#x2F;C)$。</p>
+</li>
+<li><p><strong>伪代码 (Pseudocode):</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line">Function DesertCrossing(D, C)</span><br><span class="line">    dist = C      </span><br><span class="line">    totalOil = C  </span><br><span class="line">    k = 1         </span><br><span class="line"></span><br><span class="line">    while dist &lt; D do</span><br><span class="line">        k = k + 1</span><br><span class="line">        trips = 2 * k - 1     </span><br><span class="line">        stepDist = C / trips  </span><br><span class="line"></span><br><span class="line">        if dist + stepDist &gt;= D then </span><br><span class="line">            remainDist = D - dist</span><br><span class="line">            totalOil = totalOil + remainDist * trips</span><br><span class="line">            break</span><br><span class="line">        else                  </span><br><span class="line">            dist = dist + stepDist</span><br><span class="line">            totalOil = k * C  </span><br><span class="line">        end if</span><br><span class="line">    end while</span><br><span class="line"></span><br><span class="line">    return totalOil</span><br><span class="line">End Function</span><br></pre></td></tr></table></figure></li>
+</ul>
+<h2 id="7-牛顿法解方程-Newton’s-Method"><a href="#7-牛顿法解方程-Newton’s-Method" class="headerlink" title="7. 牛顿法解方程 (Newton’s Method)"></a>7. 牛顿法解方程 (Newton’s Method)</h2><p><strong>【所属模块】</strong> 迭代算法 - 数值逼近</p>
+<ul>
+<li><p><strong>题目描述:</strong> 给定一个非线性方程 $f(x) &#x3D; 0$ 和一个初始猜测值 $x_0$，要求通过计算机迭代，求出满足精度要求 $\epsilon$ 的近似根。</p>
+</li>
+<li><p><strong>核心思路 (切线逼近):</strong> 在当前点 $(x_n, f(x_n))$ 处作函数曲线的切线，将切线与 $X$ 轴的交点作为下一个更优的猜测值 $x_{n+1}$。只要初始点选取合理且导数不为0，序列会快速收敛于真实根。</p>
+</li>
+<li><p><strong>核心迭代公式:</strong></p>
+<p>$$x_{n+1} &#x3D; x_n - \frac{f(x_n)}{f’(x_n)}$$</p>
+<p><em>(前提：</em>$f’(x_n) \neq 0$<em>)</em></p>
+</li>
+<li><p><strong>时间复杂度:</strong> <strong>二次收敛 (Quadratic Convergence)</strong>。对于单次迭代，计算复杂度为 $O(1)$。整体需要的迭代次数非常少（通常在常数级别内即可达到极高精度），大约为 $O(\log \log (1&#x2F;\epsilon))$。</p>
+</li>
+<li><p><strong>伪代码 (Pseudocode):</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">Function NewtonMethod(x0, epsilon)</span><br><span class="line">    xn = x0</span><br><span class="line">    loop</span><br><span class="line">        fx = f(xn)</span><br><span class="line">        dfx = f_prime(xn)</span><br><span class="line"></span><br><span class="line">        if dfx == 0 then return Null // 防止除以0</span><br><span class="line"></span><br><span class="line">        next_x = xn - fx / dfx</span><br><span class="line"></span><br><span class="line">        if abs(next_x - xn) &lt; epsilon then</span><br><span class="line">            return next_x</span><br><span class="line">        end if</span><br><span class="line"></span><br><span class="line">        xn = next_x  </span><br><span class="line">    end loop</span><br><span class="line">End Function</span><br></pre></td></tr></table></figure></li>
+</ul>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="http://example.com/2026/03/30/%E7%AE%97%E6%B3%95%E8%AE%BE%E8%AE%A1%E6%B5%8B%E8%AF%95%E9%A2%98-%E5%BE%AA%E7%8E%AF%E5%92%8C%E9%80%92%E5%BD%92/" data-id="cuidKX4uz-712i8xhd2YEQN7u" data-title="算法设计测试题-循环和递归" class="article-share-link"><span class="fa fa-share">Share</span></a>
+      
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E7%AE%97%E6%B3%95/" rel="tag">算法</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E8%BF%AD%E4%BB%A3/" rel="tag">迭代</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E9%80%92%E5%BD%92/" rel="tag">递归</a></li></ul>
+
+    </footer>
+  </div>
+  
+    
+<nav id="article-nav">
+  
+  
+    <a href="/2026/03/30/%E6%B3%9B%E5%9E%8B-%E8%A1%A5%E5%85%85/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">Older</strong>
+      <div class="article-nav-title">泛型-补充</div>
+    </a>
+  
+</nav>
+
+  
+</article>
+
+
+</section>
+        
+          <aside id="sidebar">
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Categories</h3>
+    <div class="widget">
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/%E6%AF%8F%E5%91%A8%E8%AE%A1%E5%88%92/">每周计划</a></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Tags</h3>
+    <div class="widget">
+      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Java/" rel="tag">Java</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/JavaSE/" rel="tag">JavaSE</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%9F%BA%E6%9C%AC%E8%AF%AD%E6%B3%95/" rel="tag">基本语法</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%BA%95%E5%B1%82%E5%8E%9F%E7%90%86/" rel="tag">底层原理</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%8E%92%E5%BA%8F/" rel="tag">排序</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%A0%B8%E5%BF%83%E8%BF%9B%E9%98%B6/" rel="tag">核心进阶</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%AE%97%E6%B3%95/" rel="tag">算法</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%8B%B1%E8%AF%AD/" rel="tag">英语</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%AE%A1%E5%88%92/" rel="tag">计划</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%BF%AD%E4%BB%A3/" rel="tag">迭代</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E9%80%92%E5%BD%92/" rel="tag">递归</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E9%98%85%E8%AF%BB/" rel="tag">阅读</a></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Tag Cloud</h3>
+    <div class="widget tagcloud">
+      <a href="/tags/Java/" style="font-size: 10px;">Java</a> <a href="/tags/JavaSE/" style="font-size: 20px;">JavaSE</a> <a href="/tags/%E5%9F%BA%E6%9C%AC%E8%AF%AD%E6%B3%95/" style="font-size: 20px;">基本语法</a> <a href="/tags/%E5%BA%95%E5%B1%82%E5%8E%9F%E7%90%86/" style="font-size: 10px;">底层原理</a> <a href="/tags/%E6%8E%92%E5%BA%8F/" style="font-size: 10px;">排序</a> <a href="/tags/%E6%A0%B8%E5%BF%83%E8%BF%9B%E9%98%B6/" style="font-size: 10px;">核心进阶</a> <a href="/tags/%E7%AE%97%E6%B3%95/" style="font-size: 20px;">算法</a> <a href="/tags/%E8%8B%B1%E8%AF%AD/" style="font-size: 20px;">英语</a> <a href="/tags/%E8%AE%A1%E5%88%92/" style="font-size: 10px;">计划</a> <a href="/tags/%E8%BF%AD%E4%BB%A3/" style="font-size: 10px;">迭代</a> <a href="/tags/%E9%80%92%E5%BD%92/" style="font-size: 10px;">递归</a> <a href="/tags/%E9%98%85%E8%AF%BB/" style="font-size: 20px;">阅读</a>
+    </div>
+  </div>
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Archives</h3>
+    <div class="widget">
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2026/03/">March 2026</a></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Recent Posts</h3>
+    <div class="widget">
+      <ul>
+        
+          <li>
+            <a href="/2026/03/30/%E7%AE%97%E6%B3%95%E8%AE%BE%E8%AE%A1%E6%B5%8B%E8%AF%95%E9%A2%98-%E5%BE%AA%E7%8E%AF%E5%92%8C%E9%80%92%E5%BD%92/">算法设计测试题-循环和递归</a>
+          </li>
+        
+          <li>
+            <a href="/2026/03/30/%E6%B3%9B%E5%9E%8B-%E8%A1%A5%E5%85%85/">泛型-补充</a>
+          </li>
+        
+          <li>
+            <a href="/2026/03/30/%E8%8B%B1%E8%AF%AD%E9%98%85%E8%AF%BB-25-12-Two/">(no title)</a>
+          </li>
+        
+          <li>
+            <a href="/2026/03/30/%E8%8B%B1%E8%AF%AD%E9%98%85%E8%AF%BB-25-12-One/">(no title)</a>
+          </li>
+        
+          <li>
+            <a href="/2026/03/30/%E8%8B%B1%E8%AF%AD%E9%98%85%E8%AF%BB-25-12-new/">(no title)</a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+
+  
+</aside>
+        
+      </div>
+      <footer id="footer">
+  
+  <div class="outer">
+    <div id="footer-info" class="inner">
+      
+      &copy; 2026 John Doe<br>
+      Powered by <a href="https://hexo.io/" target="_blank">Hexo</a>
+    </div>
+  </div>
+</footer>
+
+    </div>
+    <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/archives" class="mobile-nav-link">Archives</a>
+  
+    <a href="/categories/%E6%AF%8F%E5%91%A8%E8%AE%A1%E5%88%92/" class="mobile-nav-link">Weekly</a>
+  
+</nav>
+    
+
+
+<script src="/js/jquery-3.6.4.min.js"></script>
+
+
+
+  
+<script src="/fancybox/jquery.fancybox.min.js"></script>
+
+
+
+
+<script src="/js/script.js"></script>
+
+
+
+
+
+  </div>
+</body>
+</html>
