@@ -95,7 +95,69 @@
     
     <div class="e-content article-entry" itemprop="articleBody">
       
-        
+        <h1 id="泛型：从基础到核心底层逻辑"><a href="#泛型：从基础到核心底层逻辑" class="headerlink" title="泛型：从基础到核心底层逻辑"></a>泛型：从基础到核心底层逻辑</h1><h2 id="一、-为什么引入泛型？（解决的痛点）"><a href="#一、-为什么引入泛型？（解决的痛点）" class="headerlink" title="一、 为什么引入泛型？（解决的痛点）"></a>一、 为什么引入泛型？（解决的痛点）</h2><p>在没有泛型的时代，集合默认利用多态存入任意 <code>Object</code> 类型数据，面临两大困境：</p>
+<ol>
+<li><strong>类型不安全（隐蔽的运行时地雷）：</strong> 存入时不检查类型（混入异类元素），直到运行时强转才会抛出 <code>ClassCastException</code> 异常。<strong>泛型提供了一种编译时的严格约束机制。</strong></li>
+<li><strong>繁琐的向下转型：</strong> 遍历取出元素统一返回 <code>Object</code>，需要手动进行强转。<strong>泛型提供了自动转型的机制。</strong></li>
+</ol>
+<h2 id="二、-泛型的基本语法（自定义泛型体系）"><a href="#二、-泛型的基本语法（自定义泛型体系）" class="headerlink" title="二、 泛型的基本语法（自定义泛型体系）"></a>二、 泛型的基本语法（自定义泛型体系）</h2><p>泛型不仅限于使用别人（如集合框架）写好的，我们还可以自定义泛型。泛型标识符约定俗成：<code>T</code> (Type), <code>E</code> (Element), <code>K</code> (Key), <code>V</code> (Value)。</p>
+<h3 id="1-自定义泛型类与接口"><a href="#1-自定义泛型类与接口" class="headerlink" title="1. 自定义泛型类与接口"></a>1. 自定义泛型类与接口</h3><p>在类名或接口名后面声明 <code>&lt;T&gt;</code>，相当于声明了一个“类型占位符”。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">// 自定义泛型接口</span><br><span class="line">public interface DataHandler&lt;T&gt; &#123;</span><br><span class="line">    void handle(T data);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">// 自定义泛型类</span><br><span class="line">public class MyBox&lt;T&gt; &#123;</span><br><span class="line">    private T item;</span><br><span class="line">    public void setItem(T item) &#123; this.item = item; &#125;</span><br><span class="line">    public T getItem() &#123; return this.item; &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="2-自定义泛型方法"><a href="#2-自定义泛型方法" class="headerlink" title="2. 自定义泛型方法"></a>2. 自定义泛型方法</h3><p><strong>注意：</strong> 类的泛型 <code>&lt;T&gt;</code> 无法在静态方法中使用（因为泛型是对象实例化时确定的，而静态成员在类加载时就初始化了）。 解决办法是：<strong>让方法自己拥有独立的泛型。</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">public class Util &#123;</span><br><span class="line">    // 泛型标识符 &lt;E&gt; 必须放在修饰符之后，返回值之前！</span><br><span class="line">    public static &lt;E&gt; void printArray(E[] array) &#123;</span><br><span class="line">        for (E element : array) &#123;</span><br><span class="line">            System.out.println(element);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="三、-核心心法：声明、实例化与多态的本质"><a href="#三、-核心心法：声明、实例化与多态的本质" class="headerlink" title="三、 核心心法：声明、实例化与多态的本质"></a>三、 核心心法：声明、实例化与多态的本质</h2><p>这是理解泛型最关键的底层逻辑。当我们在写下 <code>A a = new B();</code> 这样的代码时，必须遵守以下铁律：</p>
+<h3 id="1-“各司其职”法则（能不能加-谁说了算？）"><a href="#1-“各司其职”法则（能不能加-谁说了算？）" class="headerlink" title="1. “各司其职”法则（能不能加 &lt;&gt; 谁说了算？）"></a>1. “各司其职”法则（能不能加 <code>&lt;&gt;</code> 谁说了算？）</h3><ul>
+<li><strong>等号左边（声明）：</strong> 能不能写 <code>&lt;&gt;</code>，完全取决于<strong>左边类&#x2F;接口自身的源码</strong>中是否定义了泛型。</li>
+<li><strong>等号右边（实例化）：</strong> 能不能写 <code>&lt;&gt;</code>，完全取决于<strong>右边被 new 的类自身的源码</strong>中是否定义了泛型。</li>
+</ul>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">// 父类 Parent 没有泛型，子类 Child&lt;T&gt; 有泛型</span><br><span class="line">Parent p = new Child&lt;String&gt;(&quot;Hello&quot;);         // ✅ 正确，多态（但会丢失泛型特有方法）</span><br><span class="line">// Parent&lt;String&gt; p = new Child&lt;String&gt;(&quot;...&quot;);// ❌ 报错！Parent源码没泛型，绝对不能加&lt;&gt;</span><br></pre></td></tr></table></figure>
+
+<h3 id="2-非多态场景-vs-多态场景"><a href="#2-非多态场景-vs-多态场景" class="headerlink" title="2. 非多态场景 vs 多态场景"></a>2. 非多态场景 vs 多态场景</h3><ul>
+<li><strong>非多态场景（同类实例化）：</strong> 左右两边类型一致即可。 <code>ArrayList&lt;String&gt; list = new ArrayList&lt;String&gt;();</code> （JDK7后右边可简写为 <code>&lt;&gt;</code>，由左边推导）</li>
+<li><strong>多态场景（父类引用指向子类对象）：</strong> 如果父类和子类通过继承&#x2F;实现传递了泛型，<strong>等号左右两边的泛型类型必须 100% 严格一致</strong>。泛型本身不具备多态性！ <code>List&lt;String&gt; list = new ArrayList&lt;String&gt;();</code> &#x2F;&#x2F; ✅ 正确 <code>List&lt;Object&gt; list = new ArrayList&lt;String&gt;();</code> &#x2F;&#x2F; ❌ 报错！为了防止存入 Integer 污染 String 集合。</li>
+</ul>
+<h2 id="四、-泛型在继承与实现中的传递（泛型接力赛）"><a href="#四、-泛型在继承与实现中的传递（泛型接力赛）" class="headerlink" title="四、 泛型在继承与实现中的传递（泛型接力赛）"></a>四、 泛型在继承与实现中的传递（泛型接力赛）</h2><p>当子类继承泛型父类或实现泛型接口时，父类的泛型到底怎么确定？有两种核心模式：</p>
+<h3 id="模式一：子类直接“写死”父类泛型"><a href="#模式一：子类直接“写死”父类泛型" class="headerlink" title="模式一：子类直接“写死”父类泛型"></a>模式一：子类直接“写死”父类泛型</h3><p>子类在定义时，直接明确告诉父类泛型是什么。此时子类通常不再需要保留泛型。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">// 子类直接指定父接口的泛型为 String</span><br><span class="line">class StringHandler implements DataHandler&lt;String&gt; &#123;</span><br><span class="line">    @Override</span><br><span class="line">    public void handle(String data) &#123; ... &#125; // 重写时，参数自动确定为 String</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">// 多态调用：左边 DataHandler 源码有 &lt;T&gt;，右边 StringHandler 源码把父类 T 定死了</span><br><span class="line">DataHandler&lt;String&gt; handler = new StringHandler(); </span><br></pre></td></tr></table></figure>
+
+<h3 id="模式二：子类继续传递（泛型接力）"><a href="#模式二：子类继续传递（泛型接力）" class="headerlink" title="模式二：子类继续传递（泛型接力）"></a>模式二：子类继续传递（泛型接力）</h3><p>子类自己也不知道具体类型，就必须自己也定义一个同名的泛型，用来接收使用者的指定，并传递给父类。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">// 必须写成 class ArrayList&lt;E&gt;，用这个 &lt;E&gt; 去接力 implements List&lt;E&gt;</span><br><span class="line">class MyList&lt;E&gt; extends ArrayList&lt;E&gt; &#123; &#125;</span><br><span class="line"></span><br><span class="line">// 使用时，使用者传入的 Integer 通过 MyList 传给 ArrayList，再传给 List</span><br><span class="line">List&lt;Integer&gt; list = new MyList&lt;Integer&gt;(); </span><br></pre></td></tr></table></figure>
+
+<h2 id="五、-泛型通配符（高级多态与-PECS-原则）"><a href="#五、-泛型通配符（高级多态与-PECS-原则）" class="headerlink" title="五、 泛型通配符（高级多态与 PECS 原则）"></a>五、 泛型通配符（高级多态与 PECS 原则）</h2><p>因为泛型本身没有多态性（<code>List&lt;String&gt;</code> 不能赋给 <code>List&lt;Object&gt;</code>），这就导致某些方法参数极其死板。为了让方法既能接收装 Integer 的集合，又能接收装 Double 的集合，引入了通配符 <code>?</code>。</p>
+<p><strong>注意：通配符通常只用于声明引用（特别是方法的形参），不能用于实例化（new 的时候不能用 ?）。</strong></p>
+<h3 id="1-无界通配符"><a href="#1-无界通配符" class="headerlink" title="1. 无界通配符 &lt;?&gt;"></a>1. 无界通配符 <code>&lt;?&gt;</code></h3><p>表示可以接收任意泛型类型的集合。<code>List&lt;?&gt;</code> 是所有泛型 List 的父引用。</p>
+<ul>
+<li><strong>代价：</strong> 只能读取（读出来是 Object），<strong>绝对禁止写入</strong>（除了 null），因为编译器不知道里面到底是什么类型的盘子。</li>
+</ul>
+<h3 id="2-上限通配符-Covariance"><a href="#2-上限通配符-Covariance" class="headerlink" title="2. 上限通配符 &lt;? extends 父类&gt; (Covariance)"></a>2. 上限通配符 <code>&lt;? extends 父类&gt;</code> (Covariance)</h3><p>限制传入的实参泛型，必须是指定类型<strong>及其子类</strong>。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">// 可以传入 List&lt;Number&gt;, List&lt;Integer&gt;, List&lt;Double&gt;</span><br><span class="line">public void process(List&lt;? extends Number&gt; list) &#123; ... &#125;</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><strong>特点：可读不可写。</strong> 你确信取出来的东西一定是 Number，但你不能往里面添加数据（因为如果实际传入的是 <code>List&lt;Double&gt;</code>，你往里添 <code>Integer</code> 就崩溃了）。</li>
+</ul>
+<h3 id="3-下限通配符-Contravariance"><a href="#3-下限通配符-Contravariance" class="headerlink" title="3. 下限通配符 &lt;? super 子类&gt; (Contravariance)"></a>3. 下限通配符 <code>&lt;? super 子类&gt;</code> (Contravariance)</h3><p>限制传入的实参泛型，必须是指定类型<strong>及其父类</strong>。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">// 可以传入 List&lt;Integer&gt;, List&lt;Number&gt;, List&lt;Object&gt;</span><br><span class="line">public void addData(List&lt;? super Integer&gt; list) &#123; ... &#125;</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><strong>特点：可写不可读。</strong> 你可以安全地往里面添加 <code>Integer</code>（或其子类），因为不管传入的是哪种父类集合，装 Integer 绝对安全。但读取出来只能用 <code>Object</code> 接收。</li>
+</ul>
+<h3 id="💡-终极口诀：PECS-Producer-Extends-Consumer-Super"><a href="#💡-终极口诀：PECS-Producer-Extends-Consumer-Super" class="headerlink" title="💡 终极口诀：PECS (Producer Extends, Consumer Super)"></a>💡 终极口诀：PECS (Producer Extends, Consumer Super)</h3><ul>
+<li><strong>如果你需要一个提供数据的容器（生产者 Producer）：</strong> 使用 <code>? extends T</code>（只能往外读）。</li>
+<li><strong>如果你需要一个接收数据的容器（消费者 Consumer）：</strong> 使用 <code>? super T</code>（只能往里写）。</li>
+</ul>
+<p><em>结合多态的终极校验机制：</em> 当形参是 <code>List&lt;? extends Number&gt;</code>，实参传入自定义子类 <code>MyList&lt;Integer&gt;</code> 时，编译器会顺着继承族谱，验证 <code>MyList</code> 传递给 <code>List</code> 的那个泛型（<code>Integer</code>）是否满足 <code>extends Number</code> 的约束。满足则通过，不满足则报错。</p>
+<h2 id="六、-底层原理：类型擦除（Type-Erasure）"><a href="#六、-底层原理：类型擦除（Type-Erasure）" class="headerlink" title="六、 底层原理：类型擦除（Type Erasure）"></a>六、 底层原理：类型擦除（Type Erasure）</h2><p>泛型是<strong>源代码（编译器）层面的语法糖</strong>。在 JVM 虚拟机内存中，<strong>根本不存在泛型</strong>。过程分为三段：</p>
+<ol>
+<li><strong>编译期严格安检：</strong> 编译器根据指定的泛型信息进行类型核对，不符则报错。</li>
+<li><strong>卸下伪装（类型擦除）：</strong> 一旦检查通过生成字节码前，编译器会抹去所有的 <code>&lt;T&gt;</code>。将内部类型统一替换为 <code>Object</code>（如果有上限限定如 <code>&lt;T extends Number&gt;</code>，则替换为 <code>Number</code>）。</li>
+<li><strong>悄悄补全向下转型：</strong> 既然底层全变成了 <code>Object</code>，编译器会在调用 <code>get()</code> 等获取数据的方法处，<strong>自动补上一条强制类型转换的字节码指令</strong>。</li>
+</ol>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">// 【我们写的代码】</span><br><span class="line">MyBox&lt;String&gt; box = new MyBox&lt;&gt;();</span><br><span class="line">box.setItem(&quot;Hello&quot;);</span><br><span class="line">String text = box.getItem();</span><br><span class="line"></span><br><span class="line">// 【编译后的真实字节码逻辑】</span><br><span class="line">MyBox box = new MyBox();       // 泛型被擦除了</span><br><span class="line">box.setItem(&quot;Hello&quot;);          // 底层当做 Object 存入</span><br><span class="line">String text = (String) box.getItem(); // 编译器自动补全强制转换</span><br></pre></td></tr></table></figure>
+
+<p><strong>历史原因：</strong> 采用类型擦除是为了“向下兼容”，让 JDK 1.5 引入的泛型代码能够与以前的非泛型老代码在同一个 JVM 上完美混用。这也导致了 Java 泛型不能使用基本数据类型（如 <code>int</code> 不能强转为 <code>Object</code>，必须用 <code>Integer</code>）。</p>
+
       
     </div>
     <footer class="article-footer">
@@ -103,6 +165,8 @@
       
       
       
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/JavaSE/" rel="tag">JavaSE</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%9F%BA%E6%9C%AC%E8%AF%AD%E6%B3%95/" rel="tag">基本语法</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%BA%95%E5%B1%82%E5%8E%9F%E7%90%86/" rel="tag">底层原理</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E6%A0%B8%E5%BF%83%E8%BF%9B%E9%98%B6/" rel="tag">核心进阶</a></li></ul>
+
     </footer>
   </div>
   
@@ -1148,7 +1212,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">Tags</h3>
     <div class="widget">
-      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Java/" rel="tag">Java</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/JavaSE/" rel="tag">JavaSE</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%9F%BA%E6%9C%AC%E8%AF%AD%E6%B3%95/" rel="tag">基本语法</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%8E%92%E5%BA%8F/" rel="tag">排序</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%AE%97%E6%B3%95/" rel="tag">算法</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%8B%B1%E8%AF%AD/" rel="tag">英语</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%AE%A1%E5%88%92/" rel="tag">计划</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E9%98%85%E8%AF%BB/" rel="tag">阅读</a></li></ul>
+      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Java/" rel="tag">Java</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/JavaSE/" rel="tag">JavaSE</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%9F%BA%E6%9C%AC%E8%AF%AD%E6%B3%95/" rel="tag">基本语法</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%BA%95%E5%B1%82%E5%8E%9F%E7%90%86/" rel="tag">底层原理</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%8E%92%E5%BA%8F/" rel="tag">排序</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%A0%B8%E5%BF%83%E8%BF%9B%E9%98%B6/" rel="tag">核心进阶</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%AE%97%E6%B3%95/" rel="tag">算法</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%8B%B1%E8%AF%AD/" rel="tag">英语</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%AE%A1%E5%88%92/" rel="tag">计划</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E9%98%85%E8%AF%BB/" rel="tag">阅读</a></li></ul>
     </div>
   </div>
 
@@ -1158,7 +1222,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">Tag Cloud</h3>
     <div class="widget tagcloud">
-      <a href="/tags/Java/" style="font-size: 10px;">Java</a> <a href="/tags/JavaSE/" style="font-size: 10px;">JavaSE</a> <a href="/tags/%E5%9F%BA%E6%9C%AC%E8%AF%AD%E6%B3%95/" style="font-size: 10px;">基本语法</a> <a href="/tags/%E6%8E%92%E5%BA%8F/" style="font-size: 10px;">排序</a> <a href="/tags/%E7%AE%97%E6%B3%95/" style="font-size: 10px;">算法</a> <a href="/tags/%E8%8B%B1%E8%AF%AD/" style="font-size: 20px;">英语</a> <a href="/tags/%E8%AE%A1%E5%88%92/" style="font-size: 10px;">计划</a> <a href="/tags/%E9%98%85%E8%AF%BB/" style="font-size: 20px;">阅读</a>
+      <a href="/tags/Java/" style="font-size: 10px;">Java</a> <a href="/tags/JavaSE/" style="font-size: 20px;">JavaSE</a> <a href="/tags/%E5%9F%BA%E6%9C%AC%E8%AF%AD%E6%B3%95/" style="font-size: 20px;">基本语法</a> <a href="/tags/%E5%BA%95%E5%B1%82%E5%8E%9F%E7%90%86/" style="font-size: 10px;">底层原理</a> <a href="/tags/%E6%8E%92%E5%BA%8F/" style="font-size: 10px;">排序</a> <a href="/tags/%E6%A0%B8%E5%BF%83%E8%BF%9B%E9%98%B6/" style="font-size: 10px;">核心进阶</a> <a href="/tags/%E7%AE%97%E6%B3%95/" style="font-size: 10px;">算法</a> <a href="/tags/%E8%8B%B1%E8%AF%AD/" style="font-size: 20px;">英语</a> <a href="/tags/%E8%AE%A1%E5%88%92/" style="font-size: 10px;">计划</a> <a href="/tags/%E9%98%85%E8%AF%BB/" style="font-size: 20px;">阅读</a>
     </div>
   </div>
 
