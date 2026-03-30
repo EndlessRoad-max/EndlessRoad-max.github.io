@@ -118,14 +118,22 @@
 <li><strong>非多态场景（同类实例化）：</strong> 左右两边类型一致即可。 <code>ArrayList&lt;String&gt; list = new ArrayList&lt;String&gt;();</code> （JDK7后右边可简写为 <code>&lt;&gt;</code>，由左边推导）</li>
 <li><strong>多态场景（父类引用指向子类对象）：</strong> 如果父类和子类通过继承&#x2F;实现传递了泛型，<strong>等号左右两边的泛型类型必须 100% 严格一致</strong>。泛型本身不具备多态性！ <code>List&lt;String&gt; list = new ArrayList&lt;String&gt;();</code> &#x2F;&#x2F; ✅ 正确 <code>List&lt;Object&gt; list = new ArrayList&lt;String&gt;();</code> &#x2F;&#x2F; ❌ 报错！为了防止存入 Integer 污染 String 集合。</li>
 </ul>
-<h2 id="四、-泛型在继承与实现中的传递（泛型接力赛）"><a href="#四、-泛型在继承与实现中的传递（泛型接力赛）" class="headerlink" title="四、 泛型在继承与实现中的传递（泛型接力赛）"></a>四、 泛型在继承与实现中的传递（泛型接力赛）</h2><p>当子类继承泛型父类或实现泛型接口时，父类的泛型到底怎么确定？有两种核心模式：</p>
+<h2 id="四、-终极辨析：泛型没有多态-vs-元素具有多态（核心易混点）"><a href="#四、-终极辨析：泛型没有多态-vs-元素具有多态（核心易混点）" class="headerlink" title="四、 终极辨析：泛型没有多态 vs 元素具有多态（核心易混点）"></a>四、 终极辨析：泛型没有多态 vs 元素具有多态（核心易混点）</h2><p>泛型的本质，是对类中底层的 <code>Object</code> 引用加上了<strong>死约束</strong>。必须严格区分“容器（泛型）”和“元素（对象）”的区别：</p>
+<p><strong>1. 泛型之间不存在多态（容器的死约束）</strong> 哪怕 <code>Dog</code> 是 <code>Animal</code> 的子类，<code>ArrayList&lt;Dog&gt;</code> 也绝对不是 <code>ArrayList&lt;Animal&gt;</code> 的子类。同一个类，戴上不同的泛型“帽子”后，它们之间就彻底隔离了，引用绝对不能互相指向。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">// ❌ 编译报错！泛型之间没有继承关系，不存在多态。</span><br><span class="line">ArrayList&lt;Animal&gt; list1 = new ArrayList&lt;Dog&gt;(); </span><br></pre></td></tr></table></figure>
+
+<p><strong>2. 泛型指定的类型具有多态（元素的活运用）</strong> 当一个泛型对象实例化后，它底层的泛型变成了具体的类型（比如 <code>Animal</code>）。此时，泛型约束的是“这个容器只能装 Animal 级别及以下的东西”。这个时候，<strong>面向对象本身的多态性依然完美生效</strong>，你可以安全地把子类对象扔进去。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">// ✅ 完美运行！容器是 Animal 专属，但存入的元素可以是 Animal 的子类（类本身的多态）。</span><br><span class="line">ArrayList&lt;Animal&gt; list2 = new ArrayList&lt;Animal&gt;();</span><br><span class="line">list2.add(new Animal());</span><br><span class="line">list2.add(new Dog()); </span><br><span class="line">list2.add(new Cat()); </span><br></pre></td></tr></table></figure>
+
+<p><strong>一句话总结：泛型卡死了“容器”必须一模一样，但“容器里面装的东西”完全可以享受类的多态！</strong></p>
+<h2 id="五、-泛型在继承与实现中的传递（泛型接力赛）"><a href="#五、-泛型在继承与实现中的传递（泛型接力赛）" class="headerlink" title="五、 泛型在继承与实现中的传递（泛型接力赛）"></a>五、 泛型在继承与实现中的传递（泛型接力赛）</h2><p>当子类继承泛型父类或实现泛型接口时，父类的泛型到底怎么确定？有两种核心模式：</p>
 <h3 id="模式一：子类直接“写死”父类泛型"><a href="#模式一：子类直接“写死”父类泛型" class="headerlink" title="模式一：子类直接“写死”父类泛型"></a>模式一：子类直接“写死”父类泛型</h3><p>子类在定义时，直接明确告诉父类泛型是什么。此时子类通常不再需要保留泛型。</p>
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">// 子类直接指定父接口的泛型为 String</span><br><span class="line">class StringHandler implements DataHandler&lt;String&gt; &#123;</span><br><span class="line">    @Override</span><br><span class="line">    public void handle(String data) &#123; ... &#125; // 重写时，参数自动确定为 String</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">// 多态调用：左边 DataHandler 源码有 &lt;T&gt;，右边 StringHandler 源码把父类 T 定死了</span><br><span class="line">DataHandler&lt;String&gt; handler = new StringHandler(); </span><br></pre></td></tr></table></figure>
 
 <h3 id="模式二：子类继续传递（泛型接力）"><a href="#模式二：子类继续传递（泛型接力）" class="headerlink" title="模式二：子类继续传递（泛型接力）"></a>模式二：子类继续传递（泛型接力）</h3><p>子类自己也不知道具体类型，就必须自己也定义一个同名的泛型，用来接收使用者的指定，并传递给父类。</p>
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">// 必须写成 class ArrayList&lt;E&gt;，用这个 &lt;E&gt; 去接力 implements List&lt;E&gt;</span><br><span class="line">class MyList&lt;E&gt; extends ArrayList&lt;E&gt; &#123; &#125;</span><br><span class="line"></span><br><span class="line">// 使用时，使用者传入的 Integer 通过 MyList 传给 ArrayList，再传给 List</span><br><span class="line">List&lt;Integer&gt; list = new MyList&lt;Integer&gt;(); </span><br></pre></td></tr></table></figure>
 
-<h2 id="五、-泛型通配符（高级多态与-PECS-原则）"><a href="#五、-泛型通配符（高级多态与-PECS-原则）" class="headerlink" title="五、 泛型通配符（高级多态与 PECS 原则）"></a>五、 泛型通配符（高级多态与 PECS 原则）</h2><p>因为泛型本身没有多态性（<code>List&lt;String&gt;</code> 不能赋给 <code>List&lt;Object&gt;</code>），这就导致某些方法参数极其死板。为了让方法既能接收装 Integer 的集合，又能接收装 Double 的集合，引入了通配符 <code>?</code>。</p>
+<h2 id="六、-泛型通配符（高级多态与-PECS-原则）"><a href="#六、-泛型通配符（高级多态与-PECS-原则）" class="headerlink" title="六、 泛型通配符（高级多态与 PECS 原则）"></a>六、 泛型通配符（高级多态与 PECS 原则）</h2><p>因为泛型本身没有多态性（<code>List&lt;String&gt;</code> 不能赋给 <code>List&lt;Object&gt;</code>），这就导致某些方法参数极其死板。为了让方法既能接收装 Integer 的集合，又能接收装 Double 的集合，引入了通配符 <code>?</code>。</p>
 <p><strong>注意：通配符通常只用于声明引用（特别是方法的形参），不能用于实例化（new 的时候不能用 ?）。</strong></p>
 <h3 id="1-无界通配符"><a href="#1-无界通配符" class="headerlink" title="1. 无界通配符 &lt;?&gt;"></a>1. 无界通配符 <code>&lt;?&gt;</code></h3><p>表示可以接收任意泛型类型的集合。<code>List&lt;?&gt;</code> 是所有泛型 List 的父引用。</p>
 <ul>
@@ -148,7 +156,7 @@
 <li><strong>如果你需要一个接收数据的容器（消费者 Consumer）：</strong> 使用 <code>? super T</code>（只能往里写）。</li>
 </ul>
 <p><em>结合多态的终极校验机制：</em> 当形参是 <code>List&lt;? extends Number&gt;</code>，实参传入自定义子类 <code>MyList&lt;Integer&gt;</code> 时，编译器会顺着继承族谱，验证 <code>MyList</code> 传递给 <code>List</code> 的那个泛型（<code>Integer</code>）是否满足 <code>extends Number</code> 的约束。满足则通过，不满足则报错。</p>
-<h2 id="六、-底层原理：类型擦除（Type-Erasure）"><a href="#六、-底层原理：类型擦除（Type-Erasure）" class="headerlink" title="六、 底层原理：类型擦除（Type Erasure）"></a>六、 底层原理：类型擦除（Type Erasure）</h2><p>泛型是<strong>源代码（编译器）层面的语法糖</strong>。在 JVM 虚拟机内存中，<strong>根本不存在泛型</strong>。过程分为三段：</p>
+<h2 id="七、-底层原理：类型擦除（Type-Erasure）"><a href="#七、-底层原理：类型擦除（Type-Erasure）" class="headerlink" title="七、 底层原理：类型擦除（Type Erasure）"></a>七、 底层原理：类型擦除（Type Erasure）</h2><p>泛型是<strong>源代码（编译器）层面的语法糖</strong>。在 JVM 虚拟机内存中，<strong>根本不存在泛型</strong>。过程分为三段：</p>
 <ol>
 <li><strong>编译期严格安检：</strong> 编译器根据指定的泛型信息进行类型核对，不符则报错。</li>
 <li><strong>卸下伪装（类型擦除）：</strong> 一旦检查通过生成字节码前，编译器会抹去所有的 <code>&lt;T&gt;</code>。将内部类型统一替换为 <code>Object</code>（如果有上限限定如 <code>&lt;T extends Number&gt;</code>，则替换为 <code>Number</code>）。</li>
