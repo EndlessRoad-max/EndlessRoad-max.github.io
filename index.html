@@ -185,6 +185,74 @@ mjx-container[display="true"] + br {
       <div class="outer">
         <section id="main">
   
+    <article id="post-Java-GUI-绘图底层原理与代码实战" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
+  <div class="article-meta">
+    <a href="/2026/04/01/Java-GUI-%E7%BB%98%E5%9B%BE%E5%BA%95%E5%B1%82%E5%8E%9F%E7%90%86%E4%B8%8E%E4%BB%A3%E7%A0%81%E5%AE%9E%E6%88%98/" class="article-date">
+  <time class="dt-published" datetime="2026-04-01T08:05:10.000Z" itemprop="datePublished">2026-04-01</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="p-name article-title" href="/2026/04/01/Java-GUI-%E7%BB%98%E5%9B%BE%E5%BA%95%E5%B1%82%E5%8E%9F%E7%90%86%E4%B8%8E%E4%BB%A3%E7%A0%81%E5%AE%9E%E6%88%98/">Java GUI 绘图底层原理与代码实战</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="e-content article-entry" itemprop="articleBody">
+      
+        <h1 id="Java-GUI-绘图：从原理到实战"><a href="#Java-GUI-绘图：从原理到实战" class="headerlink" title="Java GUI 绘图：从原理到实战"></a>Java GUI 绘图：从原理到实战</h1><h2 id="一、-快速开始：标准绘图模板"><a href="#一、-快速开始：标准绘图模板" class="headerlink" title="一、 快速开始：标准绘图模板"></a>一、 快速开始：标准绘图模板</h2><p>在 Java 中，绘图通常需要一个“舞台”（JFrame）和一个“画布”（JPanel）。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> javax.swing.*;</span><br><span class="line"><span class="keyword">import</span> java.awt.*;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">DrawApp</span> <span class="keyword">extends</span> <span class="title class_">JFrame</span> &#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="title function_">DrawApp</span><span class="params">()</span> &#123;</span><br><span class="line">        <span class="built_in">this</span>.add(<span class="keyword">new</span> <span class="title class_">MyPanel</span>()); <span class="comment">// 添加自定义画布</span></span><br><span class="line">        <span class="built_in">this</span>.setSize(<span class="number">400</span>, <span class="number">300</span>);   <span class="comment">// 设置窗口大小</span></span><br><span class="line">        <span class="built_in">this</span>.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);</span><br><span class="line">        <span class="built_in">this</span>.setVisible(<span class="literal">true</span>);    <span class="comment">// 显示窗口，触发 paint 钩子</span></span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">main</span><span class="params">(String[] args)</span> &#123; <span class="keyword">new</span> <span class="title class_">DrawApp</span>(); &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">MyPanel</span> <span class="keyword">extends</span> <span class="title class_">JPanel</span> &#123;</span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">paint</span><span class="params">(Graphics g)</span> &#123;</span><br><span class="line">        <span class="built_in">super</span>.paint(g); <span class="comment">// 1. 必须调用，清理旧画面</span></span><br><span class="line">        <span class="comment">// 2. 在这里写绘图逻辑...</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h2 id="二、-核心操作代码清单-Cheat-Sheet"><a href="#二、-核心操作代码清单-Cheat-Sheet" class="headerlink" title="二、 核心操作代码清单 (Cheat Sheet)"></a>二、 核心操作代码清单 (Cheat Sheet)</h2><h3 id="1-基础图形绘制"><a href="#1-基础图形绘制" class="headerlink" title="1. 基础图形绘制"></a>1. 基础图形绘制</h3><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">g.drawLine(<span class="number">10</span>, <span class="number">10</span>, <span class="number">50</span>, <span class="number">50</span>);      <span class="comment">// 画直线 (x1, y1) -&gt; (x2, y2)</span></span><br><span class="line">g.drawRect(<span class="number">10</span>, <span class="number">60</span>, <span class="number">40</span>, <span class="number">30</span>);      <span class="comment">// 画矩形框 (x, y, 宽, 高)</span></span><br><span class="line">g.drawOval(<span class="number">10</span>, <span class="number">110</span>, <span class="number">50</span>, <span class="number">50</span>);     <span class="comment">// 画圆/椭圆 (外接矩形坐标)</span></span><br></pre></td></tr></table></figure>
+<h3 id="2-颜色与填充"><a href="#2-颜色与填充" class="headerlink" title="2. 颜色与填充"></a>2. 颜色与填充</h3><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">g.setColor(Color.BLUE);          <span class="comment">// 设置画笔为蓝色</span></span><br><span class="line">g.fillRect(<span class="number">80</span>, <span class="number">60</span>, <span class="number">40</span>, <span class="number">30</span>);      <span class="comment">// 填充矩形</span></span><br><span class="line">g.fillOval(<span class="number">80</span>, <span class="number">110</span>, <span class="number">50</span>, <span class="number">50</span>);     <span class="comment">// 填充圆形</span></span><br></pre></td></tr></table></figure>
+<h3 id="3-文字与艺术字"><a href="#3-文字与艺术字" class="headerlink" title="3. 文字与艺术字"></a>3. 文字与艺术字</h3><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">g.setColor(Color.RED);</span><br><span class="line">g.setFont(<span class="keyword">new</span> <span class="title class_">Font</span>(<span class="string">&quot;微软雅黑&quot;</span>, Font.BOLD, <span class="number">20</span>)); <span class="comment">// 设置字体</span></span><br><span class="line">g.drawString(<span class="string">&quot;Hello Java&quot;</span>, <span class="number">150</span>, <span class="number">50</span>);          <span class="comment">// (x, y) 为文字基线左下角</span></span><br></pre></td></tr></table></figure>
+<h3 id="4-外部图片绘制"><a href="#4-外部图片绘制" class="headerlink" title="4. 外部图片绘制"></a>4. 外部图片绘制</h3><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">URL</span> <span class="variable">url</span> <span class="operator">=</span> MyPanel.class.getResource(<span class="string">&quot;/img.png&quot;</span>);</span><br><span class="line"><span class="type">Image</span> <span class="variable">img</span> <span class="operator">=</span> Toolkit.getDefaultToolkit().getImage(url);</span><br><span class="line">g.drawImage(img, x, y, width, height, <span class="built_in">this</span>);</span><br></pre></td></tr></table></figure>
+<h2 id="三、-深度深度原理解析"><a href="#三、-深度深度原理解析" class="headerlink" title="三、 深度深度原理解析"></a>三、 深度深度原理解析</h2><h3 id="1-为什么必须使用“继承”？"><a href="#1-为什么必须使用“继承”？" class="headerlink" title="1. 为什么必须使用“继承”？"></a>1. 为什么必须使用“继承”？</h3><p>在 Java 中，绘图不是“主动命令式”的，而是“被动响应式”的。</p>
+<ul>
+<li><strong>控制权翻转</strong>：你无法决定“现在画”，你只能决定“当系统要求画的时候，画什么”。</li>
+<li><strong>模板方法模式</strong>：通过继承 <code>JPanel</code> 并重写 <code>paint</code>，你实际上是在给系统的“绘图流程”填空。</li>
+</ul>
+<h3 id="2-什么是“钩子函数”-Hook-Function-？"><a href="#2-什么是“钩子函数”-Hook-Function-？" class="headerlink" title="2. 什么是“钩子函数” (Hook Function)？"></a>2. 什么是“钩子函数” (Hook Function)？</h3><p><code>paint(Graphics g)</code> 就是一个钩子。</p>
+<ul>
+<li>系统在运行过程中，在需要刷新的时刻（如窗口缩放、被遮挡后重新显示）预留了一个位置。</li>
+<li>你的重写操作，就是把你的代码“钩”在了系统的自动运行链条上。</li>
+</ul>
+<h3 id="3-监控器：事件派发线程-EDT"><a href="#3-监控器：事件派发线程-EDT" class="headerlink" title="3. 监控器：事件派发线程 (EDT)"></a>3. 监控器：事件派发线程 (EDT)</h3><p>Java 并不是时刻盯着你的代码，而是有一个后台循环：<strong>Event Dispatch Thread (EDT)</strong>。</p>
+<ul>
+<li><strong>Step 1</strong>: 操作系统检测到窗口变化（Resize/Move）。</li>
+<li><strong>Step 2</strong>: 操作系统发消息给 JVM 事件队列。</li>
+<li><strong>Step 3</strong>: EDT 线程取出消息，发现是“重绘”需求。</li>
+<li><strong>Step 4</strong>: EDT 自动调用你的 <code>paint(g)</code> 方法，并将 <code>Graphics</code> 画笔交给你使用。</li>
+</ul>
+<h2 id="四、-重点避坑指南"><a href="#四、-重点避坑指南" class="headerlink" title="四、 重点避坑指南"></a>四、 重点避坑指南</h2><ol>
+<li><strong>坐标系统</strong>：左上角是 $(0, 0)$。$X$ 轴向右递增，$Y$ 轴<strong>向下</strong>递增。</li>
+<li><strong>刷新残影</strong>：如果不写 <code>super.paint(g)</code>，窗口在缩放时可能会出现画面重叠或背景花屏。</li>
+<li><strong>性能注意</strong>：不要在 <code>paint</code> 方法里创建对象（如 <code>new Font</code>），因为该方法会被频繁调用，频繁创建对象会导致内存压力大，建议将对象定义为类成员变量。</li>
+</ol>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="http://example.com/2026/04/01/Java-GUI-%E7%BB%98%E5%9B%BE%E5%BA%95%E5%B1%82%E5%8E%9F%E7%90%86%E4%B8%8E%E4%BB%A3%E7%A0%81%E5%AE%9E%E6%88%98/" data-id="cuidkSssh-c3TU1EsMIfM6New" data-title="Java GUI 绘图底层原理与代码实战" class="article-share-link"><span class="fa fa-share">Share</span></a>
+      
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/GUI/" rel="tag">GUI</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Java/" rel="tag">Java</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E7%BB%98%E5%9B%BE/" rel="tag">绘图</a></li></ul>
+
+    </footer>
+  </div>
+  
+</article>
+
+
+
+  
     <article id="post-Java-资源加载空指针异常" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
   <div class="article-meta">
     <a href="/2026/04/01/Java-%E8%B5%84%E6%BA%90%E5%8A%A0%E8%BD%BD%E7%A9%BA%E6%8C%87%E9%92%88%E5%BC%82%E5%B8%B8/" class="article-date">
@@ -1228,75 +1296,6 @@ mjx-container[display="true"] + br {
 
 
   
-    <article id="post-泛型" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
-  <div class="article-meta">
-    <a href="/2026/03/28/%E6%B3%9B%E5%9E%8B/" class="article-date">
-  <time class="dt-published" datetime="2026-03-27T16:07:55.000Z" itemprop="datePublished">2026-03-28</time>
-</a>
-    
-  </div>
-  <div class="article-inner">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="p-name article-title" href="/2026/03/28/%E6%B3%9B%E5%9E%8B/">泛型</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="e-content article-entry" itemprop="articleBody">
-      
-        <h1 id="泛型基本概念（以集合为例子）"><a href="#泛型基本概念（以集合为例子）" class="headerlink" title="泛型基本概念（以集合为例子）"></a>泛型基本概念（以集合为例子）</h1><h3 id="为什么引入泛型？"><a href="#为什么引入泛型？" class="headerlink" title="为什么引入泛型？"></a>为什么引入泛型？</h3><h4 id="当没有泛型时面临的困境："><a href="#当没有泛型时面临的困境：" class="headerlink" title="当没有泛型时面临的困境："></a>当没有泛型时面临的困境：</h4><ol>
-<li><strong>类型不安全（引发运行时报错）：</strong> 当我们在使用集合存入数据时，如果没有泛型，集合默认可以利用多态存入任意 <code>Object</code> 类型的数据。虽然一个集合往往只打算存入同一种类型（例如全存 <code>String</code>），但由于缺乏约束，不小心存入了其他类型（如 <code>Integer</code>）编译时也不会报错，直到运行时才会抛出异常。<strong>我们希望存在一种编译时的约束机制。</strong></li>
-<li><strong>繁琐的向下转型：</strong> 当我们对没有泛型的集合进行遍历时，取出的元素统一返回的是 <code>Object</code> 对象。这时候如果需要使用该元素运行时的特有方法，就需要手动进行向下转型（强制类型转换）。<strong>我们希望通过一种机制避免手动强转，实现自动转型。</strong></li>
-</ol>
-<h2 id="泛型的基本使用"><a href="#泛型的基本使用" class="headerlink" title="泛型的基本使用"></a>泛型的基本使用</h2><p>在声明对象、实例化时通过 <code>&lt;引用类型&gt;</code> 来使用泛型机制。此时相当于类中定义的泛型变成了我们指定的具体类型。</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">// 标准写法（JDK 7 之后支持菱形语法，后面尖括号内的类型可省略，会自动推导）</span><br><span class="line">ArrayList&lt;String&gt; list = new ArrayList&lt;&gt;();</span><br><span class="line"></span><br><span class="line">list.add(&quot;Hello&quot;);</span><br><span class="line">// list.add(123); // 编译报错！起到了类型约束的作用</span><br><span class="line"></span><br><span class="line">// 获取元素时自动转型为 String，无需手动写 (String)</span><br><span class="line">String str = list.get(0); </span><br></pre></td></tr></table></figure>
-<h2 id="基本使用细节"><a href="#基本使用细节" class="headerlink" title="基本使用细节"></a>基本使用细节</h2><ol>
-<li><strong>只能是引用数据类型，不能是基本数据类型。</strong> 不能写 <code>ArrayList&lt;int&gt;</code>，必须使用包装类 <code>ArrayList&lt;Integer&gt;</code>。（原因和底层的“类型擦除”有关，见后文）。</li>
-<li><strong>指定泛型后，可以传入该类型及其子类类型。</strong> 例如 <code>List&lt;Animal&gt; list = new ArrayList&lt;&gt;();</code>，你不仅可以 <code>list.add(new Animal())</code>，也可以 <code>list.add(new Dog())</code>（假设 Dog 继承自 Animal）。</li>
-<li><strong>如果不指定泛型，默认就是 <code>Object</code> 类型。</strong> 建议即使是 <code>Object</code>，也显式写出 <code>ArrayList&lt;Object&gt;</code>，以提高代码可读性。</li>
-<li><strong>⚠️ 类的泛型不能用于静态成员（变量或方法）。</strong> 静态成员是在类加载时初始化的，而类的泛型参数（如 <code>T</code>）是在创建对象实例化时才确定的。在静态成员初始化时，JVM 根本不知道 <code>T</code> 是什么，因此会编译报错。 <em>(注：如果静态方法需要使用泛型，必须自己独立声明泛型，成为“静态泛型方法”。)</em></li>
-</ol>
-<h2 id="如何自定义泛型类？"><a href="#如何自定义泛型类？" class="headerlink" title="如何自定义泛型类？"></a>如何自定义泛型类？</h2><p>我们可以在自己编写的类、接口中引入“待定类型”，这就是自定义泛型。</p>
-<p><strong>语法格式：</strong> <code>class 类名&lt;泛型标识符&gt; { ... }</code> <em>常见的泛型标识符约定俗成：<code>T</code> (Type), <code>E</code> (Element), <code>K</code> (Key), <code>V</code> (Value)。</em></p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line">// 1. 在类名后声明泛型 T</span><br><span class="line">public class MyBox&lt;T&gt; &#123;</span><br><span class="line">    </span><br><span class="line">    // 2. 将 T 作为普通成员变量的类型</span><br><span class="line">    private T item;</span><br><span class="line">    </span><br><span class="line">    // 3. 将 T 作为方法的参数类型</span><br><span class="line">    public void setItem(T item) &#123;</span><br><span class="line">        this.item = item;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    // 4. 将 T 作为方法的返回值类型</span><br><span class="line">    public T getItem() &#123;</span><br><span class="line">        return this.item;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    // 🚨 错误示范：不能用于静态变量</span><br><span class="line">    // private static T staticItem; </span><br><span class="line">    </span><br><span class="line">    // ✅ 正确示范：静态方法自己独立声明泛型 &lt;E&gt;</span><br><span class="line">    public static &lt;E&gt; void printInfo(E info) &#123;</span><br><span class="line">        System.out.println(&quot;打印信息: &quot; + info);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<h2 id="底层原理（它在底层到底是怎样处理的）"><a href="#底层原理（它在底层到底是怎样处理的）" class="headerlink" title="底层原理（它在底层到底是怎样处理的）"></a>底层原理（它在底层到底是怎样处理的）</h2><p>泛型的本质是<strong>源代码（编译器）层面的语法糖</strong>。在 Java 的底层运行环境中（JVM 虚拟机内存里），<strong>根本不存在泛型这个概念</strong>。</p>
-<p>Java 处理泛型的核心机制叫做 <strong>“类型擦除（Type Erasure）”</strong>。整个过程分为以下三个关键阶段：</p>
-<h3 id="阶段一：编译期的“严格安检”（类型检查）"><a href="#阶段一：编译期的“严格安检”（类型检查）" class="headerlink" title="阶段一：编译期的“严格安检”（类型检查）"></a>阶段一：编译期的“严格安检”（类型检查）</h3><p>当编译器（如 javac）读取源代码时，它会记录你指定的泛型信息（例如 <code>ArrayList&lt;String&gt;</code>）。 当代码中调用 <code>list.add(123)</code> 时，编译器会根据记录的泛型 <code>String</code> 进行比对。发现 <code>123</code> 是整数，与 <code>String</code> 不符，立刻抛出编译错误，拒绝生成字节码文件。<strong>这就是泛型起到的“约束”作用。</strong></p>
-<h3 id="阶段二：卸下伪装的“类型擦除”"><a href="#阶段二：卸下伪装的“类型擦除”" class="headerlink" title="阶段二：卸下伪装的“类型擦除”"></a>阶段二：卸下伪装的“类型擦除”</h3><p><strong>一旦所有的代码都通过了编译器的类型检查</strong>，编译器在生成 <code>.class</code> 字节码文件之前，会执行“擦除”操作：</p>
-<ol>
-<li>把所有的泛型标识符（如 <code>&lt;T&gt;</code>、<code>&lt;String&gt;</code>）<strong>全部抹掉</strong>。</li>
-<li>将类中使用了泛型的地方，统一替换为 <strong><code>Object</code></strong>（如果泛型有限制，比如 <code>&lt;T extends Number&gt;</code>，则替换为父类 <code>Number</code>）。</li>
-</ol>
-<h3 id="阶段三：编译器悄悄补全的“向下转型”"><a href="#阶段三：编译器悄悄补全的“向下转型”" class="headerlink" title="阶段三：编译器悄悄补全的“向下转型”"></a>阶段三：编译器悄悄补全的“向下转型”</h3><p>既然底层全变成了 <code>Object</code>，为什么我们取数据时不需要手动写向下转型了呢？ 因为编译器在执行类型擦除的同时，会在你调用 <code>get()</code> 等获取数据的方法处，<strong>自动帮你生成一条强制类型转换的字节码指令</strong>。</p>
-<h4 id="💡-伪代码直观对比："><a href="#💡-伪代码直观对比：" class="headerlink" title="💡 伪代码直观对比："></a>💡 伪代码直观对比：</h4><p><strong>【我们写的代码（编译前）】</strong></p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">MyBox&lt;String&gt; box = new MyBox&lt;&gt;();</span><br><span class="line">box.setItem(&quot;Hello&quot;);          // 编译器安检：确认是 String，通过！</span><br><span class="line">String text = box.getItem();   // 自动推断为 String</span><br></pre></td></tr></table></figure>
-<p><strong>【编译后的真实模样（运行时的底层代码）】</strong></p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">MyBox box = new MyBox();       // 泛型被擦除了</span><br><span class="line">box.setItem(&quot;Hello&quot;);          // 底层其实是当做 Object 存进去的</span><br><span class="line"></span><br><span class="line">// 编译器在这里悄悄加上了 (String) 强制转换！</span><br><span class="line">String text = (String) box.getItem(); </span><br></pre></td></tr></table></figure>
-<h3 id="为什么-Java-要设计成“类型擦除”？"><a href="#为什么-Java-要设计成“类型擦除”？" class="headerlink" title="为什么 Java 要设计成“类型擦除”？"></a>为什么 Java 要设计成“类型擦除”？</h3><p>主要原因是<strong>历史包袱（向下兼容）</strong>。Java 在 JDK 1.5 才引入泛型，为了保证新加了泛型的代码编译后，依然能在老版本的 JVM 上运行，且能和以前没有写泛型的老代码完美混用，Java 团队妥协采用了这种只在编译器做检查，底层维持 <code>Object</code> 原样的方案。这也解释了为什么基本数据类型（如 <code>int</code>）不能作为泛型参数，因为它无法强转为 <code>Object</code>。</p>
-
-      
-    </div>
-    <footer class="article-footer">
-      <a data-url="http://example.com/2026/03/28/%E6%B3%9B%E5%9E%8B/" data-id="cuidHeX_SuPVbA7Pa3Poe44E4" data-title="泛型" class="article-share-link"><span class="fa fa-share">Share</span></a>
-      
-      
-      
-  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/JavaSE/" rel="tag">JavaSE</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%9F%BA%E6%9C%AC%E8%AF%AD%E6%B3%95/" rel="tag">基本语法</a></li></ul>
-
-    </footer>
-  </div>
-  
-</article>
-
-
-
-  
 
 
   <nav id="page-nav">
@@ -1322,7 +1321,7 @@ mjx-container[display="true"] + br {
   <div class="widget-wrap">
     <h3 class="widget-title">Tags</h3>
     <div class="widget">
-      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/JVM/" rel="tag">JVM</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Java/" rel="tag">Java</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/JavaSE/" rel="tag">JavaSE</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Junit/" rel="tag">Junit</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6-GC/" rel="tag">垃圾回收(GC)</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%9F%BA%E6%9C%AC%E8%AF%AD%E6%B3%95/" rel="tag">基本语法</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%BA%95%E5%B1%82%E5%8E%9F%E7%90%86/" rel="tag">底层原理</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%BC%82%E5%B8%B8%E5%A4%84%E7%90%86/" rel="tag">异常处理</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%BE%85%E5%AE%8C%E5%96%84/" rel="tag">待完善</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/" rel="tag">性能优化</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%8E%92%E5%BA%8F/" rel="tag">排序</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%A0%B8%E5%BF%83%E8%BF%9B%E9%98%B6/" rel="tag">核心进阶</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%AE%97%E6%B3%95/" rel="tag">算法</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%B1%BB%E5%8A%A0%E8%BD%BD%E5%99%A8/" rel="tag">类加载器</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%8B%B1%E8%AF%AD/" rel="tag">英语</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%AE%A1%E5%88%92/" rel="tag">计划</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%AE%BA%E6%96%87%E8%A7%84%E5%88%92/" rel="tag">论文规划</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%BF%AD%E4%BB%A3/" rel="tag">迭代</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E9%80%92%E5%BD%92/" rel="tag">递归</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E9%98%85%E8%AF%BB/" rel="tag">阅读</a></li></ul>
+      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/GUI/" rel="tag">GUI</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/JVM/" rel="tag">JVM</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Java/" rel="tag">Java</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/JavaSE/" rel="tag">JavaSE</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Junit/" rel="tag">Junit</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6-GC/" rel="tag">垃圾回收(GC)</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%9F%BA%E6%9C%AC%E8%AF%AD%E6%B3%95/" rel="tag">基本语法</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%BA%95%E5%B1%82%E5%8E%9F%E7%90%86/" rel="tag">底层原理</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%BC%82%E5%B8%B8%E5%A4%84%E7%90%86/" rel="tag">异常处理</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%BE%85%E5%AE%8C%E5%96%84/" rel="tag">待完善</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/" rel="tag">性能优化</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%8E%92%E5%BA%8F/" rel="tag">排序</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%A0%B8%E5%BF%83%E8%BF%9B%E9%98%B6/" rel="tag">核心进阶</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%AE%97%E6%B3%95/" rel="tag">算法</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%B1%BB%E5%8A%A0%E8%BD%BD%E5%99%A8/" rel="tag">类加载器</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%BB%98%E5%9B%BE/" rel="tag">绘图</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%8B%B1%E8%AF%AD/" rel="tag">英语</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%AE%A1%E5%88%92/" rel="tag">计划</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%AE%BA%E6%96%87%E8%A7%84%E5%88%92/" rel="tag">论文规划</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%BF%AD%E4%BB%A3/" rel="tag">迭代</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E9%80%92%E5%BD%92/" rel="tag">递归</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E9%98%85%E8%AF%BB/" rel="tag">阅读</a></li></ul>
     </div>
   </div>
 
@@ -1332,7 +1331,7 @@ mjx-container[display="true"] + br {
   <div class="widget-wrap">
     <h3 class="widget-title">Tag Cloud</h3>
     <div class="widget tagcloud">
-      <a href="/tags/JVM/" style="font-size: 10px;">JVM</a> <a href="/tags/Java/" style="font-size: 16.67px;">Java</a> <a href="/tags/JavaSE/" style="font-size: 13.33px;">JavaSE</a> <a href="/tags/Junit/" style="font-size: 10px;">Junit</a> <a href="/tags/%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6-GC/" style="font-size: 10px;">垃圾回收(GC)</a> <a href="/tags/%E5%9F%BA%E6%9C%AC%E8%AF%AD%E6%B3%95/" style="font-size: 13.33px;">基本语法</a> <a href="/tags/%E5%BA%95%E5%B1%82%E5%8E%9F%E7%90%86/" style="font-size: 10px;">底层原理</a> <a href="/tags/%E5%BC%82%E5%B8%B8%E5%A4%84%E7%90%86/" style="font-size: 10px;">异常处理</a> <a href="/tags/%E5%BE%85%E5%AE%8C%E5%96%84/" style="font-size: 10px;">待完善</a> <a href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/" style="font-size: 10px;">性能优化</a> <a href="/tags/%E6%8E%92%E5%BA%8F/" style="font-size: 10px;">排序</a> <a href="/tags/%E6%A0%B8%E5%BF%83%E8%BF%9B%E9%98%B6/" style="font-size: 10px;">核心进阶</a> <a href="/tags/%E7%AE%97%E6%B3%95/" style="font-size: 13.33px;">算法</a> <a href="/tags/%E7%B1%BB%E5%8A%A0%E8%BD%BD%E5%99%A8/" style="font-size: 10px;">类加载器</a> <a href="/tags/%E8%8B%B1%E8%AF%AD/" style="font-size: 20px;">英语</a> <a href="/tags/%E8%AE%A1%E5%88%92/" style="font-size: 10px;">计划</a> <a href="/tags/%E8%AE%BA%E6%96%87%E8%A7%84%E5%88%92/" style="font-size: 10px;">论文规划</a> <a href="/tags/%E8%BF%AD%E4%BB%A3/" style="font-size: 10px;">迭代</a> <a href="/tags/%E9%80%92%E5%BD%92/" style="font-size: 10px;">递归</a> <a href="/tags/%E9%98%85%E8%AF%BB/" style="font-size: 20px;">阅读</a>
+      <a href="/tags/GUI/" style="font-size: 10px;">GUI</a> <a href="/tags/JVM/" style="font-size: 10px;">JVM</a> <a href="/tags/Java/" style="font-size: 16.67px;">Java</a> <a href="/tags/JavaSE/" style="font-size: 13.33px;">JavaSE</a> <a href="/tags/Junit/" style="font-size: 10px;">Junit</a> <a href="/tags/%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6-GC/" style="font-size: 10px;">垃圾回收(GC)</a> <a href="/tags/%E5%9F%BA%E6%9C%AC%E8%AF%AD%E6%B3%95/" style="font-size: 13.33px;">基本语法</a> <a href="/tags/%E5%BA%95%E5%B1%82%E5%8E%9F%E7%90%86/" style="font-size: 10px;">底层原理</a> <a href="/tags/%E5%BC%82%E5%B8%B8%E5%A4%84%E7%90%86/" style="font-size: 10px;">异常处理</a> <a href="/tags/%E5%BE%85%E5%AE%8C%E5%96%84/" style="font-size: 10px;">待完善</a> <a href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/" style="font-size: 10px;">性能优化</a> <a href="/tags/%E6%8E%92%E5%BA%8F/" style="font-size: 10px;">排序</a> <a href="/tags/%E6%A0%B8%E5%BF%83%E8%BF%9B%E9%98%B6/" style="font-size: 10px;">核心进阶</a> <a href="/tags/%E7%AE%97%E6%B3%95/" style="font-size: 13.33px;">算法</a> <a href="/tags/%E7%B1%BB%E5%8A%A0%E8%BD%BD%E5%99%A8/" style="font-size: 10px;">类加载器</a> <a href="/tags/%E7%BB%98%E5%9B%BE/" style="font-size: 10px;">绘图</a> <a href="/tags/%E8%8B%B1%E8%AF%AD/" style="font-size: 20px;">英语</a> <a href="/tags/%E8%AE%A1%E5%88%92/" style="font-size: 10px;">计划</a> <a href="/tags/%E8%AE%BA%E6%96%87%E8%A7%84%E5%88%92/" style="font-size: 10px;">论文规划</a> <a href="/tags/%E8%BF%AD%E4%BB%A3/" style="font-size: 10px;">迭代</a> <a href="/tags/%E9%80%92%E5%BD%92/" style="font-size: 10px;">递归</a> <a href="/tags/%E9%98%85%E8%AF%BB/" style="font-size: 20px;">阅读</a>
     </div>
   </div>
 
@@ -1354,6 +1353,10 @@ mjx-container[display="true"] + br {
       <ul>
         
           <li>
+            <a href="/2026/04/01/Java-GUI-%E7%BB%98%E5%9B%BE%E5%BA%95%E5%B1%82%E5%8E%9F%E7%90%86%E4%B8%8E%E4%BB%A3%E7%A0%81%E5%AE%9E%E6%88%98/">Java GUI 绘图底层原理与代码实战</a>
+          </li>
+        
+          <li>
             <a href="/2026/04/01/Java-%E8%B5%84%E6%BA%90%E5%8A%A0%E8%BD%BD%E7%A9%BA%E6%8C%87%E9%92%88%E5%BC%82%E5%B8%B8/">Java 资源加载空指针异常</a>
           </li>
         
@@ -1367,10 +1370,6 @@ mjx-container[display="true"] + br {
         
           <li>
             <a href="/2026/03/31/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3-Java%E2%80%94%E2%80%94hashCode-%E7%9C%9F%E7%9A%84%E5%8F%AA%E6%98%AF%E5%86%85%E5%AD%98%E5%9C%B0%E5%9D%80%E5%90%97%EF%BC%9F/">深入理解 Java——hashCode 真的只是内存地址吗？</a>
-          </li>
-        
-          <li>
-            <a href="/2026/03/31/%E8%8B%B1%E8%AF%AD%E9%98%85%E8%AF%BB-2025-12-3-new/">英语阅读-2025-12-3-new</a>
           </li>
         
       </ul>
