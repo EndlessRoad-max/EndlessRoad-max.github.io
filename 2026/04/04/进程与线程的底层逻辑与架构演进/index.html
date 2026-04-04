@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  
+  <title>进程与线程的底层逻辑与架构演进 | Hexo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <meta name="description" content="并发与并行：进程与线程的底层逻辑与架构演进1. 核心概念：并发 (Concurrency) vs 并行 (Parallelism) 并行 (Parallelism)：物理上的“同时” 定义： 在同一时刻，有多条指令在不同的 CPU 核心上真正同时执行。 决定因素： 严格受限于硬件资源，即 CPU 的物理核心数（Cores）和逻辑处理器数（Threads，如超线程）。 上限： 如果 CPU 是 8">
+<meta property="og:type" content="article">
+<meta property="og:title" content="进程与线程的底层逻辑与架构演进">
+<meta property="og:url" content="http://example.com/2026/04/04/%E8%BF%9B%E7%A8%8B%E4%B8%8E%E7%BA%BF%E7%A8%8B%E7%9A%84%E5%BA%95%E5%B1%82%E9%80%BB%E8%BE%91%E4%B8%8E%E6%9E%B6%E6%9E%84%E6%BC%94%E8%BF%9B/index.html">
+<meta property="og:site_name" content="Hexo">
+<meta property="og:description" content="并发与并行：进程与线程的底层逻辑与架构演进1. 核心概念：并发 (Concurrency) vs 并行 (Parallelism) 并行 (Parallelism)：物理上的“同时” 定义： 在同一时刻，有多条指令在不同的 CPU 核心上真正同时执行。 决定因素： 严格受限于硬件资源，即 CPU 的物理核心数（Cores）和逻辑处理器数（Threads，如超线程）。 上限： 如果 CPU 是 8">
+<meta property="og:locale" content="en_US">
+<meta property="article:published_time" content="2026-04-04T11:03:29.000Z">
+<meta property="article:modified_time" content="2026-04-04T11:09:25.262Z">
+<meta property="article:author" content="John Doe">
+<meta property="article:tag" content="Java">
+<meta property="article:tag" content="多线程">
+<meta property="article:tag" content="并发编程">
+<meta property="article:tag" content="操作系统">
+<meta property="article:tag" content="计算机体系结构">
+<meta property="article:tag" content="软件架构">
+<meta name="twitter:card" content="summary">
+  
+    <link rel="alternate" href="/atom.xml" title="Hexo" type="application/atom+xml">
+  
+  
+    <link rel="shortcut icon" href="/favicon.png">
+  
+  
+  
+<link rel="stylesheet" href="/css/style.css">
+
+  
+    
+<link rel="stylesheet" href="/fancybox/jquery.fancybox.min.css">
+
+  
+  
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fork-awesome@1.2.0/css/fork-awesome.min.css">
+
+<meta name="generator" content="Hexo 8.1.1"></head>
+
+<body>
+  <div id="container">
+    <div id="wrap">
+      <header id="header">
+  <div id="banner"></div>
+  <div id="header-outer" class="outer">
+    <div id="header-title" class="inner">
+      <h1 id="logo-wrap">
+        <a href="/" id="logo">Hexo</a>
+      </h1>
+      
+    </div>
+    <div id="header-inner" class="inner">
+      <nav id="main-nav">
+        <a id="main-nav-toggle" class="nav-icon"><span class="fa fa-bars"></span></a>
+        
+          <a class="main-nav-link" href="/">Home</a>
+        
+          <a class="main-nav-link" href="/archives">Archives</a>
+        
+          <a class="main-nav-link" href="/categories/%E6%AF%8F%E5%91%A8%E8%AE%A1%E5%88%92/">Weekly</a>
+        
+      </nav>
+      <nav id="sub-nav">
+        
+        
+          <a class="nav-icon" href="/atom.xml" title="RSS Feed"><span class="fa fa-rss"></span></a>
+        
+        <a class="nav-icon nav-search-btn" title="Search"><span class="fa fa-search"></span></a>
+      </nav>
+      <div id="search-form-wrap">
+        <form action="//google.com/search" method="get" accept-charset="UTF-8" class="search-form"><input type="search" name="q" class="search-form-input" placeholder="Search"><button type="submit" class="search-form-submit">&#xF002;</button><input type="hidden" name="sitesearch" value="http://example.com"></form>
+      </div>
+    </div>
+  </div>
+</header>
+
+      <div class="outer">
+        <section id="main"><article id="post-进程与线程的底层逻辑与架构演进" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
+  <div class="article-meta">
+    <a href="/2026/04/04/%E8%BF%9B%E7%A8%8B%E4%B8%8E%E7%BA%BF%E7%A8%8B%E7%9A%84%E5%BA%95%E5%B1%82%E9%80%BB%E8%BE%91%E4%B8%8E%E6%9E%B6%E6%9E%84%E6%BC%94%E8%BF%9B/" class="article-date">
+  <time class="dt-published" datetime="2026-04-04T11:03:29.000Z" itemprop="datePublished">2026-04-04</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="p-name article-title" itemprop="headline name">
+      进程与线程的底层逻辑与架构演进
+    </h1>
+  
+
+      </header>
+    
+    <div class="e-content article-entry" itemprop="articleBody">
+      
+        <h1 id="并发与并行：进程与线程的底层逻辑与架构演进"><a href="#并发与并行：进程与线程的底层逻辑与架构演进" class="headerlink" title="并发与并行：进程与线程的底层逻辑与架构演进"></a>并发与并行：进程与线程的底层逻辑与架构演进</h1><h2 id="1-核心概念：并发-Concurrency-vs-并行-Parallelism"><a href="#1-核心概念：并发-Concurrency-vs-并行-Parallelism" class="headerlink" title="1. 核心概念：并发 (Concurrency) vs 并行 (Parallelism)"></a>1. 核心概念：并发 (Concurrency) vs 并行 (Parallelism)</h2><ul>
+<li><strong>并行 (Parallelism)：物理上的“同时”</strong><ul>
+<li><strong>定义：</strong> 在同一时刻，有多条指令在不同的 CPU 核心上真正同时执行。</li>
+<li><strong>决定因素：</strong> 严格受限于硬件资源，即 CPU 的物理核心数（Cores）和逻辑处理器数（Threads，如超线程）。</li>
+<li><strong>上限：</strong> 如果 CPU 是 8 核 16 线程，任何瞬间的并行极限就是 16。</li>
+</ul>
+</li>
+<li><strong>并发 (Concurrency)：宏观上的“同时”，微观上的“轮换”</strong><ul>
+<li><strong>定义：</strong> 在一段时间内，多个任务都在推进，但在微观的极短时间内，只有一个任务在执行。</li>
+<li><strong>决定因素：</strong> 操作系统调度算法（时间片轮转）、内存大小。</li>
+<li><strong>上限：</strong> 取决于软件建模和系统资源（主要是内存），可以创建成千上万个并发任务。</li>
+</ul>
+</li>
+</ul>
+<h2 id="2-硬件执行的物理铁律"><a href="#2-硬件执行的物理铁律" class="headerlink" title="2. 硬件执行的物理铁律"></a>2. 硬件执行的物理铁律</h2><ul>
+<li><strong>单核单任务：</strong> 在物理层面，一个 CPU 核心（逻辑核）在绝对的同一瞬时，只能处理 1 个执行单位。</li>
+<li><strong>分时复用 (Time Slicing)：</strong> 操作系统通过极快地切换任务（纳秒/微秒级），让多个任务轮流使用核心，产生“同时运行”的错觉，这就是并发的本质。</li>
+<li><strong>超线程技术 (Hyper-Threading)：</strong> 硬件厂商在单核内增加一组寄存器，使得核心内的运算单元可以在不同线程间快速切换（伪并行），提高核心部件利用率，但这并未突破“单运算单元单时刻单任务”的物理限制。</li>
+</ul>
+<h2 id="3-基本执行单位的演进：从进程到线程"><a href="#3-基本执行单位的演进：从进程到线程" class="headerlink" title="3. 基本执行单位的演进：从进程到线程"></a>3. 基本执行单位的演进：从进程到线程</h2><ul>
+<li><strong>过去（单核主导）：进程是基本单位。</strong><ul>
+<li>多个进程在单个核心上轮流抢占时间片，实现纯并发。</li>
+</ul>
+</li>
+<li><strong>现在（多核主导）：线程是基本单位。</strong><ul>
+<li>操作系统将一个进程内的多个线程分配到不同的空闲物理核心上，实现<strong>真正的物理并行</strong>。</li>
+<li>超出核心数的线程，则在各核心上排队轮换，产生<strong>并发</strong>。</li>
+</ul>
+</li>
+</ul>
+<h2 id="4-为什么倾向于“同进程多线程”而非“多进程并行”？"><a href="#4-为什么倾向于“同进程多线程”而非“多进程并行”？" class="headerlink" title="4. 为什么倾向于“同进程多线程”而非“多进程并行”？"></a>4. 为什么倾向于“同进程多线程”而非“多进程并行”？</h2><p>在单一业务处理中，多线程成为主流，主要基于<strong>开销和性能</strong>的考量：</p>
+<ul>
+<li><strong>极低切换成本：</strong> 线程共享所属进程的内存空间。切换线程只需保存寄存器和栈信息，而切换进程需要更换虚拟内存映射表（TLB 刷新），开销巨大。</li>
+<li><strong>高效数据共享：</strong> 线程间共享内存数据，读写极快（如 Java 堆内存）；进程间共享需要复杂的跨进程通信（IPC），速度较慢。</li>
+</ul>
+<blockquote>
+<p><strong>结论：</strong> Java 等应用被设计为单进程多线程模式，是为了在突破单进程性能瓶颈的同时，极致追求共享数据的效率和降低上下文切换的损耗。</p>
+</blockquote>
+<h2 id="5-架构的现代分工：单进程-多线程-vs-多进程"><a href="#5-架构的现代分工：单进程-多线程-vs-多进程" class="headerlink" title="5. 架构的现代分工：单进程(多线程) vs 多进程"></a>5. 架构的现代分工：单进程(多线程) vs 多进程</h2><p>虽然多线程在局部性能上占优，但<strong>多进程架构并没有被淘汰，反而在现代架构中不可或缺</strong>，主要用于解决多线程的致命弱点：<strong>隔离性差</strong>（一损俱损）。</p>
+<h3 id="现代软件架构的协同："><a href="#现代软件架构的协同：" class="headerlink" title="现代软件架构的协同："></a>现代软件架构的协同：</h3><ol>
+<li><strong>微观层面（Scale Up / 垂直扩展） —— 追求“快”</strong><ul>
+<li><strong>手段：</strong> 在单个应用实例内（如一个 JVM），极度依赖<strong>单进程多线程</strong>模型（线程池、并发库）。</li>
+<li><strong>目的：</strong> 榨干单台服务器的 CPU 和内存资源，追求局部最高计算性能。</li>
+</ul>
+</li>
+<li><strong>宏观层面（Scale Out / 水平扩展） —— 追求“稳”与“大”</strong><ul>
+<li><strong>手段：</strong> 在整体系统架构上，绝对依赖<strong>多进程架构</strong>（甚至是跨机器的分布式进程，如微服务、K8s 容器编排）。</li>
+<li><strong>优势：</strong><ul>
+<li><strong>高可用性/容灾：</strong> 一个进程崩溃（如 Chrome 某个标签页、微服务某个节点）不影响全局。</li>
+<li><strong>无限横向扩展：</strong> 突破单机硬件极限，将负载分散到海量服务器。</li>
+<li><strong>语言特性弥补：</strong> 如 Python (受限于 GIL)、Node.js / Redis (单线程模型)，必须依赖多进程机制来利用多核。</li>
+</ul>
+</li>
+</ul>
+</li>
+</ol>
+<blockquote>
+<p><strong>总结：</strong> 多线程负责单点的高效执行，多进程负责全局的稳定与扩展。两者协同，构成了现代高并发、高可用架构的基石。</p>
+</blockquote>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="http://example.com/2026/04/04/%E8%BF%9B%E7%A8%8B%E4%B8%8E%E7%BA%BF%E7%A8%8B%E7%9A%84%E5%BA%95%E5%B1%82%E9%80%BB%E8%BE%91%E4%B8%8E%E6%9E%B6%E6%9E%84%E6%BC%94%E8%BF%9B/" data-id="cuidLZCjAr_wPFoB8nXlXcepb" data-title="进程与线程的底层逻辑与架构演进" class="article-share-link"><span class="fa fa-share">Share</span></a>
+      
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Java/" rel="tag">Java</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%A4%9A%E7%BA%BF%E7%A8%8B/" rel="tag">多线程</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B/" rel="tag">并发编程</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F/" rel="tag">操作系统</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E4%BD%93%E7%B3%BB%E7%BB%93%E6%9E%84/" rel="tag">计算机体系结构</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E8%BD%AF%E4%BB%B6%E6%9E%B6%E6%9E%84/" rel="tag">软件架构</a></li></ul>
+
+    </footer>
+  </div>
+  
+    
+<nav id="article-nav">
+  
+  
+    <a href="/2026/04/04/Java%E4%BA%8B%E4%BB%B6%E5%A4%84%E7%90%86%E6%9C%BA%E5%88%B6-%E5%88%9D%E8%AF%86/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">Older</strong>
+      <div class="article-nav-title">Java事件处理机制</div>
+    </a>
+  
+</nav>
+
+  
+</article>
+
+
+</section>
+        
+          <aside id="sidebar">
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Categories</h3>
+    <div class="widget">
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/%E6%AF%8F%E5%91%A8%E8%AE%A1%E5%88%92/">每周计划</a></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Tags</h3>
+    <div class="widget">
+      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/EDT-%E4%BA%8B%E4%BB%B6%E5%88%86%E5%8F%91%E7%BA%BF%E7%A8%8B/" rel="tag">EDT(事件分发线程)</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/GUI/" rel="tag">GUI</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/JVM/" rel="tag">JVM</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Java/" rel="tag">Java</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/JavaSE/" rel="tag">JavaSE</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/JavaWeb/" rel="tag">JavaWeb</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Junit/" rel="tag">Junit</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/KeyListener/" rel="tag">KeyListener</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Swing-AWT/" rel="tag">Swing&#x2F;AWT</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Tomcat/" rel="tag">Tomcat</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E4%BA%8B%E4%BB%B6%E5%A4%84%E7%90%86%E6%9C%BA%E5%88%B6/" rel="tag">事件处理机制</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%90%8E%E7%AB%AF%E5%9F%BA%E7%A1%80/" rel="tag">后端基础</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6-GC/" rel="tag">垃圾回收(GC)</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%9F%BA%E6%9C%AC%E8%AF%AD%E6%B3%95/" rel="tag">基本语法</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%A4%9A%E7%BA%BF%E7%A8%8B/" rel="tag">多线程</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%A7%94%E6%89%98%E4%BA%8B%E4%BB%B6%E6%A8%A1%E5%9E%8B/" rel="tag">委托事件模型</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B/" rel="tag">并发编程</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%BA%95%E5%B1%82%E5%8E%9F%E7%90%86/" rel="tag">底层原理</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%BC%82%E5%B8%B8%E5%A4%84%E7%90%86/" rel="tag">异常处理</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%BE%85%E5%AE%8C%E5%96%84/" rel="tag">待完善</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/" rel="tag">性能优化</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%8E%92%E5%BA%8F/" rel="tag">排序</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%8E%A7%E5%88%B6%E5%8F%8D%E8%BD%AC-IoC/" rel="tag">控制反转(IoC)</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F/" rel="tag">操作系统</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%A0%B8%E5%BF%83%E8%BF%9B%E9%98%B6/" rel="tag">核心进阶</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%AE%97%E6%B3%95/" rel="tag">算法</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%B1%BB%E5%8A%A0%E8%BD%BD%E5%99%A8/" rel="tag">类加载器</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%BB%98%E5%9B%BE/" rel="tag">绘图</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%8B%B1%E8%AF%AD/" rel="tag">英语</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%AE%A1%E5%88%92/" rel="tag">计划</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E4%BD%93%E7%B3%BB%E7%BB%93%E6%9E%84/" rel="tag">计算机体系结构</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%AE%BA%E6%96%87%E8%A7%84%E5%88%92/" rel="tag">论文规划</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%BD%AF%E4%BB%B6%E6%9E%B6%E6%9E%84/" rel="tag">软件架构</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%BF%AD%E4%BB%A3/" rel="tag">迭代</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E9%80%92%E5%BD%92/" rel="tag">递归</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E9%98%85%E8%AF%BB/" rel="tag">阅读</a></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Tag Cloud</h3>
+    <div class="widget tagcloud">
+      <a href="/tags/EDT-%E4%BA%8B%E4%BB%B6%E5%88%86%E5%8F%91%E7%BA%BF%E7%A8%8B/" style="font-size: 10px;">EDT(事件分发线程)</a> <a href="/tags/GUI/" style="font-size: 10px;">GUI</a> <a href="/tags/JVM/" style="font-size: 10px;">JVM</a> <a href="/tags/Java/" style="font-size: 20px;">Java</a> <a href="/tags/JavaSE/" style="font-size: 16.67px;">JavaSE</a> <a href="/tags/JavaWeb/" style="font-size: 10px;">JavaWeb</a> <a href="/tags/Junit/" style="font-size: 10px;">Junit</a> <a href="/tags/KeyListener/" style="font-size: 10px;">KeyListener</a> <a href="/tags/Swing-AWT/" style="font-size: 10px;">Swing/AWT</a> <a href="/tags/Tomcat/" style="font-size: 10px;">Tomcat</a> <a href="/tags/%E4%BA%8B%E4%BB%B6%E5%A4%84%E7%90%86%E6%9C%BA%E5%88%B6/" style="font-size: 10px;">事件处理机制</a> <a href="/tags/%E5%90%8E%E7%AB%AF%E5%9F%BA%E7%A1%80/" style="font-size: 10px;">后端基础</a> <a href="/tags/%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6-GC/" style="font-size: 10px;">垃圾回收(GC)</a> <a href="/tags/%E5%9F%BA%E6%9C%AC%E8%AF%AD%E6%B3%95/" style="font-size: 13.33px;">基本语法</a> <a href="/tags/%E5%A4%9A%E7%BA%BF%E7%A8%8B/" style="font-size: 10px;">多线程</a> <a href="/tags/%E5%A7%94%E6%89%98%E4%BA%8B%E4%BB%B6%E6%A8%A1%E5%9E%8B/" style="font-size: 10px;">委托事件模型</a> <a href="/tags/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B/" style="font-size: 10px;">并发编程</a> <a href="/tags/%E5%BA%95%E5%B1%82%E5%8E%9F%E7%90%86/" style="font-size: 10px;">底层原理</a> <a href="/tags/%E5%BC%82%E5%B8%B8%E5%A4%84%E7%90%86/" style="font-size: 10px;">异常处理</a> <a href="/tags/%E5%BE%85%E5%AE%8C%E5%96%84/" style="font-size: 10px;">待完善</a> <a href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/" style="font-size: 10px;">性能优化</a> <a href="/tags/%E6%8E%92%E5%BA%8F/" style="font-size: 10px;">排序</a> <a href="/tags/%E6%8E%A7%E5%88%B6%E5%8F%8D%E8%BD%AC-IoC/" style="font-size: 10px;">控制反转(IoC)</a> <a href="/tags/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F/" style="font-size: 10px;">操作系统</a> <a href="/tags/%E6%A0%B8%E5%BF%83%E8%BF%9B%E9%98%B6/" style="font-size: 10px;">核心进阶</a> <a href="/tags/%E7%AE%97%E6%B3%95/" style="font-size: 13.33px;">算法</a> <a href="/tags/%E7%B1%BB%E5%8A%A0%E8%BD%BD%E5%99%A8/" style="font-size: 10px;">类加载器</a> <a href="/tags/%E7%BB%98%E5%9B%BE/" style="font-size: 10px;">绘图</a> <a href="/tags/%E8%8B%B1%E8%AF%AD/" style="font-size: 20px;">英语</a> <a href="/tags/%E8%AE%A1%E5%88%92/" style="font-size: 10px;">计划</a> <a href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E4%BD%93%E7%B3%BB%E7%BB%93%E6%9E%84/" style="font-size: 10px;">计算机体系结构</a> <a href="/tags/%E8%AE%BA%E6%96%87%E8%A7%84%E5%88%92/" style="font-size: 10px;">论文规划</a> <a href="/tags/%E8%BD%AF%E4%BB%B6%E6%9E%B6%E6%9E%84/" style="font-size: 10px;">软件架构</a> <a href="/tags/%E8%BF%AD%E4%BB%A3/" style="font-size: 10px;">迭代</a> <a href="/tags/%E9%80%92%E5%BD%92/" style="font-size: 10px;">递归</a> <a href="/tags/%E9%98%85%E8%AF%BB/" style="font-size: 20px;">阅读</a>
+    </div>
+  </div>
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Archives</h3>
+    <div class="widget">
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2026/04/">April 2026</a></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2026/03/">March 2026</a></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Recent Posts</h3>
+    <div class="widget">
+      <ul>
+        
+          <li>
+            <a href="/2026/04/04/%E8%BF%9B%E7%A8%8B%E4%B8%8E%E7%BA%BF%E7%A8%8B%E7%9A%84%E5%BA%95%E5%B1%82%E9%80%BB%E8%BE%91%E4%B8%8E%E6%9E%B6%E6%9E%84%E6%BC%94%E8%BF%9B/">进程与线程的底层逻辑与架构演进</a>
+          </li>
+        
+          <li>
+            <a href="/2026/04/04/Java%E4%BA%8B%E4%BB%B6%E5%A4%84%E7%90%86%E6%9C%BA%E5%88%B6-%E5%88%9D%E8%AF%86/">Java事件处理机制</a>
+          </li>
+        
+          <li>
+            <a href="/2026/04/03/%E5%88%9D%E8%AF%86JavaWeb/">初识JavaWeb</a>
+          </li>
+        
+          <li>
+            <a href="/2026/04/01/Java-GUI-%E7%BB%98%E5%9B%BE%E5%BA%95%E5%B1%82%E5%8E%9F%E7%90%86%E4%B8%8E%E4%BB%A3%E7%A0%81%E5%AE%9E%E6%88%98/">Java GUI 绘图底层原理与代码实战</a>
+          </li>
+        
+          <li>
+            <a href="/2026/04/01/Java-%E8%B5%84%E6%BA%90%E5%8A%A0%E8%BD%BD%E7%A9%BA%E6%8C%87%E9%92%88%E5%BC%82%E5%B8%B8/">Java 资源加载空指针异常</a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+
+  
+</aside>
+        
+      </div>
+      <footer id="footer">
+  
+  <div class="outer">
+    <div id="footer-info" class="inner">
+      
+      &copy; 2026 John Doe<br>
+      Powered by <a href="https://hexo.io/" target="_blank">Hexo</a>
+    </div>
+  </div>
+</footer>
+
+    </div>
+    <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/archives" class="mobile-nav-link">Archives</a>
+  
+    <a href="/categories/%E6%AF%8F%E5%91%A8%E8%AE%A1%E5%88%92/" class="mobile-nav-link">Weekly</a>
+  
+</nav>
+    
+
+
+<script src="/js/jquery-3.6.4.min.js"></script>
+
+
+
+  
+<script src="/fancybox/jquery.fancybox.min.js"></script>
+
+
+
+
+<script src="/js/script.js"></script>
+
+
+
+
+
+  </div>
+</body>
+</html>
