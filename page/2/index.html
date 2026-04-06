@@ -185,6 +185,449 @@ mjx-container[display="true"] + br {
       <div class="outer">
         <section id="main">
   
+    <article id="post-论文复现清单" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
+  <div class="article-meta">
+    <a href="/2026/03/31/%E8%AE%BA%E6%96%87%E5%A4%8D%E7%8E%B0%E6%B8%85%E5%8D%95/" class="article-date">
+  <time class="dt-published" datetime="2026-03-31T08:58:06.000Z" itemprop="datePublished">2026-03-31</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="p-name article-title" href="/2026/03/31/%E8%AE%BA%E6%96%87%E5%A4%8D%E7%8E%B0%E6%B8%85%E5%8D%95/">论文复现清单</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="e-content article-entry" itemprop="articleBody">
+      
+        <h3 id="📂-第一部分：你需要复现的论文目录清单"><a href="#📂-第一部分：你需要复现的论文目录清单" class="headerlink" title="📂 第一部分：你需要复现的论文目录清单"></a><strong>📂 第一部分：你需要复现的论文目录清单</strong></h3><p>这份清单的筛选标准是：<strong>模型轻量、代码开源、在航空/垂直领域有验证、且代表了2025-2026年的主流方向（如知识蒸馏、小样本、抗噪）。</strong></p>
+<h4 id="1-基石模型（必须跑通，作为对比基准）"><a href="#1-基石模型（必须跑通，作为对比基准）" class="headerlink" title="1. 基石模型（必须跑通，作为对比基准）"></a><strong>1. 基石模型（必须跑通，作为对比基准）</strong></h4><ul>
+<li><strong>论文标题：</strong> <strong>《航空事故领域的知识抽取方法研究与实现》</strong> (东北大学学报, 2026)</li>
+<li><strong>核心模型：</strong> <strong>BERT + BiGRU-IDCNN-CRF</strong></li>
+<li><strong>推荐理由：</strong><ul>
+<li><strong>最贴合你的背景：</strong> 这是专门针对“航空事故”领域的研究，直接解决了你“做什么数据”的问题。</li>
+<li><strong>低配友好：</strong> 这是一个典型的“预训练模型+轻量级特征提取器”架构。IDCNN（膨胀卷积）比LSTM并行计算更快，CRF保证了标签的合法性。</li>
+<li><strong>复现价值：</strong> 它的NER（命名实体识别）精确率达到了94.69%。你需要复现它，作为你后续改进的“基线（Baseline）”。</li>
+</ul>
+</li>
+<li><strong>硬件需求：</strong> 单张 1080Ti 或 3060 即可轻松运行。</li>
+</ul>
+<h4 id="2-进阶模型（针对低资源-少样本场景）"><a href="#2-进阶模型（针对低资源-少样本场景）" class="headerlink" title="2. 进阶模型（针对低资源/少样本场景）"></a><strong>2. 进阶模型（针对低资源/少样本场景）</strong></h4><ul>
+<li><strong>论文标题：</strong> <strong>《大小模型协同训练的少样本命名实体识别方法》</strong> (武汉大学, 2025)</li>
+<li><strong>核心方法：</strong> <strong>Knowledge Distillation (知识蒸馏) / Co-training</strong></li>
+<li><strong>推荐理由：</strong><ul>
+<li><strong>解决痛点：</strong> 航空数据标注难。这篇论文展示了如何用大模型（老师）教小模型（学生），让小模型在只有少量数据的情况下达到高效果。</li>
+<li><strong>技术路线：</strong> 学习如何利用API（如ChatGPT/文心一言）生成伪标签，然后在本地训练小模型。这是低算力实验室的“生存之道”。</li>
+</ul>
+</li>
+<li><strong>硬件需求：</strong> 训练学生模型只需普通显卡；老师模型通过API调用（不耗本地显存）。</li>
+</ul>
+<h4 id="3-拓展模型（针对复杂关系抽取）"><a href="#3-拓展模型（针对复杂关系抽取）" class="headerlink" title="3. 拓展模型（针对复杂关系抽取）"></a><strong>3. 拓展模型（针对复杂关系抽取）</strong></h4><ul>
+<li><strong>论文标题：</strong> <strong>《基于图神经网络的A320飞行控制系统实体关系抽取方法研究》</strong> (2025)</li>
+<li><strong>核心模型：</strong> <strong>GCN (图卷积网络) + Attention</strong></li>
+<li><strong>推荐理由：</strong><ul>
+<li><strong>领域深度：</strong> 聚焦于“A320飞行控制系统”，非常垂直。</li>
+<li><strong>技术特点：</strong> 航空故障往往涉及组件之间的拓扑关系（如“传感器A”连接到“控制器B”）。GCN能很好地处理这种非欧几里得空间的数据。</li>
+<li><strong>创新点：</strong> 学习如何将飞机的系统原理图转化为图数据结构，辅助文本抽取。</li>
+</ul>
+</li>
+</ul>
+<h4 id="4-数据构建（磨刀不误砍柴工）"><a href="#4-数据构建（磨刀不误砍柴工）" class="headerlink" title="4. 数据构建（磨刀不误砍柴工）"></a><strong>4. 数据构建（磨刀不误砍柴工）</strong></h4><ul>
+<li><strong>论文标题：</strong> <strong>《Corpus Construction for Aviation Speech Recognition》</strong> (Springer, 2022/2025引用)</li>
+<li><strong>核心内容：</strong> <strong>航空专业语料库构建</strong></li>
+<li><strong>推荐理由：</strong> 虽然偏向语音，但其<strong>文本预处理、清洗和关键词提取</strong>的方法论完全适用于文本挖掘。你需要学习如何从杂乱的航空维修手册或通话记录中清洗出高质量的训练数据。</li>
+</ul>
+<hr>
+<h3 id="📖-第二部分：航空领域信息抽取综述（为你定制）"><a href="#📖-第二部分：航空领域信息抽取综述（为你定制）" class="headerlink" title="📖 第二部分：航空领域信息抽取综述（为你定制）"></a><strong>📖 第二部分：航空领域信息抽取综述（为你定制）</strong></h3><p>为了让你对该领域有全面了解，我基于最新的文献趋势，为你撰写了这篇综述摘要。你可以将其作为你开题报告或文献综述的框架基础。</p>
+<h4 id="🚀-航空领域信息抽取技术综述：从深度学习到大模型协同"><a href="#🚀-航空领域信息抽取技术综述：从深度学习到大模型协同" class="headerlink" title="🚀 航空领域信息抽取技术综述：从深度学习到大模型协同"></a><strong>🚀 航空领域信息抽取技术综述：从深度学习到大模型协同</strong></h4><p><strong>1. 领域背景与挑战</strong><br>航空领域的数据具有<strong>“高专业性、强逻辑性、多源异构”</strong>的特点。数据来源包括飞行手册（AMM）、故障隔离手册（FIM）、驾驶舱语音记录（CVR）以及事故调查报告。</p>
+<ul>
+<li><strong>核心难点：</strong><ul>
+<li><strong>术语复杂：</strong> 大量缩写（如V1, Vr, N1）和特定语境含义。</li>
+<li><strong>标注稀缺：</strong> 依赖航空专家标注，成本极高，导致“小样本”问题突出。</li>
+<li><strong>关系重叠：</strong> 一个故障现象可能对应多个原因，实体间关系复杂（重叠关系）。</li>
+</ul>
+</li>
+</ul>
+<p><strong>2. 技术演进路线</strong></p>
+<ul>
+<li><strong>阶段一：基于统计与规则（传统方法）</strong><ul>
+<li>早期依赖人工编写的词典和正则表达式。准确率高但召回率低，难以应对新词。</li>
+</ul>
+</li>
+<li><strong>阶段二：深度学习时代（当前主流）</strong><ul>
+<li><strong>命名实体识别（NER）：</strong> 目前<strong>BERT + BiLSTM + CRF</strong> 仍是航空领域的“黄金标准”。2026年的研究显示，通过引入IDCNN（膨胀卷积）替换LSTM，可以在保持精度的同时提升训练速度，非常适合工程落地。</li>
+<li><strong>关系抽取（RE）：</strong> 从管道式（先NER后RE）转向<strong>联合抽取（Joint Extraction）</strong>。例如，利用<strong>指针网络（Pointer Network）</strong>或<strong>表填充（Table Filling）</strong>方法，一次性解决实体识别和关系分类，有效解决了“误差传播”问题。</li>
+</ul>
+</li>
+<li><strong>阶段三：大模型与知识增强（2025-2026趋势）</strong><ul>
+<li><strong>远程监督与强化学习：</strong> 针对数据噪声问题，利用强化学习（RL）自动筛选高质量的训练样本（如东北大学2026年研究）。</li>
+<li><strong>生成式抽取：</strong> 利用T5或BART等生成式模型，将抽取任务转化为“问答”或“文本生成”任务（例如：输入“飞机引擎震动”，输出“&lt;故障&gt;引擎震动&lt;/故障&gt;”）。</li>
+<li><strong>知识图谱融合：</strong> 将航空维修手册构建成知识图谱，利用图神经网络（GNN）辅助文本理解。例如，当文本提到“液压泵压力低”时，图谱能提供“液压泵”属于“液压系统”的先验知识，提升模型理解力。</li>
+</ul>
+</li>
+</ul>
+<p><strong>3. 低算力环境下的最佳实践</strong></p>
+<p>对于设备有限的实验室，目前的最佳实践路径是：</p>
+<ol>
+<li><strong>数据层：</strong> 使用<strong>远程监督</strong>技术，利用现有的航空知识库自动标注大量无标签文本。</li>
+<li><strong>模型层：</strong> 采用<strong>“预训练模型（BERT/RoBERTa）+ 轻量化适配器（Adapter）”</strong>的模式。不要全量微调大模型，只训练少量的Adapter参数。</li>
+<li><strong>增强层：</strong> 引入<strong>知识蒸馏</strong>。用云端大模型（Teacher）对难例进行标注，指导本地小模型（Student）学习。</li>
+</ol>
+<p><strong>4. 总结与展望</strong><br>航空领域的信息抽取正处于从“感知智能”（识别文字）向“认知智能”（理解故障逻辑）跨越的阶段。未来的研究热点将集中在<strong>可解释性抽取</strong>（告诉维修人员为什么判定是这个故障）以及<strong>多模态融合</strong>（结合文本报告与传感器时序数据）。</p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="http://example.com/2026/03/31/%E8%AE%BA%E6%96%87%E5%A4%8D%E7%8E%B0%E6%B8%85%E5%8D%95/" data-id="cuidBQC-rDHaTim1vuKBNiTBf" data-title="论文复现清单" class="article-share-link"><span class="fa fa-share">Share</span></a>
+      
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E8%AE%BA%E6%96%87%E8%A7%84%E5%88%92/" rel="tag">论文规划</a></li></ul>
+
+    </footer>
+  </div>
+  
+</article>
+
+
+
+  
+    <article id="post-深入理解-Java——hashCode-真的只是内存地址吗？" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
+  <div class="article-meta">
+    <a href="/2026/03/31/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3-Java%E2%80%94%E2%80%94hashCode-%E7%9C%9F%E7%9A%84%E5%8F%AA%E6%98%AF%E5%86%85%E5%AD%98%E5%9C%B0%E5%9D%80%E5%90%97%EF%BC%9F/" class="article-date">
+  <time class="dt-published" datetime="2026-03-31T06:35:55.000Z" itemprop="datePublished">2026-03-31</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="p-name article-title" href="/2026/03/31/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3-Java%E2%80%94%E2%80%94hashCode-%E7%9C%9F%E7%9A%84%E5%8F%AA%E6%98%AF%E5%86%85%E5%AD%98%E5%9C%B0%E5%9D%80%E5%90%97%EF%BC%9F/">深入理解 Java——hashCode 真的只是内存地址吗？</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="e-content article-entry" itemprop="articleBody">
+      
+        <p>在 Java 开发中，我们经常会遇到这样一个问题：“<code>Object</code> 的 <code>hashCode()</code> 方法返回的到底是不是对象的内存地址？”</p>
+<p>很多人的第一反应是：<strong>不是，它只是一个为了支持哈希表（如 HashMap）快速查找的值。</strong> 这个回答在宏观业务逻辑上是完全正确的。但在深入探究 JVM 的底层实现后，我们会发现，<code>hashCode</code> 与内存地址之间，有着一段与 Java 垃圾回收（GC）机制紧密相关的“爱恨情仇”。</p>
+<h2 id="一、-核心误区：hashCode-真的和内存地址完全无关吗？"><a href="#一、-核心误区：hashCode-真的和内存地址完全无关吗？" class="headerlink" title="一、 核心误区：hashCode 真的和内存地址完全无关吗？"></a>一、 核心误区：hashCode 真的和内存地址完全无关吗？</h2><p>其实，<code>hashCode</code> 的生成策略取决于 JVM 的版本和具体实现：</p>
+<ol>
+<li><strong>早期 JVM 的历史遗留</strong>：在早期的 HotSpot JVM 中，默认的 <code>hashCode()</code>（Identity Hash Code）确实是<strong>基于对象的底层物理内存地址</strong>计算出来的。</li>
+<li><strong>现代 JVM 的进化（Java 8 及之后）</strong>：现代 HotSpot JVM 默认<strong>不再</strong>依赖内存地址。现在的默认策略是使用一个线程局部的伪随机数生成器（Xorshift 算法）来生成这个哈希值。</li>
+</ol>
+<p><strong>为什么现代 JVM 要抛弃使用内存地址作为 hashCode 呢？</strong> 这就不得不提到 Java 强大的垃圾回收器（GC）。</p>
+<h2 id="二、-为什么-GC-不只回收垃圾，还要“移动”存活对象？"><a href="#二、-为什么-GC-不只回收垃圾，还要“移动”存活对象？" class="headerlink" title="二、 为什么 GC 不只回收垃圾，还要“移动”存活对象？"></a>二、 为什么 GC 不只回收垃圾，还要“移动”存活对象？</h2><p>如果 GC 仅仅是简单地把没有引用的对象标记为“可用空间”（即<strong>标记-清除算法 Mark-Sweep</strong>），会产生一个致命的问题：<strong>内存碎片（Memory Fragmentation）</strong>。</p>
+<p>打个比方：想象一个电影院（内存），观众（对象）随机离场（变成垃圾）。这时候电影院里空出了很多零散的座位（内存碎片）。如果此时来了一个需要连坐的 5 人家庭（比如 Java 中申请一个大数组），虽然总空座位有 10 个，但因为不连续，他们根本坐不下，从而触发 <code>OutOfMemoryError</code>。</p>
+<p>为了腾出<strong>连续的内存空间</strong>，GC 会扮演电影院管理员的角色，把所有还在看电影的观众（存活的、被引用的对象）全部“赶”到电影院的一侧排排坐。这就是 GC 的<strong>标记-整理（Mark-Compact）</strong>或<strong>复制（Copying）</strong>算法。</p>
+<p><strong>结论：GC 移动的恰恰是那些存活的、被引用的对象。</strong> 死掉的对象不需要移动，它们占用的物理空间直接被覆盖掉即可。</p>
+<h2 id="三、-对象被移动后，引用变量怎么办？"><a href="#三、-对象被移动后，引用变量怎么办？" class="headerlink" title="三、 对象被移动后，引用变量怎么办？"></a>三、 对象被移动后，引用变量怎么办？</h2><p>当 GC 把一个对象从内存地址 A 移动到地址 B 时，JVM 必须同步更新所有指向该对象的引用。这是 JVM 在 GC 时做的最繁重的工作之一：</p>
+<ul>
+<li><strong>Stop-The-World (STW) 机制</strong>：在传统的垃圾回收器（如 Parallel GC, CMS）中，为了安全地完成“移动对象 + 更新引用”的操作，JVM 会暂停所有业务线程（STW）。在世界静止的这一刻，GC 偷偷把对象搬好，修改完所有引用指针，然后再让业务线程继续运行。</li>
+<li><strong>现代前沿 GC 的黑科技</strong>：在最新的垃圾回收器（如 ZGC 和 Shenandoah）中，为了避免长时间停顿，它们实现了<strong>并发移动</strong>。通过引入“读屏障（Load Barrier）”或“染色指针（Colored Pointers）”等技术，当业务线程试图通过旧地址访问被移动的对象时，JVM 能够瞬间拦截并重定向到新地址，同时顺手更新旧引用。</li>
+</ul>
+<h2 id="四、-致命冲突：如果-hashCode-内存地址，会发生什么？"><a href="#四、-致命冲突：如果-hashCode-内存地址，会发生什么？" class="headerlink" title="四、 致命冲突：如果 hashCode = 内存地址，会发生什么？"></a>四、 致命冲突：如果 hashCode = 内存地址，会发生什么？</h2><p>现在我们把逻辑闭环连上：</p>
+<ol>
+<li><code>HashMap</code> 等散列表依赖对象的 <code>hashCode</code> 来计算存储位置（Bucket）。Java 规范要求：一个对象只要没被修改，其 <code>hashCode</code> 在同一次执行中<strong>必须保持不变</strong>。</li>
+<li>GC 为了解决内存碎片，会<strong>频繁移动存活对象</strong>，导致对象的<strong>物理内存地址不断变化</strong>。</li>
+</ol>
+<p><strong>冲突点爆发：</strong> 如果 <code>hashCode()</code> 每次都去读取对象当前的真实内存地址，那么每次 GC 之后，对象的 <code>hashCode</code> 就会改变。这会导致对象在 <code>HashMap</code> 里彻底迷失！ （存进去的时候算出了一个位置，GC 之后再用同一个对象去查，因为地址变了，算出了另一个位置，结果就是 <code>get()</code> 返回 <code>null</code>）。</p>
+<h2 id="五、-JVM-的终极解决方案：缓存机制"><a href="#五、-JVM-的终极解决方案：缓存机制" class="headerlink" title="五、 JVM 的终极解决方案：缓存机制"></a>五、 JVM 的终极解决方案：缓存机制</h2><p>为了解决这个冲突，现代 JVM 采取了以下策略：</p>
+<ol>
+<li><strong>首次计算</strong>：当第一次调用对象的 <code>hashCode()</code> 时，JVM 利用伪随机数算法生成一个 Hash 值。</li>
+<li><strong>永久缓存</strong>：生成完毕后，JVM 会将这个值<strong>永久写入到该对象的对象头（Mark Word）中</strong>。</li>
+<li><strong>后续读取</strong>：之后再次调用 <code>hashCode()</code> 时，直接从对象头中读取这个缓存好的值，不再重新计算。</li>
+</ol>
+<p>这样一来，无论 GC 怎么把这个对象在内存中搬来搬去，它头顶上顶着的这个 <code>hashCode</code> 永远不会变，完美保证了哈希表等数据结构的稳定性！</p>
+<p><strong>总结</strong> 从写代码的业务视角来看，<code>hashCode</code> 确实只是为了支持哈希表的一个值，不应被视为地址。但从底层探究，正是因为 GC 的内存整理机制导致了对象物理地址的动态性，才倒逼 JVM 放弃了“地址即哈希”的朴素设定，演化出了今天对象头缓存伪随机数的优雅设计。</p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="http://example.com/2026/03/31/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3-Java%E2%80%94%E2%80%94hashCode-%E7%9C%9F%E7%9A%84%E5%8F%AA%E6%98%AF%E5%86%85%E5%AD%98%E5%9C%B0%E5%9D%80%E5%90%97%EF%BC%9F/" data-id="cuidplXKaVyWfhk1HB9zqccbV" data-title="深入理解 Java——hashCode 真的只是内存地址吗？" class="article-share-link"><span class="fa fa-share">Share</span></a>
+      
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/JVM/" rel="tag">JVM</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Java/" rel="tag">Java</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6-GC/" rel="tag">垃圾回收(GC)</a></li></ul>
+
+    </footer>
+  </div>
+  
+</article>
+
+
+
+  
+    <article id="post-英语阅读-2025-12-3-new" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
+  <div class="article-meta">
+    <a href="/2026/03/31/%E8%8B%B1%E8%AF%AD%E9%98%85%E8%AF%BB-2025-12-3-new/" class="article-date">
+  <time class="dt-published" datetime="2026-03-31T00:46:39.000Z" itemprop="datePublished">2026-03-31</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="p-name article-title" href="/2026/03/31/%E8%8B%B1%E8%AF%AD%E9%98%85%E8%AF%BB-2025-12-3-new/">英语阅读-2025-12-3-new</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="e-content article-entry" itemprop="articleBody">
+      
+        <h1 id="英语阅读精读报告：45岁之后的求职之路-Looking-for-a-job-after-45"><a href="#英语阅读精读报告：45岁之后的求职之路-Looking-for-a-job-after-45" class="headerlink" title="英语阅读精读报告：45岁之后的求职之路 (Looking for a job after 45)"></a>英语阅读精读报告：45岁之后的求职之路 (Looking for a job after 45)</h1><img src="/2026/03/31/%E8%8B%B1%E8%AF%AD%E9%98%85%E8%AF%BB-2025-12-3-new/read1.png" class="" title="文章">
+<h2 id="📍-文章核心主旨与现实意义-Main-Idea-amp-Significance"><a href="#📍-文章核心主旨与现实意义-Main-Idea-amp-Significance" class="headerlink" title="📍 文章核心主旨与现实意义 (Main Idea &amp; Significance)"></a>📍 文章核心主旨与现实意义 (Main Idea &amp; Significance)</h2><ul>
+<li><strong>核心主旨</strong>：深度探讨了 45 岁以上中年求职者在职场中面临的严峻“年龄歧视（Ageism）”和长期失业困境。</li>
+<li><strong>现象揭秘</strong>：文章通过一份涵盖七国、五千多人的权威全球调查，无情地揭露了招聘市场的一个“魔幻现实”——招聘经理们虽然在理智上承认老员工的能力不输年轻人，但在实际操作中却深受“认知偏见（perception bias）”的驱使，极度排斥雇佣 45 岁以上的求职者。</li>
+</ul>
+<h2 id="📖-段落大意梳理-Paragraph-Summary"><a href="#📖-段落大意梳理-Paragraph-Summary" class="headerlink" title="📖 段落大意梳理 (Paragraph Summary)"></a>📖 段落大意梳理 (Paragraph Summary)</h2><ul>
+<li><strong>A段：残酷的职场困境</strong><ul>
+<li>提出问题：45 岁以上人群构成了长期失业者的绝大多数。招聘经理极不情愿雇佣他们，借口是他们“不合群、经验过时、不愿学新东西”。</li>
+</ul>
+</li>
+<li><strong>B段：唯一的破局之道与调查背景</strong><ul>
+<li>指明出路：继续教育和培训（More education and training）是真正能带来改变的方法。随后引出前麦肯锡顾问创立的非营利组织 Generation 发布的全球调查报告。</li>
+</ul>
+</li>
+<li><strong>C段：令人窒息的失业数据</strong><ul>
+<li>数据支撑：45岁以上者占长期失业人数的 40% 以上；一旦失业，有近 2/3 的概率失业超一年。年龄是他们重返职场的“最大障碍”。</li>
+</ul>
+</li>
+<li><strong>D段：招聘经理的“神逻辑”</strong><ul>
+<li>揭示根源：求职难的很大一部分原因在于招聘经理的“认知偏见”。他们即使承认老员工表现得一样好甚至更好，也依然拒绝雇佣，固执地认为老员工技能差、适应力低。</li>
+</ul>
+</li>
+<li><strong>E段：极度双标的评分结果</strong><ul>
+<li>荒谬的对比：近 90% 的经理承认老员工能力强，却在打分时把 45 岁以上求职者的各项指标（竟然连“经验”也算在内）打得比 18-34 岁的年轻人还要低。</li>
+</ul>
+</li>
+</ul>
+<h2 id="📚-核心生词本-Vocabulary-Builder"><a href="#📚-核心生词本-Vocabulary-Builder" class="headerlink" title="📚 核心生词本 (Vocabulary Builder)"></a>📚 核心生词本 (Vocabulary Builder)</h2><h3 id="🌟-重点名词-Nouns"><a href="#🌟-重点名词-Nouns" class="headerlink" title="🌟 重点名词 (Nouns)"></a>🌟 重点名词 (Nouns)</h3><ul>
+<li><strong>ageism</strong> <code>/ˈeɪdʒɪzəm/</code> n. 年龄歧视</li>
+<li><strong>bulk</strong> <code>/bʌlk/</code> n. 大部分，主体 (the bulk of…)</li>
+<li><strong>consultant</strong> <code>/kənˈsʌltənt/</code> n. 顾问</li>
+<li><strong>analyst</strong> <code>/ˈænəlɪst/</code> n. 分析师</li>
+<li><strong>barrier</strong> <code>/ˈbæriər/</code> n. 障碍，壁垒</li>
+<li><strong>bias</strong> <code>/ˈbaɪəs/</code> n. 偏见，偏心</li>
+<li><strong>perception</strong> <code>/pərˈsepʃn/</code> n. 认知，感知，看法</li>
+<li><strong>candidate</strong> <code>/ˈkændɪdət/</code> n. 候选人，求职者 (同义词：applicant / job seeker)</li>
+<li><strong>adaptability</strong> <code>/əˌdæptəˈbɪləti/</code> n. 适应能力 (职场核心软技能)</li>
+<li><strong>measure</strong> <code>/ˈmeʒər/</code> n. 衡量标准，指标</li>
+</ul>
+<h3 id="🌟-重点动词-Verbs"><a href="#🌟-重点动词-Verbs" class="headerlink" title="🌟 重点动词 (Verbs)"></a>🌟 重点动词 (Verbs)</h3><ul>
+<li><strong>lay off</strong> 裁员，解雇 (被动语态：be laid off)</li>
+<li><strong>comprise</strong> <code>/kəmˈpraɪz/</code> v. 包含，由…组成，占…比例</li>
+<li><strong>hire</strong> <code>/haɪər/</code> v./n. 雇佣 / 新招的员工</li>
+<li><strong>rate</strong> <code>/reɪt/</code> v. 评估，评价，打分</li>
+</ul>
+<h3 id="🌟-重点形容词-Adjectives"><a href="#🌟-重点形容词-Adjectives" class="headerlink" title="🌟 重点形容词 (Adjectives)"></a>🌟 重点形容词 (Adjectives)</h3><ul>
+<li><strong>damaging</strong> <code>/ˈdæmɪdʒɪŋ/</code> adj. 造成破坏的，有害的</li>
+<li><strong>reluctant</strong> <code>/rɪˈlʌktənt/</code> adj. 不情愿的，勉强的</li>
+<li><strong>persistent</strong> <code>/pərˈsɪstənt/</code> adj. 持续的，坚持不懈的</li>
+<li><strong>substantial</strong> <code>/səbˈstænʃl/</code> adj. 大量的，实质的，重大的</li>
+<li><strong>widespread</strong> <code>/ˈwaɪdspred/</code> adj. 普遍的，广泛的</li>
+<li><strong>remarkable</strong> <code>/rɪˈmɑːrkəbl/</code> adj. 显著的，令人惊讶的</li>
+</ul>
+<h2 id="🔗-高频句型与地道搭配-Key-Collocations-amp-Phrases"><a href="#🔗-高频句型与地道搭配-Key-Collocations-amp-Phrases" class="headerlink" title="🔗 高频句型与地道搭配 (Key Collocations &amp; Phrases)"></a>🔗 高频句型与地道搭配 (Key Collocations &amp; Phrases)</h2><ol>
+<li><strong>the second half of one’s career</strong>：职业生涯的下半场</li>
+<li><strong>make up the bulk of…</strong>：构成…的大部分/绝大多数 (<em>极佳的图表/数据描述词组</em>)</li>
+<li><strong>make a difference</strong>：产生影响，带来改变，起作用 (<em>万能写作金句</em>)</li>
+<li><strong>based on…</strong>：基于，根据…</li>
+<li><strong>out of work</strong>：失业 (<em>替换 unemployed</em>)</li>
+<li><strong>find it + adj. + to do sth.</strong>：发现/觉得做某事很… (如 find it harder to get jobs)</li>
+<li><strong>a barrier to doing sth.</strong>：做某事的障碍 (<em>注意 to 是介词！后面接 doing</em>)</li>
+<li><strong>on the part of sb.</strong>：在某人那方面，由某人表现出的</li>
+<li><strong>turn out to be…</strong>：结果是，证明是</li>
+<li><strong>as good as or better than…</strong>：和…一样好甚至更好 (<em>完美的比较级并列结构</em>)</li>
+<li><strong>perception bias against…</strong>：对…的认知偏见</li>
+<li><strong>A is three times as likely to do sth. as B</strong>：A 做某事的可能性是 B 的三倍 (<em>高级倍数表达法</em>)</li>
+<li><strong>on average</strong>：平均而言</li>
+<li><strong>nine in 10</strong>：十分之九 (<em>极地道的比例表达法</em>)</li>
+</ol>
+<h1 id="英语阅读精读报告：45岁之后的求职之路-下半部分-F-J段"><a href="#英语阅读精读报告：45岁之后的求职之路-下半部分-F-J段" class="headerlink" title="英语阅读精读报告：45岁之后的求职之路 (下半部分 F-J段)"></a>英语阅读精读报告：45岁之后的求职之路 (下半部分 F-J段)</h1><img src="/2026/03/31/%E8%8B%B1%E8%AF%AD%E9%98%85%E8%AF%BB-2025-12-3-new/read2.png" class="" title="文章">
+<h2 id="📍-文章核心主旨与现实意义-Main-Idea-amp-Significance-1"><a href="#📍-文章核心主旨与现实意义-Main-Idea-amp-Significance-1" class="headerlink" title="📍 文章核心主旨与现实意义 (Main Idea &amp; Significance)"></a>📍 文章核心主旨与现实意义 (Main Idea &amp; Significance)</h2><ul>
+<li><strong>核心主旨</strong>：文章后半部分主要探讨了打破年龄歧视的“终极武器”——<strong>教育与再培训（Education and training）</strong>，同时也指出了一个残酷的社会现实——教育资源的阶层差异。</li>
+<li><strong>现象揭秘</strong>：虽然招聘经理对大龄求职者有“不愿学新技术”的偏见，但只要大龄求职者主动参与培训，就能“逆风翻盘”。然而，培训需要时间和金钱，这导致低收入群体更难获得转型的机会，从而陷入“越穷越难转型”的困境。</li>
+</ul>
+<h2 id="📖-段落大意梳理-Paragraph-Summary-1"><a href="#📖-段落大意梳理-Paragraph-Summary-1" class="headerlink" title="📖 段落大意梳理 (Paragraph Summary)"></a>📖 段落大意梳理 (Paragraph Summary)</h2><ul>
+<li><strong>F段：招聘经理的深层担忧</strong><ul>
+<li>经理们不仅担心老员工不愿学新技术，而且因为经理自己大多不到45岁，所以本能地排斥招比自己年纪大的人。</li>
+</ul>
+</li>
+<li><strong>G段：逆风翻盘的好消息</strong><ul>
+<li>只要45岁以上的人积极参加相关培训或拿到证书，就能彻底扭转劣势。74%的成功转行者表示，培训帮了大忙。</li>
+</ul>
+</li>
+<li><strong>H段：保持学习热情的惊人回报</strong><ul>
+<li>对培训感到“兴奋/有热情”的人，失业时间更短，拿到的工作邀约（Offer）更多，对工作也更满意。</li>
+</ul>
+</li>
+<li><strong>I段：什么类型的培训最管用？</strong><ul>
+<li>培训比政府补贴有用得多。虽然学校的行业资格证最打动人，但耗时耗钱。其实面对面培训、在职培训、甚至网课（不管有没有证书）都非常有帮助。</li>
+</ul>
+</li>
+<li><strong>J段：残酷的社会资源差异（不利的一面）</strong><ul>
+<li>仅仅展现出“我在学习新技能”这个态度本身就很有用。但缺点是，低收入、学历低、来自弱势社区的人往往最缺乏再培训的资源和兴趣，导致穷人更难转型。</li>
+</ul>
+</li>
+</ul>
+<h2 id="📚-核心生词本-Vocabulary-Builder-扩充版"><a href="#📚-核心生词本-Vocabulary-Builder-扩充版" class="headerlink" title="📚 核心生词本 (Vocabulary Builder - 扩充版)"></a>📚 核心生词本 (Vocabulary Builder - 扩充版)</h2><h3 id="🌟-重点名词-Nouns-1"><a href="#🌟-重点名词-Nouns-1" class="headerlink" title="🌟 重点名词 (Nouns)"></a>🌟 重点名词 (Nouns)</h3><ul>
+<li><strong>fear</strong> <code>/fɪr/</code> n. 担忧，恐惧，害怕</li>
+<li><strong>technology</strong> <code>/tekˈnɑːlədʒi/</code> n. 技术，科技</li>
+<li><strong>majority</strong> <code>/məˈdʒɔːrəti/</code> n. 大多数，大部分</li>
+<li><strong>credential</strong> <code>/krəˈdenʃl/</code> n. 资历，文凭，证书</li>
+<li><strong>career</strong> <code>/kəˈrɪr/</code> n. 职业，事业</li>
+<li><strong>path</strong> <code>/pæθ/</code> n. 道路，路径 (career path 职业道路)</li>
+<li><strong>attitude</strong> <code>/ˈætɪtuːd/</code> n. 态度，看法</li>
+<li><strong>offer</strong> <code>/ˈɔːfər/</code> n. 提供，工作邀约 (job offer)</li>
+<li><strong>subsidy</strong> <code>/ˈsʌbsədi/</code> n. 补贴，补助金</li>
+<li><strong>qualification</strong> <code>/ˌkwɑːlɪfɪˈkeɪʃn/</code> n. 资格，学历，证明</li>
+<li><strong>certification</strong> <code>/ˌsɜːrtɪfɪˈkeɪʃn/</code> n. 认证，证书</li>
+<li><strong>downside</strong> <code>/ˈdaʊnsaɪd/</code> n. 缺点，不利的一面</li>
+<li><strong>community</strong> <code>/kəˈmjuːnəti/</code> n. 社区，群体</li>
+<li><strong>income</strong> <code>/ˈɪnˌkʌm/</code> n. 收入 (high/low income 高/低收入)</li>
+<li><strong>diploma</strong> <code>/dɪˈploʊmə/</code> n. 毕业文凭，学位证书</li>
+<li><strong>program</strong> <code>/ˈproʊɡræm/</code> n. 项目，计划，程序</li>
+</ul>
+<h3 id="🌟-重点动词-Verbs-1"><a href="#🌟-重点动词-Verbs-1" class="headerlink" title="🌟 重点动词 (Verbs)"></a>🌟 重点动词 (Verbs)</h3><ul>
+<li><strong>worry</strong> <code>/ˈwɜːri/</code> v. 担心，发愁</li>
+<li><strong>try</strong> <code>/traɪ/</code> v. 尝试，努力</li>
+<li><strong>switch</strong> <code>/swɪtʃ/</code> v. 转换，改变 (switch careers 转行)</li>
+<li><strong>enable</strong> <code>/ɪˈneɪbl/</code> v. 使能够，使成为可能</li>
+<li><strong>shift</strong> <code>/ʃɪft/</code> v. 转移，转向</li>
+<li><strong>depend</strong> <code>/dɪˈpend/</code> v. 取决于，依赖 (depend on…)</li>
+<li><strong>cost</strong> <code>/kɔːst/</code> v. 花费，消耗 (cost money and time 耗时耗钱)</li>
+<li><strong>participate</strong> <code>/pɑːrˈtɪsɪpeɪt/</code> v. 参加，参与</li>
+</ul>
+<h3 id="🌟-重点形容词-副词-Adjectives-amp-Adverbs"><a href="#🌟-重点形容词-副词-Adjectives-amp-Adverbs" class="headerlink" title="🌟 重点形容词/副词 (Adjectives &amp; Adverbs)"></a>🌟 重点形容词/副词 (Adjectives &amp; Adverbs)</h3><ul>
+<li><strong>unable</strong> <code>/ʌnˈeɪbl/</code> adj. 不能的，无法的</li>
+<li><strong>active</strong> <code>/ˈæktɪv/</code> adj. 积极的，活跃的 (副词 actively)</li>
+<li><strong>relevant</strong> <code>/ˈreləvənt/</code> adj. 相关的，切题的</li>
+<li><strong>excited</strong> <code>/ɪkˈsaɪtɪd/</code> adj. 兴奋的，激动的</li>
+<li><strong>satisfied</strong> <code>/ˈsætɪsfaɪd/</code> adj. 满意的，满足的</li>
+<li><strong>obviously</strong> <code>/ˈɑːbviəsli/</code> adv. 显然地，明显地</li>
+<li><strong>helpful</strong> <code>/ˈhelpfl/</code> adj. 有帮助的，有益的</li>
+<li><strong>informal</strong> <code>/ɪnˈfɔːrml/</code> adj. 非正式的 (反义词 formal)</li>
+<li><strong>historically</strong> <code>/hɪˈstɔːrɪkli/</code> adv. 历史上地，历来</li>
+<li><strong>disadvantaged</strong> <code>/ˌdɪsədˈvæntɪdʒd/</code> adj. 处于劣势的，弱势的，贫困的</li>
+</ul>
+<h2 id="🔗-高频句型与地道搭配-Key-Collocations-amp-Phrases-1"><a href="#🔗-高频句型与地道搭配-Key-Collocations-amp-Phrases-1" class="headerlink" title="🔗 高频句型与地道搭配 (Key Collocations &amp; Phrases)"></a>🔗 高频句型与地道搭配 (Key Collocations &amp; Phrases)</h2><ol>
+<li><strong>be reluctant to do sth.</strong>：不情愿做某事 (<em>全文灵魂词组</em>)</li>
+<li><strong>besides</strong>：此外，而且 (<em>非常基础且好用的逻辑连接词</em>)</li>
+<li><strong>the majority of…</strong>：…的大多数</li>
+<li><strong>engage in</strong>：参与，从事于</li>
+<li><strong>turn sth. on its head</strong>：彻底改变某事，完全推翻 (<em>高级俚语</em>)</li>
+<li><strong>three-quarters</strong>：四分之三</li>
+<li><strong>be likely to do sth.</strong>：有可能做某事</li>
+<li><strong>overwhelmingly say that…</strong>：压倒性地/绝大多数表示…</li>
+<li><strong>enable sb. to do sth.</strong>：使某人能够做某事 (<em>万能提分句型</em>)</li>
+<li><strong>be excited by…</strong>：对…感到兴奋/充满热情</li>
+<li><strong>be satisfied by/with…</strong>：对…感到满意</li>
+<li><strong>depend on…</strong>：取决于…</li>
+<li><strong>be impressed by…</strong>：对…留下深刻印象，被…打动</li>
+<li><strong>in-person</strong>：面对面的，亲身参与的 (如 in-person training)</li>
+<li><strong>on-the-job training</strong>：在职培训</li>
+<li><strong>have an effect (on)</strong>：产生效果，有影响</li>
+<li><strong>on its own</strong>：其本身，单凭它自己</li>
+<li><strong>on average</strong>：平均而言</li>
+</ol>
+<h1 id="英语阅读精读报告：45岁之后的求职之路-大结局-K-M段"><a href="#英语阅读精读报告：45岁之后的求职之路-大结局-K-M段" class="headerlink" title="英语阅读精读报告：45岁之后的求职之路 (大结局 K-M段)"></a>英语阅读精读报告：45岁之后的求职之路 (大结局 K-M段)</h1><img src="/2026/03/31/%E8%8B%B1%E8%AF%AD%E9%98%85%E8%AF%BB-2025-12-3-new/read3.png" class="" title="文章">
+<h2 id="📍-文章核心主旨与最终结论-Main-Idea-amp-Conclusion"><a href="#📍-文章核心主旨与最终结论-Main-Idea-amp-Conclusion" class="headerlink" title="📍 文章核心主旨与最终结论 (Main Idea &amp; Conclusion)"></a>📍 文章核心主旨与最终结论 (Main Idea &amp; Conclusion)</h2><ul>
+<li><strong>核心主旨</strong>：文章的最后三段从理论分析转向了<strong>实际行动指南</strong>。作者用生动的例子说明了“经验胜于文凭”，并一针见血地指出：抱怨年龄歧视是毫无用处的（get us nowhere）。</li>
+<li><strong>最终结论（Bottom line）</strong>：面对残酷的现实，中年求职者最好的自救方式就是利用互联网进行低成本的技能培训，从而向雇主证明自己“能解决问题”。同时，文章在结尾升华了主题，指出了缺乏学习意愿的底层群体给整个社会带来的挑战。</li>
+</ul>
+<h2 id="📖-段落大意梳理-Paragraph-Summary-2"><a href="#📖-段落大意梳理-Paragraph-Summary-2" class="headerlink" title="📖 段落大意梳理 (Paragraph Summary)"></a>📖 段落大意梳理 (Paragraph Summary)</h2><ul>
+<li><strong>K段：实际经验 &gt; 一纸文凭</strong><ul>
+<li>雇主更看重求职者的实际工作经验，而不是一个好听的学位。因为有过实践经验的人往往从入职的第一天起（from day 1）就能立刻上手干活、融入团队。</li>
+</ul>
+</li>
+<li><strong>L段：停止抱怨，立刻行动</strong><ul>
+<li>抱怨“年龄歧视”解决不了任何问题。雇主面临着时间压力，他们只是想招能解决问题的人。如今多亏了互联网（如 YouTube 等），获取免费或廉价的技能培训变得前所未有的容易。</li>
+</ul>
+</li>
+<li><strong>M段：最终结论与社会挑战</strong><ul>
+<li>结论：45岁之后找工作确实难，上网学新技能是最好的出路。遗憾的是，最需要学习的人往往最不去学，这不仅是对个体生命的浪费，也变成了全社会的损失。因为只有当更多人就业时，所有人才能受益。</li>
+</ul>
+</li>
+</ul>
+<h2 id="📚-核心生词本-Vocabulary-Builder-基础与高阶并重"><a href="#📚-核心生词本-Vocabulary-Builder-基础与高阶并重" class="headerlink" title="📚 核心生词本 (Vocabulary Builder - 基础与高阶并重)"></a>📚 核心生词本 (Vocabulary Builder - 基础与高阶并重)</h2><h3 id="🌟-重点名词-Nouns-2"><a href="#🌟-重点名词-Nouns-2" class="headerlink" title="🌟 重点名词 (Nouns)"></a>🌟 重点名词 (Nouns)</h3><ul>
+<li><strong>employer</strong> <code>/ɪmˈplɔɪər/</code> n. 雇主，老板 (反义词: employee 员工)</li>
+<li><strong>graduate</strong> <code>/ˈɡrædʒuət/</code> n. 毕业生 (college graduate 大学毕业生)</li>
+<li><strong>industry</strong> <code>/ˈɪndəstri/</code> n. 行业，工业</li>
+<li><strong>degree</strong> <code>/dɪˈɡriː/</code> n. 学位，程度</li>
+<li><strong>literature</strong> <code>/ˈlɪtrətʃər/</code> n. 文学 (literature graduate 文科毕业生)</li>
+<li><strong>finance</strong> <code>/ˈfaɪnæns/</code> n. 金融，财务</li>
+<li><strong>economics</strong> <code>/ˌiːkəˈnɑːmɪks/</code> n. 经济学</li>
+<li><strong>pressure</strong> <code>/ˈpreʃər/</code> n. 压力 (under pressure 在压力下)</li>
+<li><strong>instruction</strong> <code>/ɪnˈstrʌkʃn/</code> n. 指导，教学，说明</li>
+<li><strong>course</strong> <code>/kɔːrs/</code> n. 课程 (online courses 网课)</li>
+<li><strong>society</strong> <code>/səˈsaɪəti/</code> n. 社会</li>
+<li><strong>benefit</strong> <code>/ˈbenɪfɪt/</code> n./v. 好处 / 受益，得益</li>
+</ul>
+<h3 id="🌟-重点动词-Verbs-2"><a href="#🌟-重点动词-Verbs-2" class="headerlink" title="🌟 重点动词 (Verbs)"></a>🌟 重点动词 (Verbs)</h3><ul>
+<li><strong>surf</strong> <code>/sɜːrf/</code> v. 冲浪 (surf the internet 网上冲浪)</li>
+<li><strong>travel</strong> <code>/ˈtrævl/</code> v. 旅行 (travel around 环游)</li>
+<li><strong>solve</strong> <code>/sɑːlv/</code> v. 解决 (solve problems 解决问题)</li>
+<li><strong>resolve</strong> <code>/rɪˈzɑːlv/</code> v. 解决，消除 (resolve their worries 消除他们的担忧)</li>
+<li><strong>gain</strong> <code>/ɡeɪn/</code> v. 获得，获取 (gain instruction 获取指导)</li>
+<li><strong>raise</strong> <code>/reɪz/</code> v. 引起，提出 (raise a challenge 引发挑战)</li>
+</ul>
+<h3 id="🌟-重点形容词-副词-Adjectives-amp-Adverbs-1"><a href="#🌟-重点形容词-副词-Adjectives-amp-Adverbs-1" class="headerlink" title="🌟 重点形容词/副词 (Adjectives &amp; Adverbs)"></a>🌟 重点形容词/副词 (Adjectives &amp; Adverbs)</h3><ul>
+<li><strong>willing</strong> <code>/ˈwɪlɪŋ/</code> adj. 愿意的，乐意的</li>
+<li><strong>inexpensive</strong> <code>/ˌɪnɪkˈspensɪv/</code> adj. 不贵的，廉价的</li>
+<li><strong>free</strong> <code>/friː/</code> adj. 免费的，自由的</li>
+<li><strong>sadly</strong> <code>/ˈsædli/</code> adv. 悲哀地，遗憾地</li>
+<li><strong>unemployed</strong> <code>/ˌʌnɪmˈplɔɪd/</code> adj. 失业的</li>
+</ul>
+<h2 id="🔗-高频句型与地道搭配-Key-Collocations-amp-Phrases-2"><a href="#🔗-高频句型与地道搭配-Key-Collocations-amp-Phrases-2" class="headerlink" title="🔗 高频句型与地道搭配 (Key Collocations &amp; Phrases)"></a>🔗 高频句型与地道搭配 (Key Collocations &amp; Phrases)</h2><ol>
+<li><strong>more likely to hire A than B</strong>：更有可能雇佣 A 而不是 B (<em>极其重要的比较句型</em>)</li>
+<li><strong>spend time doing sth.</strong>：花时间做某事 (如 spend their summers working)</li>
+<li><strong>from day 1</strong>：从第一天起，立刻上手 (<em>非常实用的职场口语</em>)</li>
+<li><strong>rail against</strong>：抱怨，强烈抗议 (<em>高级书面表达，替换 complain about</em>)</li>
+<li><strong>get sb. nowhere</strong>：对某人毫无用处，行不通 (<em>高分地道短语！如 It gets us nowhere 这毫无用处</em>)</li>
+<li><strong>under pressure</strong>：面临压力，在压力下 (under time pressure 时间紧迫)</li>
+<li><strong>thanks to</strong>：多亏了…，因为… (<em>表示原因的积极表达</em>)</li>
+<li><strong>bottom line</strong>：底线，最终结果，<strong>结论 (最重要的一点)</strong></li>
+<li><strong>let alone</strong>：更不用说，遑论 (<em>进阶加分短语！如 difficult getting a job, let alone changing careers 找工作都难，更别说转行了</em>)</li>
+<li><strong>as a whole</strong>：作为一个整体 (society as a whole 整个社会)</li>
+<li><strong>go to waste</strong>：被浪费掉，白白浪费</li>
+<li><strong>Not only do we not want to…, but…</strong>：我们不仅不想…，而且… (<em>Not only 在句首引起的部分倒装结构，写作满分句型</em>)</li>
+</ol>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="http://example.com/2026/03/31/%E8%8B%B1%E8%AF%AD%E9%98%85%E8%AF%BB-2025-12-3-new/" data-id="cuidNHNykdeJ398tB6nr4sX3U" data-title="英语阅读-2025-12-3-new" class="article-share-link"><span class="fa fa-share">Share</span></a>
+      
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E8%8B%B1%E8%AF%AD/" rel="tag">英语</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E9%98%85%E8%AF%BB/" rel="tag">阅读</a></li></ul>
+
+    </footer>
+  </div>
+  
+</article>
+
+
+
+  
     <article id="post-算法设计测试题-循环和递归" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
   <div class="article-meta">
     <a href="/2026/03/30/%E7%AE%97%E6%B3%95%E8%AE%BE%E8%AE%A1%E6%B5%8B%E8%AF%95%E9%A2%98-%E5%BE%AA%E7%8E%AF%E5%92%8C%E9%80%92%E5%BD%92/" class="article-date">
@@ -959,280 +1402,6 @@ mjx-container[display="true"] + br {
 
 
   
-    <article id="post-我的第一篇文章" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
-  <div class="article-meta">
-    <a href="/2026/03/26/%E6%88%91%E7%9A%84%E7%AC%AC%E4%B8%80%E7%AF%87%E6%96%87%E7%AB%A0/" class="article-date">
-  <time class="dt-published" datetime="2026-03-26T09:47:08.000Z" itemprop="datePublished">2026-03-26</time>
-</a>
-    
-  </div>
-  <div class="article-inner">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="p-name article-title" href="/2026/03/26/%E6%88%91%E7%9A%84%E7%AC%AC%E4%B8%80%E7%AF%87%E6%96%87%E7%AB%A0/">我的第一篇文章</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="e-content article-entry" itemprop="articleBody">
-      
-        <h2 id="1-为什么我要建博客？"><a href="#1-为什么我要建博客？" class="headerlink" title="1. 为什么我要建博客？"></a>1. 为什么我要建博客？</h2><p>作为一名计算机专业的学生，我希望通过写博客来记录我的踩坑日常和学习心得。</p>
-<h2 id="2-代码高亮测试"><a href="#2-代码高亮测试" class="headerlink" title="2. 代码高亮测试"></a>2. 代码高亮测试</h2><p>这是我写的第一段代码，看看高亮效果如何：</p>
-<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 打印一句经典的问候语</span></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">sayHello</span>(<span class="params"></span>) &#123;</span><br><span class="line">    <span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="string">&quot;Hello, World!&quot;</span>);</span><br><span class="line">&#125;</span><br><span class="line"><span class="title function_">sayHello</span>();</span><br></pre></td></tr></table></figure>
-
-      
-    </div>
-    <footer class="article-footer">
-      <a data-url="http://example.com/2026/03/26/%E6%88%91%E7%9A%84%E7%AC%AC%E4%B8%80%E7%AF%87%E6%96%87%E7%AB%A0/" data-id="cuidusE93PPFktknBp_xq_XG0" data-title="我的第一篇文章" class="article-share-link"><span class="fa fa-share">Share</span></a>
-      
-      
-      
-    </footer>
-  </div>
-  
-</article>
-
-
-
-  
-    <article id="post-hello-world" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
-  <div class="article-meta">
-    <a href="/2026/03/26/hello-world/" class="article-date">
-  <time class="dt-published" datetime="2026-03-26T08:35:50.811Z" itemprop="datePublished">2026-03-26</time>
-</a>
-    
-  </div>
-  <div class="article-inner">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="p-name article-title" href="/2026/03/26/hello-world/">Hello World</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="e-content article-entry" itemprop="articleBody">
-      
-        <p>Welcome to <a target="_blank" rel="noopener" href="https://hexo.io/">Hexo</a>! This is your very first post. Check <a target="_blank" rel="noopener" href="https://hexo.io/docs/">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a target="_blank" rel="noopener" href="https://hexo.io/docs/troubleshooting.html">troubleshooting</a> or you can ask me on <a target="_blank" rel="noopener" href="https://github.com/hexojs/hexo/issues">GitHub</a>.</p>
-<h2 id="Quick-Start"><a href="#Quick-Start" class="headerlink" title="Quick Start"></a>Quick Start</h2><h3 id="Create-a-new-post"><a href="#Create-a-new-post" class="headerlink" title="Create a new post"></a>Create a new post</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo new <span class="string">&quot;My New Post&quot;</span></span><br></pre></td></tr></table></figure>
-<p>More info: <a target="_blank" rel="noopener" href="https://hexo.io/docs/writing.html">Writing</a></p>
-<h3 id="Run-server"><a href="#Run-server" class="headerlink" title="Run server"></a>Run server</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo server</span><br></pre></td></tr></table></figure>
-<p>More info: <a target="_blank" rel="noopener" href="https://hexo.io/docs/server.html">Server</a></p>
-<h3 id="Generate-static-files"><a href="#Generate-static-files" class="headerlink" title="Generate static files"></a>Generate static files</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo generate</span><br></pre></td></tr></table></figure>
-<p>More info: <a target="_blank" rel="noopener" href="https://hexo.io/docs/generating.html">Generating</a></p>
-<h3 id="Deploy-to-remote-sites"><a href="#Deploy-to-remote-sites" class="headerlink" title="Deploy to remote sites"></a>Deploy to remote sites</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo deploy</span><br></pre></td></tr></table></figure>
-<p>More info: <a target="_blank" rel="noopener" href="https://hexo.io/docs/one-command-deployment.html">Deployment</a></p>
-
-      
-    </div>
-    <footer class="article-footer">
-      <a data-url="http://example.com/2026/03/26/hello-world/" data-id="cuid7zfx233TeEkz39-7ZmccS" data-title="Hello World" class="article-share-link"><span class="fa fa-share">Share</span></a>
-      
-      
-      
-    </footer>
-  </div>
-  
-</article>
-
-
-
-  
-    <article id="post-英语阅读-25-12-2-new" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
-  <div class="article-meta">
-    <a href="/2026/03/23/%E8%8B%B1%E8%AF%AD%E9%98%85%E8%AF%BB-25-12-2-new/" class="article-date">
-  <time class="dt-published" datetime="2026-03-23T00:46:39.000Z" itemprop="datePublished">2026-03-23</time>
-</a>
-    
-  </div>
-  <div class="article-inner">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="p-name article-title" href="/2026/03/23/%E8%8B%B1%E8%AF%AD%E9%98%85%E8%AF%BB-25-12-2-new/">英语阅读-2025-12-2-New</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="e-content article-entry" itemprop="articleBody">
-      
-        <h1 id="英语阅读精读笔记：游戏经验与求职-Part-1"><a href="#英语阅读精读笔记：游戏经验与求职-Part-1" class="headerlink" title="英语阅读精读笔记：游戏经验与求职 (Part 1)"></a>英语阅读精读笔记：游戏经验与求职 (Part 1)</h1><img src="/2026/03/23/%E8%8B%B1%E8%AF%AD%E9%98%85%E8%AF%BB-25-12-2-new/read1.png" class="" title="文章">
-<h2 id="📍-段落大意梳理-Paragraph-Summary"><a href="#📍-段落大意梳理-Paragraph-Summary" class="headerlink" title="📍 段落大意梳理 (Paragraph Summary)"></a>📍 段落大意梳理 (Paragraph Summary)</h2><ul>
-<li><strong>A 段：引出话题</strong><ul>
-<li>游戏产业巨大，但人们很少把游戏经验写进简历。不过，<strong>企业开始意识到玩家所具备的技能</strong>对职场是有价值的。</li>
-</ul>
-</li>
-<li><strong>B 段：游戏类型与职位匹配</strong><ul>
-<li>一家初创公司坚信游戏技能可应用于现实工作，并有数据支撑：喜欢<strong>解谜/塔防</strong>游戏的往往具备 IT 思维；而偏爱<strong>策略/资源管理</strong>游戏（如《文明》）的玩家，则展现出管理者的特质。</li>
-</ul>
-</li>
-<li><strong>C 段：技能的可转移性</strong><ul>
-<li>Game Academy 公司的理念：分析玩家习惯，提供课程，帮助他们完善游戏中的天赋。社会也<strong>越来越认可游戏技能是“可转移的 (transferable)”</strong>。</li>
-</ul>
-</li>
-<li><strong>D 段：军方也在招募玩家</strong><ul>
-<li>英国皇家空军发言人证实：玩家在游戏中练就的<strong>吸收信息、迅速反应、团队协调以及在压力下保持冷静</strong>的能力，正是军队多个岗位所需要的。</li>
-</ul>
-</li>
-<li><strong>E 段：如何将游戏写入简历</strong><ul>
-<li>招聘专家指出，玩家具备团队协作、解决问题等<strong>软技能 (soft skills)</strong>。但重点不是在简历里炫耀游戏排名，而是要懂得<strong>如何将这些经历与你申请的工作“相关联 (relevant)”</strong>。</li>
-</ul>
-</li>
-<li><strong>F 段：现实的阻力与应对</strong><ul>
-<li>学术研究表明游戏有益，但目前<strong>社会的负面刻板印象 (negative reputation)</strong> 依然存在。如果贸然自称是铁杆玩家，可能会搞砸面试。关键在于你要能<strong>向雇主解释</strong>（比如解释你是如何在线上游戏中领导团队的），从而说服他们这些经验是有用的。</li>
-</ul>
-</li>
-</ul>
-<h2 id="📚-核心生词本-Vocabulary-Builder"><a href="#📚-核心生词本-Vocabulary-Builder" class="headerlink" title="📚 核心生词本 (Vocabulary Builder)"></a>📚 核心生词本 (Vocabulary Builder)</h2><h3 id="🌟-重点名词-Nouns"><a href="#🌟-重点名词-Nouns" class="headerlink" title="🌟 重点名词 (Nouns)"></a>🌟 重点名词 (Nouns)</h3><ul>
-<li><strong>résumé</strong> <code>/ˈrezəmeɪ/</code> n. 简历</li>
-<li><strong>aptitude</strong> <code>/ˈæptɪtuːd/</code> n. 天资，天赋</li>
-<li><strong>acceptance</strong> <code>/əkˈseptəns/</code> n. 接受，认可</li>
-<li><strong>attribute</strong> <code>/ˈætrɪbjuːt/</code> n. 属性，特质</li>
-<li><strong>role</strong> <code>/roʊl/</code> n. 角色，职位</li>
-<li><strong>recruitment</strong> <code>/rɪˈkruːtmənt/</code> n. 招聘</li>
-<li><strong>employee</strong> <code>/ɪmˈplɔɪiː/</code> n. 员工，雇员</li>
-<li><strong>reputation</strong> <code>/ˌrepjuˈteɪʃn/</code> n. 名声，声誉</li>
-<li><strong>headline</strong> <code>/ˈhedlaɪn/</code> n. 头条新闻</li>
-</ul>
-<h3 id="🌟-重点动词-Verbs"><a href="#🌟-重点动词-Verbs" class="headerlink" title="🌟 重点动词 (Verbs)"></a>🌟 重点动词 (Verbs)</h3><ul>
-<li><strong>reckon</strong> <code>/ˈrekən/</code> v. 认为，以为 (偏英式/口语)</li>
-<li><strong>refine</strong> <code>/rɪˈfaɪn/</code> v. 完善，提炼，改进</li>
-<li><strong>absorb</strong> <code>/əbˈzɔːrb/</code> v. 吸收，理解 (信息)</li>
-<li><strong>coordinate</strong> <code>/koʊˈɔːrdɪneɪt/</code> v. 协调，配合</li>
-<li><strong>acquire</strong> <code>/əˈkwaɪər/</code> v. 获得，取得 (技能/知识)</li>
-<li><strong>utilise / utilize</strong> <code>/ˈjuːtəlaɪz/</code> v. 利用，使用 (正式)</li>
-<li><strong>harm</strong> <code>/hɑːrm/</code> v. 伤害，损害</li>
-<li><strong>persuade</strong> <code>/pərˈsweɪd/</code> v. 说服，劝说</li>
-</ul>
-<h3 id="🌟-重点形容词-副词-Adjectives-amp-Adverbs"><a href="#🌟-重点形容词-副词-Adjectives-amp-Adverbs" class="headerlink" title="🌟 重点形容词/副词 (Adjectives &amp; Adverbs)"></a>🌟 重点形容词/副词 (Adjectives &amp; Adverbs)</h3><ul>
-<li><strong>transferable</strong> <code>/trænsˈfɜːrəbl/</code> adj. 可转移的 (如 transferable skills)</li>
-<li><strong>swiftly</strong> <code>/ˈswɪftli/</code> adv. 迅速地，敏捷地</li>
-<li><strong>relevant</strong> <code>/ˈreləvənt/</code> adj. 相关的，切题的 (<em>简历核心词</em>)</li>
-<li><strong>potential</strong> <code>/pəˈtenʃl/</code> adj. 潜在的</li>
-<li><strong>determined</strong> <code>/dɪˈtɜːrmɪnd/</code> adj. 坚定的</li>
-<li><strong>negative</strong> <code>/ˈneɡətɪv/</code> adj. 负面的</li>
-</ul>
-<h2 id="🔗-高频核心搭配-Key-Collocations"><a href="#🔗-高频核心搭配-Key-Collocations" class="headerlink" title="🔗 高频核心搭配 (Key Collocations)"></a>🔗 高频核心搭配 (Key Collocations)</h2><ol>
-<li><strong>wake up to sth.</strong>：开始意识到，认识到 (某个事实)</li>
-<li><strong>be convinced that…</strong>：确信，坚信…</li>
-<li><strong>apply A to B</strong>：将 A 应用于 B</li>
-<li><strong>back up</strong>：支持，证实 (如 backed up by hard data)</li>
-<li><strong>have sth. in common with sb.</strong>：与某人有共同点</li>
-<li><strong>offer courses in sth.</strong>：提供某方面的课程</li>
-<li><strong>a growing acceptance of/that…</strong>：越来越多的认可</li>
-<li><strong>remain calm under pressure</strong>：在压力下保持冷静 (<em>极佳的简历用词</em>)</li>
-<li><strong>soft skills</strong>：软技能 (沟通、团队合作等通用能力)</li>
-<li><strong>make sth. relevant to…</strong>：使某事与…相关</li>
-<li><strong>make headlines</strong>：登上头条，成为新闻焦点</li>
-<li><strong>change one’s mind</strong>：改变想法/主意</li>
-<li><strong>chances of getting a job</strong>：获得工作的机会</li>
-<li><strong>lead a team</strong>：领导团队</li>
-</ol>
-<h1 id="英语阅读精读笔记：游戏经验与求职-Part-2"><a href="#英语阅读精读笔记：游戏经验与求职-Part-2" class="headerlink" title="英语阅读精读笔记：游戏经验与求职 (Part 2)"></a>英语阅读精读笔记：游戏经验与求职 (Part 2)</h1><img src="/2026/03/23/%E8%8B%B1%E8%AF%AD%E9%98%85%E8%AF%BB-25-12-2-new/read2.png" class="" title="文章">
-<h2 id="📍-段落大意梳理-Paragraph-Summary-1"><a href="#📍-段落大意梳理-Paragraph-Summary-1" class="headerlink" title="📍 段落大意梳理 (Paragraph Summary)"></a>📍 段落大意梳理 (Paragraph Summary)</h2><ul>
-<li><strong>G 段：从“休闲玩家”到“有意识的玩家”</strong><ul>
-<li>随便打发时间玩游戏对求职无益。关键是要运用<strong>批判性思维 (critical thinking)</strong>，成为“有意识的”玩家。如果在游戏里展现了极强的<strong>领导力 (leadership)</strong>（如指挥大型团队副本），完全有理由写进简历。</li>
-</ul>
-</li>
-<li><strong>H 段：硬核游戏堪比 MBA</strong><ul>
-<li>举例《星战前夜》(EVE Online)：这游戏拥有由真实市场原则驱动的复杂经济系统，涉及<strong>原材料开采、制造成本、以及基于供求关系的价格波动 (fluctuate)</strong>。玩懂它基本上等于拿了个 MBA。</li>
-</ul>
-</li>
-<li><strong>I 段：游戏经验的完美变现</strong><ul>
-<li>玩家 Ricci 将他在游戏里管理几百人公会的经验（如创造力、组织能力和<strong>冲突解决能力 conflict resolution</strong>），成功转移到了现实商业中。他重组了一家公司并打入国际市场，将成功归功于游戏带来的锻炼。</li>
-</ul>
-</li>
-<li><strong>J 段：培养职场“元技能”</strong><ul>
-<li>尽管传统观念认为打游戏是“浪费时间 (a waste of time)”，但商业顾问指出，游戏不仅能培养决策和预判能力，更能培养高级的<strong>“元技能 (meta-skills)”</strong>——即“学习如何学习”、实验精神和创造性思维。</li>
-</ul>
-</li>
-<li><strong>K 段：游戏思维在医疗领域的应用</strong><ul>
-<li>一位放射治疗物理学家表示，游戏培养了他的<strong>竞争精神 (competitive spirit)</strong> 和<strong>解决问题 (problem-solving)</strong> 的能力。他在工作中不断优化辐射剂量、追求最佳治疗效果的过程，本质上和在游戏里反复尝试以求“完美通关”毫无二致。</li>
-</ul>
-</li>
-<li><strong>L 段：总结与灵魂拷问</strong><ul>
-<li>改变雇主的刻板印象<strong>任重道远 (have a mountain to climb)</strong>。但当问及玩家在游戏中的成就时，其规模和广度令人惊叹；反观工作却并非如此。作者最后发出感叹：如果现实工作也能像游戏一样，带给人们极高的<strong>投入度 (engagement)</strong> 和强大的技能，那该多好！</li>
-</ul>
-</li>
-</ul>
-<h2 id="📚-核心生词本-Vocabulary-Builder-1"><a href="#📚-核心生词本-Vocabulary-Builder-1" class="headerlink" title="📚 核心生词本 (Vocabulary Builder)"></a>📚 核心生词本 (Vocabulary Builder)</h2><h3 id="🌟-重点名词-Nouns-1"><a href="#🌟-重点名词-Nouns-1" class="headerlink" title="🌟 重点名词 (Nouns)"></a>🌟 重点名词 (Nouns)</h3><ul>
-<li><strong>prospect</strong> <code>/ˈprɑːspekt/</code> n. 前景，前途 (如 career prospects 职业前景)</li>
-<li><strong>achievement</strong> <code>/əˈtʃiːvmənt/</code> n. 成就，成绩</li>
-<li><strong>leadership</strong> <code>/ˈliːdərʃɪp/</code> n. 领导力 (<em>简历核心软技能</em>)</li>
-<li><strong>corporation</strong> <code>/ˌkɔːrpəˈreɪʃn/</code> n. (大)公司，企业</li>
-<li><strong>commodity</strong> <code>/kəˈmɑːdəti/</code> n. 商品，货物</li>
-<li><strong>demand</strong> <code>/dɪˈmænd/</code> n. 需求 (supply and demand 供求)</li>
-<li><strong>entrepreneur</strong> <code>/ˌɑːntrəprəˈnɜːr/</code> n. 企业家，创业者</li>
-<li><strong>consultant</strong> <code>/kənˈsʌltənt/</code> n. 顾问</li>
-<li><strong>meta-skills</strong> n. 元技能 (底层的学习与认知能力)</li>
-<li><strong>engagement</strong> <code>/ɪnˈɡeɪdʒmənt/</code> n. 投入感，敬业度，参与度 (<em>HR高频词</em>)</li>
-<li><strong>scope</strong> <code>/skoʊp/</code> n. 范围，广度</li>
-</ul>
-<h3 id="🌟-重点动词-Verbs-1"><a href="#🌟-重点动词-Verbs-1" class="headerlink" title="🌟 重点动词 (Verbs)"></a>🌟 重点动词 (Verbs)</h3><ul>
-<li><strong>transform</strong> <code>/trænsˈfɔːrm/</code> v. 改变，转换</li>
-<li><strong>fluctuate</strong> <code>/ˈflʌktʃueɪt/</code> v. 波动，起伏 (<em>经济类必考词</em>)</li>
-<li><strong>haul</strong> <code>/hɔːl/</code> v. (用力)拖，拉，运输</li>
-<li><strong>restructure</strong> <code>/ˌriːˈstrʌktʃər/</code> v. 重组，调整结构</li>
-<li><strong>maintain</strong> <code>/meɪnˈteɪn/</code> v. 坚称，断言 (本文用法) / 维护，保持</li>
-<li><strong>anticipate</strong> <code>/ænˈtɪsɪpeɪt/</code> v. 预期，预判</li>
-<li><strong>optimise (optimize)</strong> <code>/ˈɑːptɪmaɪz/</code> v. 优化，使最优化</li>
-<li><strong>confess</strong> <code>/kənˈfes/</code> v. 坦白，承认</li>
-</ul>
-<h3 id="🌟-重点形容词-副词-Adjectives-amp-Adverbs-1"><a href="#🌟-重点形容词-副词-Adjectives-amp-Adverbs-1" class="headerlink" title="🌟 重点形容词/副词 (Adjectives &amp; Adverbs)"></a>🌟 重点形容词/副词 (Adjectives &amp; Adverbs)</h3><ul>
-<li><strong>casually</strong> <code>/ˈkæʒuəli/</code> adv. 随便地，休闲地</li>
-<li><strong>conscious</strong> <code>/ˈkɑːnʃəs/</code> adj. 有意识的，自觉的</li>
-<li><strong>fictional</strong> <code>/ˈfɪkʃənl/</code> adj. 虚构的</li>
-<li><strong>competitive</strong> <code>/kəmˈpetətɪv/</code> adj. 竞争的，好竞争的</li>
-<li><strong>essentially</strong> <code>/ɪˈsenʃəli/</code> adv. 本质上，根本上</li>
-</ul>
-<h2 id="🔗-高频核心搭配-Key-Collocations-amp-Idioms"><a href="#🔗-高频核心搭配-Key-Collocations-amp-Idioms" class="headerlink" title="🔗 高频核心搭配 (Key Collocations &amp; Idioms)"></a>🔗 高频核心搭配 (Key Collocations &amp; Idioms)</h2><ol>
-<li><strong>be unlikely to do sth.</strong>：不太可能做某事</li>
-<li><strong>transform A into B</strong>：把 A 转变成 B</li>
-<li><strong>critical thinking</strong>：批判性思维 (<em>高频核心词</em>)</li>
-<li><strong>see A as B</strong>：将 A 视为/看作 B</li>
-<li><strong>make fun of</strong>：嘲笑，拿…开玩笑</li>
-<li><strong>come into effect</strong>：生效，产生影响 (<em>商业/法律用语</em>)</li>
-<li><strong>based on</strong>：基于，根据</li>
-<li><strong>transfer A to B</strong>：将 A 转移/应用到 B</li>
-<li><strong>conflict resolution</strong>：冲突解决能力 (<em>简历黄金词汇</em>)</li>
-<li><strong>credit A to B</strong>：将 A (成功等) 归功于 B</li>
-<li><strong>credit A with B</strong>：把 B (的作用/功劳) 归于 A</li>
-<li><strong>a waste of time</strong>：浪费时间</li>
-<li><strong>expose sb. to sth.</strong>：使某人接触到某物</li>
-<li><strong>problem-solving</strong>：解决问题的能力 (<em>职场核心软技能</em>)</li>
-<li><strong>have a mountain to climb</strong>：面临巨大的困难，任重道远 (<em>极地道的比喻</em>)</li>
-</ol>
-
-      
-    </div>
-    <footer class="article-footer">
-      <a data-url="http://example.com/2026/03/23/%E8%8B%B1%E8%AF%AD%E9%98%85%E8%AF%BB-25-12-2-new/" data-id="cuid1gE_Msz55ftx9KkaBAB00" data-title="英语阅读-2025-12-2-New" class="article-share-link"><span class="fa fa-share">Share</span></a>
-      
-      
-      
-  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E8%8B%B1%E8%AF%AD/" rel="tag">英语</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E9%98%85%E8%AF%BB/" rel="tag">阅读</a></li></ul>
-
-    </footer>
-  </div>
-  
-</article>
-
-
-
-  
 
 
   <nav id="page-nav">
@@ -1258,7 +1427,7 @@ mjx-container[display="true"] + br {
   <div class="widget-wrap">
     <h3 class="widget-title">Tags</h3>
     <div class="widget">
-      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/EDT-%E4%BA%8B%E4%BB%B6%E5%88%86%E5%8F%91%E7%BA%BF%E7%A8%8B/" rel="tag">EDT(事件分发线程)</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/GUI/" rel="tag">GUI</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/JVM/" rel="tag">JVM</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Java/" rel="tag">Java</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/JavaSE/" rel="tag">JavaSE</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/JavaWeb/" rel="tag">JavaWeb</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Junit/" rel="tag">Junit</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/KeyListener/" rel="tag">KeyListener</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Swing-AWT/" rel="tag">Swing&#x2F;AWT</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Tomcat/" rel="tag">Tomcat</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E4%BA%8B%E4%BB%B6%E5%A4%84%E7%90%86%E6%9C%BA%E5%88%B6/" rel="tag">事件处理机制</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%86%85%E5%AD%98%E6%A8%A1%E5%9E%8B/" rel="tag">内存模型</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%90%8E%E7%AB%AF%E5%9F%BA%E7%A1%80/" rel="tag">后端基础</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6-GC/" rel="tag">垃圾回收(GC)</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%9F%BA%E6%9C%AC%E8%AF%AD%E6%B3%95/" rel="tag">基本语法</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%A4%9A%E7%BA%BF%E7%A8%8B/" rel="tag">多线程</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%A7%94%E6%89%98%E4%BA%8B%E4%BB%B6%E6%A8%A1%E5%9E%8B/" rel="tag">委托事件模型</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B/" rel="tag">并发编程</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%BA%95%E5%B1%82%E5%8E%9F%E7%90%86/" rel="tag">底层原理</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%BC%82%E5%B8%B8%E5%A4%84%E7%90%86/" rel="tag">异常处理</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%BE%85%E5%AE%8C%E5%96%84/" rel="tag">待完善</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/" rel="tag">性能优化</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%8E%92%E5%BA%8F/" rel="tag">排序</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%8E%A7%E5%88%B6%E5%8F%8D%E8%BD%AC-IoC/" rel="tag">控制反转(IoC)</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F/" rel="tag">操作系统</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%A0%B8%E5%BF%83%E8%BF%9B%E9%98%B6/" rel="tag">核心进阶</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%AE%97%E6%B3%95/" rel="tag">算法</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%B1%BB%E5%8A%A0%E8%BD%BD%E5%99%A8/" rel="tag">类加载器</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%BB%98%E5%9B%BE/" rel="tag">绘图</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%8B%B1%E8%AF%AD/" rel="tag">英语</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%AE%A1%E5%88%92/" rel="tag">计划</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E4%BD%93%E7%B3%BB%E7%BB%93%E6%9E%84/" rel="tag">计算机体系结构</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%AE%BA%E6%96%87%E8%A7%84%E5%88%92/" rel="tag">论文规划</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%BD%AF%E4%BB%B6%E6%9E%B6%E6%9E%84/" rel="tag">软件架构</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%BF%AD%E4%BB%A3/" rel="tag">迭代</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E9%80%92%E5%BD%92/" rel="tag">递归</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E9%98%85%E8%AF%BB/" rel="tag">阅读</a></li></ul>
+      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/EDT-%E4%BA%8B%E4%BB%B6%E5%88%86%E5%8F%91%E7%BA%BF%E7%A8%8B/" rel="tag">EDT(事件分发线程)</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/GUI/" rel="tag">GUI</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/JVM/" rel="tag">JVM</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Java/" rel="tag">Java</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/JavaSE/" rel="tag">JavaSE</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/JavaWeb/" rel="tag">JavaWeb</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Junit/" rel="tag">Junit</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/KeyListener/" rel="tag">KeyListener</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Swing-AWT/" rel="tag">Swing&#x2F;AWT</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Tomcat/" rel="tag">Tomcat</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/interrupt/" rel="tag">interrupt</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E4%B8%AD%E6%96%AD/" rel="tag">中断</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E4%BA%8B%E4%BB%B6%E5%A4%84%E7%90%86%E6%9C%BA%E5%88%B6/" rel="tag">事件处理机制</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%86%85%E5%AD%98%E6%A8%A1%E5%9E%8B/" rel="tag">内存模型</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%90%8E%E7%AB%AF%E5%9F%BA%E7%A1%80/" rel="tag">后端基础</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6-GC/" rel="tag">垃圾回收(GC)</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%9F%BA%E6%9C%AC%E8%AF%AD%E6%B3%95/" rel="tag">基本语法</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%A4%9A%E7%BA%BF%E7%A8%8B/" rel="tag">多线程</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%A4%9A%E7%BA%BF%E7%A8%8B%E7%8A%B6%E6%80%81/" rel="tag">多线程状态</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%A7%94%E6%89%98%E4%BA%8B%E4%BB%B6%E6%A8%A1%E5%9E%8B/" rel="tag">委托事件模型</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B/" rel="tag">并发编程</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%BA%95%E5%B1%82%E5%8E%9F%E7%90%86/" rel="tag">底层原理</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%BC%82%E5%B8%B8%E5%A4%84%E7%90%86/" rel="tag">异常处理</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%BE%85%E5%AE%8C%E5%96%84/" rel="tag">待完善</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/" rel="tag">性能优化</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%8E%92%E5%BA%8F/" rel="tag">排序</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%8E%A7%E5%88%B6%E5%8F%8D%E8%BD%AC-IoC/" rel="tag">控制反转(IoC)</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F/" rel="tag">操作系统</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%A0%B8%E5%BF%83%E8%BF%9B%E9%98%B6/" rel="tag">核心进阶</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%AE%97%E6%B3%95/" rel="tag">算法</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%B1%BB%E5%8A%A0%E8%BD%BD%E5%99%A8/" rel="tag">类加载器</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%BB%98%E5%9B%BE/" rel="tag">绘图</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%8B%B1%E8%AF%AD/" rel="tag">英语</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%AE%A1%E5%88%92/" rel="tag">计划</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E4%BD%93%E7%B3%BB%E7%BB%93%E6%9E%84/" rel="tag">计算机体系结构</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%AE%BA%E6%96%87%E8%A7%84%E5%88%92/" rel="tag">论文规划</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%BD%AF%E4%BB%B6%E6%9E%B6%E6%9E%84/" rel="tag">软件架构</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%BF%AD%E4%BB%A3/" rel="tag">迭代</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E9%80%92%E5%BD%92/" rel="tag">递归</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E9%98%85%E8%AF%BB/" rel="tag">阅读</a></li></ul>
     </div>
   </div>
 
@@ -1268,7 +1437,7 @@ mjx-container[display="true"] + br {
   <div class="widget-wrap">
     <h3 class="widget-title">Tag Cloud</h3>
     <div class="widget tagcloud">
-      <a href="/tags/EDT-%E4%BA%8B%E4%BB%B6%E5%88%86%E5%8F%91%E7%BA%BF%E7%A8%8B/" style="font-size: 10px;">EDT(事件分发线程)</a> <a href="/tags/GUI/" style="font-size: 10px;">GUI</a> <a href="/tags/JVM/" style="font-size: 13.33px;">JVM</a> <a href="/tags/Java/" style="font-size: 20px;">Java</a> <a href="/tags/JavaSE/" style="font-size: 16.67px;">JavaSE</a> <a href="/tags/JavaWeb/" style="font-size: 10px;">JavaWeb</a> <a href="/tags/Junit/" style="font-size: 10px;">Junit</a> <a href="/tags/KeyListener/" style="font-size: 10px;">KeyListener</a> <a href="/tags/Swing-AWT/" style="font-size: 10px;">Swing/AWT</a> <a href="/tags/Tomcat/" style="font-size: 10px;">Tomcat</a> <a href="/tags/%E4%BA%8B%E4%BB%B6%E5%A4%84%E7%90%86%E6%9C%BA%E5%88%B6/" style="font-size: 10px;">事件处理机制</a> <a href="/tags/%E5%86%85%E5%AD%98%E6%A8%A1%E5%9E%8B/" style="font-size: 10px;">内存模型</a> <a href="/tags/%E5%90%8E%E7%AB%AF%E5%9F%BA%E7%A1%80/" style="font-size: 10px;">后端基础</a> <a href="/tags/%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6-GC/" style="font-size: 10px;">垃圾回收(GC)</a> <a href="/tags/%E5%9F%BA%E6%9C%AC%E8%AF%AD%E6%B3%95/" style="font-size: 13.33px;">基本语法</a> <a href="/tags/%E5%A4%9A%E7%BA%BF%E7%A8%8B/" style="font-size: 13.33px;">多线程</a> <a href="/tags/%E5%A7%94%E6%89%98%E4%BA%8B%E4%BB%B6%E6%A8%A1%E5%9E%8B/" style="font-size: 10px;">委托事件模型</a> <a href="/tags/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B/" style="font-size: 10px;">并发编程</a> <a href="/tags/%E5%BA%95%E5%B1%82%E5%8E%9F%E7%90%86/" style="font-size: 10px;">底层原理</a> <a href="/tags/%E5%BC%82%E5%B8%B8%E5%A4%84%E7%90%86/" style="font-size: 10px;">异常处理</a> <a href="/tags/%E5%BE%85%E5%AE%8C%E5%96%84/" style="font-size: 10px;">待完善</a> <a href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/" style="font-size: 10px;">性能优化</a> <a href="/tags/%E6%8E%92%E5%BA%8F/" style="font-size: 10px;">排序</a> <a href="/tags/%E6%8E%A7%E5%88%B6%E5%8F%8D%E8%BD%AC-IoC/" style="font-size: 10px;">控制反转(IoC)</a> <a href="/tags/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F/" style="font-size: 13.33px;">操作系统</a> <a href="/tags/%E6%A0%B8%E5%BF%83%E8%BF%9B%E9%98%B6/" style="font-size: 10px;">核心进阶</a> <a href="/tags/%E7%AE%97%E6%B3%95/" style="font-size: 13.33px;">算法</a> <a href="/tags/%E7%B1%BB%E5%8A%A0%E8%BD%BD%E5%99%A8/" style="font-size: 10px;">类加载器</a> <a href="/tags/%E7%BB%98%E5%9B%BE/" style="font-size: 10px;">绘图</a> <a href="/tags/%E8%8B%B1%E8%AF%AD/" style="font-size: 20px;">英语</a> <a href="/tags/%E8%AE%A1%E5%88%92/" style="font-size: 10px;">计划</a> <a href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E4%BD%93%E7%B3%BB%E7%BB%93%E6%9E%84/" style="font-size: 10px;">计算机体系结构</a> <a href="/tags/%E8%AE%BA%E6%96%87%E8%A7%84%E5%88%92/" style="font-size: 10px;">论文规划</a> <a href="/tags/%E8%BD%AF%E4%BB%B6%E6%9E%B6%E6%9E%84/" style="font-size: 10px;">软件架构</a> <a href="/tags/%E8%BF%AD%E4%BB%A3/" style="font-size: 10px;">迭代</a> <a href="/tags/%E9%80%92%E5%BD%92/" style="font-size: 10px;">递归</a> <a href="/tags/%E9%98%85%E8%AF%BB/" style="font-size: 20px;">阅读</a>
+      <a href="/tags/EDT-%E4%BA%8B%E4%BB%B6%E5%88%86%E5%8F%91%E7%BA%BF%E7%A8%8B/" style="font-size: 10px;">EDT(事件分发线程)</a> <a href="/tags/GUI/" style="font-size: 10px;">GUI</a> <a href="/tags/JVM/" style="font-size: 12.5px;">JVM</a> <a href="/tags/Java/" style="font-size: 17.5px;">Java</a> <a href="/tags/JavaSE/" style="font-size: 20px;">JavaSE</a> <a href="/tags/JavaWeb/" style="font-size: 10px;">JavaWeb</a> <a href="/tags/Junit/" style="font-size: 10px;">Junit</a> <a href="/tags/KeyListener/" style="font-size: 10px;">KeyListener</a> <a href="/tags/Swing-AWT/" style="font-size: 10px;">Swing/AWT</a> <a href="/tags/Tomcat/" style="font-size: 10px;">Tomcat</a> <a href="/tags/interrupt/" style="font-size: 10px;">interrupt</a> <a href="/tags/%E4%B8%AD%E6%96%AD/" style="font-size: 10px;">中断</a> <a href="/tags/%E4%BA%8B%E4%BB%B6%E5%A4%84%E7%90%86%E6%9C%BA%E5%88%B6/" style="font-size: 10px;">事件处理机制</a> <a href="/tags/%E5%86%85%E5%AD%98%E6%A8%A1%E5%9E%8B/" style="font-size: 10px;">内存模型</a> <a href="/tags/%E5%90%8E%E7%AB%AF%E5%9F%BA%E7%A1%80/" style="font-size: 10px;">后端基础</a> <a href="/tags/%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6-GC/" style="font-size: 10px;">垃圾回收(GC)</a> <a href="/tags/%E5%9F%BA%E6%9C%AC%E8%AF%AD%E6%B3%95/" style="font-size: 12.5px;">基本语法</a> <a href="/tags/%E5%A4%9A%E7%BA%BF%E7%A8%8B/" style="font-size: 15px;">多线程</a> <a href="/tags/%E5%A4%9A%E7%BA%BF%E7%A8%8B%E7%8A%B6%E6%80%81/" style="font-size: 10px;">多线程状态</a> <a href="/tags/%E5%A7%94%E6%89%98%E4%BA%8B%E4%BB%B6%E6%A8%A1%E5%9E%8B/" style="font-size: 10px;">委托事件模型</a> <a href="/tags/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B/" style="font-size: 10px;">并发编程</a> <a href="/tags/%E5%BA%95%E5%B1%82%E5%8E%9F%E7%90%86/" style="font-size: 10px;">底层原理</a> <a href="/tags/%E5%BC%82%E5%B8%B8%E5%A4%84%E7%90%86/" style="font-size: 10px;">异常处理</a> <a href="/tags/%E5%BE%85%E5%AE%8C%E5%96%84/" style="font-size: 10px;">待完善</a> <a href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/" style="font-size: 10px;">性能优化</a> <a href="/tags/%E6%8E%92%E5%BA%8F/" style="font-size: 10px;">排序</a> <a href="/tags/%E6%8E%A7%E5%88%B6%E5%8F%8D%E8%BD%AC-IoC/" style="font-size: 10px;">控制反转(IoC)</a> <a href="/tags/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F/" style="font-size: 12.5px;">操作系统</a> <a href="/tags/%E6%A0%B8%E5%BF%83%E8%BF%9B%E9%98%B6/" style="font-size: 10px;">核心进阶</a> <a href="/tags/%E7%AE%97%E6%B3%95/" style="font-size: 12.5px;">算法</a> <a href="/tags/%E7%B1%BB%E5%8A%A0%E8%BD%BD%E5%99%A8/" style="font-size: 10px;">类加载器</a> <a href="/tags/%E7%BB%98%E5%9B%BE/" style="font-size: 10px;">绘图</a> <a href="/tags/%E8%8B%B1%E8%AF%AD/" style="font-size: 17.5px;">英语</a> <a href="/tags/%E8%AE%A1%E5%88%92/" style="font-size: 10px;">计划</a> <a href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E4%BD%93%E7%B3%BB%E7%BB%93%E6%9E%84/" style="font-size: 10px;">计算机体系结构</a> <a href="/tags/%E8%AE%BA%E6%96%87%E8%A7%84%E5%88%92/" style="font-size: 10px;">论文规划</a> <a href="/tags/%E8%BD%AF%E4%BB%B6%E6%9E%B6%E6%9E%84/" style="font-size: 10px;">软件架构</a> <a href="/tags/%E8%BF%AD%E4%BB%A3/" style="font-size: 10px;">迭代</a> <a href="/tags/%E9%80%92%E5%BD%92/" style="font-size: 10px;">递归</a> <a href="/tags/%E9%98%85%E8%AF%BB/" style="font-size: 17.5px;">阅读</a>
     </div>
   </div>
 
@@ -1290,23 +1459,23 @@ mjx-container[display="true"] + br {
       <ul>
         
           <li>
+            <a href="/2026/04/06/Java%E7%BA%BF%E7%A8%8B%E4%B8%AD%E6%96%AD%E6%96%B9%E6%B3%95%E7%AC%94%E8%AE%B0/">Java线程中断方法笔记</a>
+          </li>
+        
+          <li>
+            <a href="/2026/04/06/Java-%E7%BA%BF%E7%A8%8B%E7%8A%B6%E6%80%81%E4%B8%8E%E8%BD%AC%E6%8D%A2%E5%85%A8%E8%A7%A3%E6%9E%90/">Java 线程状态与转换全解析</a>
+          </li>
+        
+          <li>
+            <a href="/2026/04/06/Java-%E5%A4%9A%E7%BA%BF%E7%A8%8B%E7%9A%84%E5%9F%BA%E6%9C%AC%E4%BD%BF%E7%94%A8/">Java-多线程的基本使用</a>
+          </li>
+        
+          <li>
             <a href="/2026/04/05/Java-%E5%A4%9A%E7%BA%BF%E7%A8%8B%E4%B8%8E-JVM-%E5%86%85%E5%AD%98%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E7%AC%94%E8%AE%B0/">Java 多线程与 JVM 内存模型基础笔记</a>
           </li>
         
           <li>
             <a href="/2026/04/04/%E8%BF%9B%E7%A8%8B%E4%B8%8E%E7%BA%BF%E7%A8%8B%E7%9A%84%E5%BA%95%E5%B1%82%E9%80%BB%E8%BE%91%E4%B8%8E%E6%9E%B6%E6%9E%84%E6%BC%94%E8%BF%9B/">进程与线程的底层逻辑与架构演进</a>
-          </li>
-        
-          <li>
-            <a href="/2026/04/04/Java%E4%BA%8B%E4%BB%B6%E5%A4%84%E7%90%86%E6%9C%BA%E5%88%B6-%E5%88%9D%E8%AF%86/">Java事件处理机制</a>
-          </li>
-        
-          <li>
-            <a href="/2026/04/03/%E5%88%9D%E8%AF%86JavaWeb/">初识JavaWeb</a>
-          </li>
-        
-          <li>
-            <a href="/2026/04/01/Java-GUI-%E7%BB%98%E5%9B%BE%E5%BA%95%E5%B1%82%E5%8E%9F%E7%90%86%E4%B8%8E%E4%BB%A3%E7%A0%81%E5%AE%9E%E6%88%98/">Java GUI 绘图底层原理与代码实战</a>
           </li>
         
       </ul>

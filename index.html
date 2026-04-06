@@ -73,6 +73,301 @@
       <div class="outer">
         <section id="main">
   
+    <article id="post-Java线程中断方法笔记" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
+  <div class="article-meta">
+    <a href="/2026/04/06/Java%E7%BA%BF%E7%A8%8B%E4%B8%AD%E6%96%AD%E6%96%B9%E6%B3%95%E7%AC%94%E8%AE%B0/" class="article-date">
+  <time class="dt-published" datetime="2026-04-06T11:29:20.000Z" itemprop="datePublished">2026-04-06</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="p-name article-title" href="/2026/04/06/Java%E7%BA%BF%E7%A8%8B%E4%B8%AD%E6%96%AD%E6%96%B9%E6%B3%95%E7%AC%94%E8%AE%B0/">Java线程中断方法笔记</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="e-content article-entry" itemprop="articleBody">
+      
+        <h1 id="Java-线程中断机制-Thread-Interrupt-核心笔记"><a href="#Java-线程中断机制-Thread-Interrupt-核心笔记" class="headerlink" title="Java 线程中断机制 (Thread Interrupt) 核心笔记"></a>Java 线程中断机制 (Thread Interrupt) 核心笔记</h1><h2 id="一、-核心思想：协作式而非强制式"><a href="#一、-核心思想：协作式而非强制式" class="headerlink" title="一、 核心思想：协作式而非强制式"></a>一、 核心思想：协作式而非强制式</h2><p>Java 的线程中断<strong>不是</strong>强制杀死线程（废弃的 <code>Thread.stop()</code> 才是），而是一种<strong>协作式的通信机制</strong>。 调用 <code>interrupt()</code> 方法，仅仅是给目标线程发送一个“中断信号”（将内部的布尔标志位设置为 <code>true</code>），目标线程是否响应、何时响应、如何响应，完全由目标线程的代码自己决定。</p>
+<h2 id="二、-线程内部的“中断标志位”"><a href="#二、-线程内部的“中断标志位”" class="headerlink" title="二、 线程内部的“中断标志位”"></a>二、 线程内部的“中断标志位”</h2><p>每个线程内部都有一个 boolean 型的标志位，代表是否被中断：</p>
+<ul>
+<li><strong>初始状态：</strong> <code>false</code></li>
+<li><strong>调用 <code>targetThread.interrupt()</code>：</strong> 标志位变为 <code>true</code>。</li>
+</ul>
+<h2 id="三、-不同线程状态下的不同表现"><a href="#三、-不同线程状态下的不同表现" class="headerlink" title="三、 不同线程状态下的不同表现"></a>三、 不同线程状态下的不同表现</h2><h3 id="1-运行态-Runnable"><a href="#1-运行态-Runnable" class="headerlink" title="1. 运行态 (Runnable)"></a>1. 运行态 (Runnable)</h3><ul>
+<li><strong>表现：</strong> 没有任何直接影响。线程会继续欢快地执行代码。</li>
+<li><strong>应对：</strong> 开发者必须在循环或耗时操作中，手动通过 <code>Thread.currentThread().isInterrupted()</code> 来检查标志位，并主动编写退出逻辑（如 <code>break</code> 或 <code>return</code>）。</li>
+</ul>
+<h3 id="2-可响应中断的阻塞态-Waiting-Timed-Waiting"><a href="#2-可响应中断的阻塞态-Waiting-Timed-Waiting" class="headerlink" title="2. 可响应中断的阻塞态 (Waiting / Timed_Waiting)"></a>2. 可响应中断的阻塞态 (Waiting / Timed_Waiting)</h3><p>例如线程调用了 <code>Thread.sleep()</code>, <code>Object.wait()</code>, <code>Thread.join()</code>。</p>
+<ul>
+<li><strong>表现：</strong> JVM 会立刻打断阻塞状态。</li>
+<li><strong>动作（原子操作）：</strong><ol>
+<li>立即抛出 <code>InterruptedException</code>。</li>
+<li><strong>清空中断标志位</strong>（将标志位重置为 <code>false</code>）。</li>
+</ol>
+</li>
+<li><strong>应对：</strong> 必须使用 <code>try-catch</code> 捕获异常，并在 <code>catch</code> 块中处理退出逻辑或<strong>重新设置中断标志位</strong>。</li>
+</ul>
+<h3 id="3-不可响应中断的阻塞态-Blocked-传统-I-O-阻塞"><a href="#3-不可响应中断的阻塞态-Blocked-传统-I-O-阻塞" class="headerlink" title="3. 不可响应中断的阻塞态 (Blocked / 传统 I/O 阻塞)"></a>3. 不可响应中断的阻塞态 (Blocked / 传统 I/O 阻塞)</h3><p>例如线程卡在 <code>synchronized</code> 隐式锁上，或者传统的 <code>InputStream.read()</code>。</p>
+<ul>
+<li><strong>表现：</strong> 中断标志位被设为 <code>true</code>，但<strong>线程依然会死死卡住</strong>，不会抛出异常，也不会被唤醒。</li>
+</ul>
+<h2 id="四、-核心-API-区分"><a href="#四、-核心-API-区分" class="headerlink" title="四、 核心 API 区分"></a>四、 核心 API 区分</h2><ul>
+<li><code>thread.interrupt()</code>：<strong>实例方法</strong>。向指定线程发送中断信号，设置标志位为 <code>true</code>。</li>
+<li><code>thread.isInterrupted()</code>：<strong>实例方法</strong>。检查指定线程的中断状态，<strong>不会</strong>清除标志位。</li>
+<li><code>Thread.interrupted()</code>：<strong>静态方法</strong>。检查<strong>当前执行这段代码的线程</strong>的中断状态，<strong>并且会清除标志位</strong>（判断后立马设为 false）。极其容易用错，一般推荐用 <code>isInterrupted()</code>。</li>
+</ul>
+<h2 id="五、-代码实战与避坑指南"><a href="#五、-代码实战与避坑指南" class="headerlink" title="五、 代码实战与避坑指南"></a>五、 代码实战与避坑指南</h2><h3 id="场景-1：优雅中断“运行态”的线程"><a href="#场景-1：优雅中断“运行态”的线程" class="headerlink" title="场景 1：优雅中断“运行态”的线程"></a>场景 1：优雅中断“运行态”的线程</h3><p>这是最标准的轮询中断标志位的写法。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">public class RunnableInterruptDemo &#123;</span><br><span class="line">    public static void main(String[] args) throws InterruptedException &#123;</span><br><span class="line">        Thread worker = new Thread(() -&gt; &#123;</span><br><span class="line">            // 核心：在耗时循环中不断检查自己的中断状态</span><br><span class="line">            while (!Thread.currentThread().isInterrupted()) &#123;</span><br><span class="line">                System.out.println(&quot;Worker 正在执行复杂的业务计算...&quot;);</span><br><span class="line">                // 模拟耗时运算（非阻塞）</span><br><span class="line">                long sum = 0;</span><br><span class="line">                for (int i = 0; i &lt; 100000; i++) sum += i; </span><br><span class="line">            &#125;</span><br><span class="line">            System.out.println(&quot;Worker 检测到中断信号，正在清理资源并退出...&quot;);</span><br><span class="line">        &#125;);</span><br><span class="line"></span><br><span class="line">        worker.start();</span><br><span class="line">        Thread.sleep(10); // 让工作线程飞一会</span><br><span class="line">        System.out.println(&quot;Main: 发出中断信号!&quot;);</span><br><span class="line">        worker.interrupt(); // 改变标志位为 true</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="场景-2：💣-经典陷阱：吞咽异常导致中断失效"><a href="#场景-2：💣-经典陷阱：吞咽异常导致中断失效" class="headerlink" title="场景 2：💣 经典陷阱：吞咽异常导致中断失效"></a>场景 2：💣 经典陷阱：吞咽异常导致中断失效</h3><p>当线程在 <code>sleep</code> 时被中断，抛出异常后标志位会被清空。如果不做额外处理，外层的 <code>while</code> 循环会以为没有收到中断信号，导致死循环。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line">public class SwallowExceptionTrap &#123;</span><br><span class="line">    public static void main(String[] args) throws InterruptedException &#123;</span><br><span class="line">        Thread trapThread = new Thread(() -&gt; &#123;</span><br><span class="line">            while (!Thread.currentThread().isInterrupted()) &#123;</span><br><span class="line">                try &#123;</span><br><span class="line">                    System.out.println(&quot;TrapThread: 我开始睡觉了...&quot;);</span><br><span class="line">                    Thread.sleep(2000); // 在这里阻塞</span><br><span class="line">                &#125; catch (InterruptedException e) &#123;</span><br><span class="line">                    // 【大坑】仅仅打印异常，什么都不做</span><br><span class="line">                    System.out.println(&quot;TrapThread: 哎呀，收到异常了！但是标志位被重置成了 false&quot;);</span><br><span class="line">                    // 此时 Thread.currentThread().isInterrupted() 是 false</span><br><span class="line">                    // 循环会继续进行，线程永远无法停下来！</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">            System.out.println(&quot;这段代码永远不会被执行到...&quot;);</span><br><span class="line">        &#125;);</span><br><span class="line"></span><br><span class="line">        trapThread.start();</span><br><span class="line">        Thread.sleep(500);</span><br><span class="line">        trapThread.interrupt(); // 中断它</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="场景-3：✅-标准解法：在-Catch-块中重置标志位"><a href="#场景-3：✅-标准解法：在-Catch-块中重置标志位" class="headerlink" title="场景 3：✅ 标准解法：在 Catch 块中重置标志位"></a>场景 3：✅ 标准解法：在 Catch 块中重置标志位</h3><p>在遇到 <code>InterruptedException</code> 时，如果当前上下文不适合立即退出（例如在某个底层工具类中），最标准的做法是<strong>重置中断标志位</strong>，将中断信号传递给上层。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line">public class CorrectInterruptHandling &#123;</span><br><span class="line">    public static void main(String[] args) throws InterruptedException &#123;</span><br><span class="line">        Thread goodThread = new Thread(() -&gt; &#123;</span><br><span class="line">            while (!Thread.currentThread().isInterrupted()) &#123;</span><br><span class="line">                try &#123;</span><br><span class="line">                    System.out.println(&quot;GoodThread: 模拟网络请求（带有延迟）...&quot;);</span><br><span class="line">                    Thread.sleep(2000);</span><br><span class="line">                &#125; catch (InterruptedException e) &#123;</span><br><span class="line">                    System.out.println(&quot;GoodThread: 捕获到 InterruptedException，此时标志位是 false&quot;);</span><br><span class="line">                    </span><br><span class="line">                    // 【标准答案】重新设置中断标志位为 true</span><br><span class="line">                    Thread.currentThread().interrupt(); </span><br><span class="line">                    </span><br><span class="line">                    System.out.println(&quot;GoodThread: 已重新打上中断标记，交给外层循环处理。&quot;);</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">            System.out.println(&quot;GoodThread: 外层循环检测到中断标记，优雅退出！&quot;);</span><br><span class="line">        &#125;);</span><br><span class="line"></span><br><span class="line">        goodThread.start();</span><br><span class="line">        Thread.sleep(500);</span><br><span class="line">        goodThread.interrupt(); </span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="http://example.com/2026/04/06/Java%E7%BA%BF%E7%A8%8B%E4%B8%AD%E6%96%AD%E6%96%B9%E6%B3%95%E7%AC%94%E8%AE%B0/" data-id="cuidgAXj4IQRy_uX-0ridPDwv" data-title="Java线程中断方法笔记" class="article-share-link"><span class="fa fa-share">Share</span></a>
+      
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/JavaSE/" rel="tag">JavaSE</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/interrupt/" rel="tag">interrupt</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E4%B8%AD%E6%96%AD/" rel="tag">中断</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%A4%9A%E7%BA%BF%E7%A8%8B/" rel="tag">多线程</a></li></ul>
+
+    </footer>
+  </div>
+  
+</article>
+
+
+
+  
+    <article id="post-Java-线程状态与转换全解析" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
+  <div class="article-meta">
+    <a href="/2026/04/06/Java-%E7%BA%BF%E7%A8%8B%E7%8A%B6%E6%80%81%E4%B8%8E%E8%BD%AC%E6%8D%A2%E5%85%A8%E8%A7%A3%E6%9E%90/" class="article-date">
+  <time class="dt-published" datetime="2026-04-06T11:22:32.000Z" itemprop="datePublished">2026-04-06</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="p-name article-title" href="/2026/04/06/Java-%E7%BA%BF%E7%A8%8B%E7%8A%B6%E6%80%81%E4%B8%8E%E8%BD%AC%E6%8D%A2%E5%85%A8%E8%A7%A3%E6%9E%90/">Java 线程状态与转换全解析</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="e-content article-entry" itemprop="articleBody">
+      
+        <h1 id="Java-线程生命周期与状态转换笔记"><a href="#Java-线程生命周期与状态转换笔记" class="headerlink" title="Java 线程生命周期与状态转换笔记"></a>Java 线程生命周期与状态转换笔记</h1><p>在 Java 中，线程的状态定义在 <code>Thread.State</code> 枚举类中。根据你提供的流程图，我们可以将线程的一生划分为 <strong>6 种主要状态</strong>，并深入理解它们之间的转换逻辑。</p>
+<img src="/2026/04/06/Java-%E7%BA%BF%E7%A8%8B%E7%8A%B6%E6%80%81%E4%B8%8E%E8%BD%AC%E6%8D%A2%E5%85%A8%E8%A7%A3%E6%9E%90/statechange.png" class="" title="多线程状态转换">
+<h2 id="1-新建状态-NEW"><a href="#1-新建状态-NEW" class="headerlink" title="1. 新建状态 (NEW)"></a>1. 新建状态 (NEW)</h2><ul>
+<li><strong>触发条件</strong>：<code>Thread t = new Thread();</code></li>
+<li><strong>底层表现</strong>：此时仅在 JVM 堆中创建了一个 Java 对象，操作系统层面<strong>尚未创建</strong>真正的线程。</li>
+<li><strong>下一步</strong>：调用 <code>start()</code> 方法进入下一个阶段。</li>
+</ul>
+<h2 id="2-可运行状态-RUNNABLE"><a href="#2-可运行状态-RUNNABLE" class="headerlink" title="2. 可运行状态 (RUNNABLE)"></a>2. 可运行状态 (RUNNABLE)</h2><p>在 Java 层面统称为 <code>RUNNABLE</code>，但在底层（操作系统层面）分为两个子状态：</p>
+<h3 id="A-就绪-Ready"><a href="#A-就绪-Ready" class="headerlink" title="A. 就绪 (Ready)"></a>A. 就绪 (Ready)</h3><ul>
+<li>线程已在操作系统中创建，等待 CPU 调度。</li>
+<li><strong>来源</strong>：<code>NEW</code> 状态调用 <code>start0()</code>、<code>Running</code> 状态执行 <code>yield()</code>、或者被挂起。</li>
+</ul>
+<h3 id="B-运行-Running"><a href="#B-运行-Running" class="headerlink" title="B. 运行 (Running)"></a>B. 运行 (Running)</h3><ul>
+<li>线程获得了 CPU 时间片，正在执行 <code>run()</code> 方法中的指令。</li>
+<li><strong>转换逻辑</strong>：<ul>
+<li><strong>Ready -&gt; Running</strong>：线程被操作系统调度器选中执行。</li>
+<li><strong>Running -&gt; Ready</strong>：调用 <code>Thread.yield()</code>（主动让出 CPU）或线程执行权被系统剥夺（被挂起）。</li>
+</ul>
+</li>
+</ul>
+<h2 id="3-阻塞状态-BLOCKED"><a href="#3-阻塞状态-BLOCKED" class="headerlink" title="3. 阻塞状态 (BLOCKED)"></a>3. 阻塞状态 (BLOCKED)</h2><ul>
+<li><strong>核心特征</strong>：线程正在等待获取一个<strong>排他锁（Monitor Lock）</strong>。</li>
+<li><strong>触发场景</strong>：进入 <code>synchronized</code> 修饰的代码块或方法，但锁已被其他线程占用。</li>
+<li><strong>恢复条件</strong>：<strong>获得锁</strong>后，重新进入 <code>RUNNABLE</code> 状态。</li>
+</ul>
+<h2 id="4-等待状态-WAITING"><a href="#4-等待状态-WAITING" class="headerlink" title="4. 等待状态 (WAITING)"></a>4. 等待状态 (WAITING)</h2><ul>
+<li><strong>核心特征</strong>：无限期等待，除非被其他线程显式唤醒。</li>
+<li><strong>触发方法</strong>：<ol>
+<li><code>object.wait()</code>：让出锁并进入等待池。</li>
+<li><code>thread.join()</code>：等待目标线程结束。</li>
+<li><code>LockSupport.park()</code>：挂起当前线程。</li>
+</ol>
+</li>
+<li><strong>恢复条件</strong>：<ul>
+<li>其他线程调用 <code>object.notify()</code> / <code>notifyAll()</code>。</li>
+<li>调用 <code>LockSupport.unpark(thread)</code>。</li>
+</ul>
+</li>
+</ul>
+<h2 id="5-超时等待状态-TIMED-WAITING"><a href="#5-超时等待状态-TIMED-WAITING" class="headerlink" title="5. 超时等待状态 (TIMED_WAITING)"></a>5. 超时等待状态 (TIMED_WAITING)</h2><ul>
+<li><strong>核心特征</strong>：在指定时间内等待，时间到后会自动尝试返回可运行状态。</li>
+<li><strong>触发方法</strong>：<ol>
+<li><code>Thread.sleep(long)</code>：<strong>不释放锁</strong>，只让出 CPU。</li>
+<li><code>object.wait(long)</code>：释放锁，到时自动唤醒或被手动唤醒。</li>
+<li><code>thread.join(long)</code>。</li>
+<li><code>LockSupport.parkNanos()</code> / <code>parkUntil()</code>。</li>
+</ol>
+</li>
+<li><strong>恢复条件</strong>：<strong>时间结束</strong>或被显式唤醒。</li>
+</ul>
+<h2 id="6-终止状态-TERMINATED"><a href="#6-终止状态-TERMINATED" class="headerlink" title="6. 终止状态 (TERMINATED)"></a>6. 终止状态 (TERMINATED)</h2><ul>
+<li><strong>触发条件</strong>：<code>run()</code> 方法执行完毕，或因为未捕获的异常导致线程意外退出。</li>
+<li><strong>结果</strong>：线程生命周期结束，占用的资源被回收。</li>
+</ul>
+<h2 id="💡-深度对比：Blocked-vs-Waiting-vs-TimedWaiting"><a href="#💡-深度对比：Blocked-vs-Waiting-vs-TimedWaiting" class="headerlink" title="💡 深度对比：Blocked vs Waiting vs TimedWaiting"></a>💡 深度对比：Blocked vs Waiting vs TimedWaiting</h2><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>状态</th>
+<th>是否释放锁</th>
+<th>触发条件</th>
+<th>唤醒方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>BLOCKED</strong></td>
+<td>不涉及（在拿锁前）</td>
+<td>等待进入同步块</td>
+<td>获得锁（其他线程释放）</td>
+</tr>
+<tr>
+<td><strong>WAITING</strong></td>
+<td><strong>释放锁</strong> (wait方式)</td>
+<td>显式同步/协作</td>
+<td>notify/notifyAll/join结束</td>
+</tr>
+<tr>
+<td><strong>TIMED_WAITING</strong></td>
+<td><strong>sleep不放/wait放</strong></td>
+<td>时间段触发</td>
+<td>时间到/notify/unpark</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h2 id="关键流程总结"><a href="#关键流程总结" class="headerlink" title="关键流程总结"></a>关键流程总结</h2><ol>
+<li><strong>启动</strong>：<code>NEW</code> -&gt; <code>start()</code> -&gt; <code>RUNNABLE</code>。</li>
+<li><strong>让位</strong>：<code>Running</code> -&gt; <code>yield()</code> -&gt; <code>Ready</code>。</li>
+<li><strong>休眠</strong>：<code>Running</code> -&gt; <code>sleep()</code> -&gt; <code>TIMED_WAITING</code> -&gt; <code>时间结束</code> -&gt; <code>RUNNABLE</code>。</li>
+<li><strong>协作</strong>：<code>Running</code> -&gt; <code>wait()</code> -&gt; <code>WAITING</code> -&gt; <code>notify()</code> -&gt; <code>RUNNABLE</code>。</li>
+<li><strong>竞争</strong>：<code>Running</code> -&gt; <code>争锁失败</code> -&gt; <code>BLOCKED</code> -&gt; <code>拿到锁</code> -&gt; <code>RUNNABLE</code>。</li>
+</ol>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="http://example.com/2026/04/06/Java-%E7%BA%BF%E7%A8%8B%E7%8A%B6%E6%80%81%E4%B8%8E%E8%BD%AC%E6%8D%A2%E5%85%A8%E8%A7%A3%E6%9E%90/" data-id="cuido1MZAMXHhn4oPfqaFnin0" data-title="Java 线程状态与转换全解析" class="article-share-link"><span class="fa fa-share">Share</span></a>
+      
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/JavaSE/" rel="tag">JavaSE</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%A4%9A%E7%BA%BF%E7%A8%8B/" rel="tag">多线程</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%A4%9A%E7%BA%BF%E7%A8%8B%E7%8A%B6%E6%80%81/" rel="tag">多线程状态</a></li></ul>
+
+    </footer>
+  </div>
+  
+</article>
+
+
+
+  
+    <article id="post-Java-多线程的基本使用" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
+  <div class="article-meta">
+    <a href="/2026/04/06/Java-%E5%A4%9A%E7%BA%BF%E7%A8%8B%E7%9A%84%E5%9F%BA%E6%9C%AC%E4%BD%BF%E7%94%A8/" class="article-date">
+  <time class="dt-published" datetime="2026-04-06T04:34:38.000Z" itemprop="datePublished">2026-04-06</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="p-name article-title" href="/2026/04/06/Java-%E5%A4%9A%E7%BA%BF%E7%A8%8B%E7%9A%84%E5%9F%BA%E6%9C%AC%E4%BD%BF%E7%94%A8/">Java-多线程的基本使用</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="e-content article-entry" itemprop="articleBody">
+      
+        <h1 id="Java-多线程的基本使用"><a href="#Java-多线程的基本使用" class="headerlink" title="Java-多线程的基本使用"></a>Java-多线程的基本使用</h1><h2 id="1-创建线程的两种方式"><a href="#1-创建线程的两种方式" class="headerlink" title="1.创建线程的两种方式"></a>1.创建线程的两种方式</h2><h3 id="继承Thread类"><a href="#继承Thread类" class="headerlink" title="继承Thread类"></a>继承Thread类</h3><h4 id="代码"><a href="#代码" class="headerlink" title="代码"></a>代码</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">class MyThread extends Thread &#123;</span><br><span class="line">    @Override</span><br><span class="line">    public void run() &#123;</span><br><span class="line">        System.out.println(Thread.currentThread().getName() + &quot;：继承Thread类运行...&quot;);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">// 启动方式</span><br><span class="line">// new MyThread().start(); </span><br></pre></td></tr></table></figure>
+<h3 id="实现Runable接口-Thread调用"><a href="#实现Runable接口-Thread调用" class="headerlink" title="实现Runable接口+Thread调用"></a>实现Runable接口+Thread调用</h3><h4 id="代码-1"><a href="#代码-1" class="headerlink" title="代码"></a>代码</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">class MyRunnable implements Runnable &#123;</span><br><span class="line">    @Override</span><br><span class="line">    public void run() &#123;</span><br><span class="line">        System.out.println(Thread.currentThread().getName() + &quot;：实现Runnable接口运行...&quot;);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">// 启动方式</span><br><span class="line">// MyRunnable mr = new MyRunnable();</span><br><span class="line">// new Thread(mr, &quot;线程A&quot;).start(); </span><br></pre></td></tr></table></figure>
+<h4 id="涉及知识点：设计模式——代理模式（静态代理）"><a href="#涉及知识点：设计模式——代理模式（静态代理）" class="headerlink" title="涉及知识点：设计模式——代理模式（静态代理）"></a>涉及知识点：设计模式——代理模式（静态代理）</h4><h4 id="思想"><a href="#思想" class="headerlink" title="思想"></a>思想</h4><p><code>Thread</code>类和自定义的<code>Runnable</code>实现类都实现了<code>Runnable</code>接口。<code>Thread</code>对象充当<strong>代理对象</strong>，内部持有了<strong>真实对象</strong>（自定义<code>Runnable</code>对象）的引用。客户端调用代理对象的<code>start()</code>方法，底层最终会去执行真实对象的<code>run()</code>方法。</p>
+<h4 id="代码-2"><a href="#代码-2" class="headerlink" title="代码"></a>代码</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line">// 简易模拟Thread与Runnable的静态代理关系</span><br><span class="line">interface CustomRunnable &#123; void run(); &#125;</span><br><span class="line"></span><br><span class="line">// 真实角色</span><br><span class="line">class RealRole implements CustomRunnable &#123;</span><br><span class="line">    public void run() &#123; System.out.println(&quot;真实角色执行核心业务逻辑&quot;); &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">// 代理角色（模拟Thread）</span><br><span class="line">class ProxyRole implements CustomRunnable &#123;</span><br><span class="line">    private CustomRunnable target; // 代理对象内部持有真实对象的引用</span><br><span class="line"></span><br><span class="line">    public ProxyRole(CustomRunnable target) &#123; this.target = target; &#125;</span><br><span class="line"></span><br><span class="line">    public void run() &#123; </span><br><span class="line">        if (target != null) &#123; target.run(); &#125; // 实际调用真实对象的方法</span><br><span class="line">    &#125; </span><br><span class="line">    </span><br><span class="line">    public void start() &#123;</span><br><span class="line">        System.out.println(&quot;底层C++分配线程资源...&quot;);</span><br><span class="line">        this.run(); </span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">// 调用</span><br><span class="line">// new ProxyRole(new RealRole()).start();</span><br></pre></td></tr></table></figure>
+<h2 id="2-多线程售票系统初步实现"><a href="#2-多线程售票系统初步实现" class="headerlink" title="2.多线程售票系统初步实现"></a>2.多线程售票系统初步实现</h2><h4 id="代码-3"><a href="#代码-3" class="headerlink" title="代码"></a>代码</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">class TicketWindow implements Runnable &#123;</span><br><span class="line">    private int tickets = 10; // 共享资源</span><br><span class="line"></span><br><span class="line">    @Override</span><br><span class="line">    public void run() &#123;</span><br><span class="line">        while (tickets &gt; 0) &#123;</span><br><span class="line">            try &#123; Thread.sleep(10); &#125; catch (InterruptedException e) &#123;&#125; // 模拟网络延迟</span><br><span class="line">            System.out.println(Thread.currentThread().getName() + &quot; 卖出第: &quot; + tickets--);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">// 测试（3个窗口卖10张票）：</span><br><span class="line">// TicketWindow tw = new TicketWindow();</span><br><span class="line">// new Thread(tw, &quot;窗口1&quot;).start();</span><br><span class="line">// new Thread(tw, &quot;窗口2&quot;).start();</span><br><span class="line">// new Thread(tw, &quot;窗口3&quot;).start();</span><br></pre></td></tr></table></figure>
+<h4 id="问题"><a href="#问题" class="headerlink" title="问题"></a>问题</h4><p>运行上述代码会发现<strong>数据错乱</strong>：出现重卖（同一张票被多次卖出）或超卖（卖出第0张、甚至负数张票）。 <strong>原因</strong>：多个线程并发访问并修改共享数据（<code>tickets</code>）时，操作不具备原子性（<code>tickets--</code>分为读、减、写三步），发生线程安全问题。</p>
+<h2 id="3-线程类（Thread）常用方法"><a href="#3-线程类（Thread）常用方法" class="headerlink" title="3.线程类（Thread）常用方法"></a>3.线程类（Thread）常用方法</h2><ul>
+<li><strong><code>start()</code></strong>: 启动线程，JVM将调用此线程的<code>run()</code>方法。</li>
+<li><strong><code>run()</code></strong>: 线程需要执行的任务代码。直接调用只是普通方法，不会启动新线程。</li>
+<li><strong><code>setName(String name)</code> / <code>getName()</code></strong>: 设置/获取线程名称。</li>
+<li><strong><code>Thread.currentThread()</code></strong>: 静态方法，获取当前正在执行的线程对象的引用。</li>
+<li><strong><code>Thread.sleep(long millis)</code></strong>: 静态方法，让当前线程休眠指定毫秒数（<strong>不释放锁</strong>）。</li>
+<li><strong><code>join()</code></strong>: 线程插队，当前线程阻塞等待调用<code>join()</code>的线程执行完毕。</li>
+<li><strong><code>Thread.yield()</code></strong>: 线程礼让，当前线程暂停，让出CPU给同等优先级的线程（不保证一定会让成功）。</li>
+<li><strong><code>interrupt()</code></strong>: 中断线程（打断休眠等状态，而非直接停止线程）。</li>
+</ul>
+<h2 id="4-JavaSE中规定的线程状态及转换图"><a href="#4-JavaSE中规定的线程状态及转换图" class="headerlink" title="4.JavaSE中规定的线程状态及转换图"></a>4.JavaSE中规定的线程状态及转换图</h2><p>Java中线程状态由内部枚举类 <code>Thread.State</code> 定义，共6种：</p>
+<ol>
+<li><strong>NEW</strong> (新建)：尚未启动。</li>
+<li><strong>RUNNABLE</strong> (可运行)：在Java虚拟机中执行（包括就绪和运行中）。</li>
+<li><strong>BLOCKED</strong> (阻塞)：等待监视器锁（也就是在等别人释放锁）。</li>
+<li><strong>WAITING</strong> (无限等待)：调用无参的 <code>wait()</code> 或 <code>join()</code> 进入此状态，需被其他线程唤醒。</li>
+<li><strong>TIMED_WAITING</strong> (计时等待)：调用带参的 <code>sleep(time)</code> 或 <code>wait(time)</code>，时间到了自动唤醒。</li>
+<li><strong>TERMINATED</strong> (终止)：线程执行完毕退出。</li>
+</ol>
+<blockquote>
+<p><strong>简易转换逻辑</strong>：<code>NEW</code> -&gt; <code>start()</code> -&gt; <code>RUNNABLE</code> -&gt; 抢锁失败 -&gt; <code>BLOCKED</code> -&gt; 抢到锁 -&gt; <code>RUNNABLE</code> -&gt; 执行完毕 -&gt; <code>TERMINATED</code>。</p>
+</blockquote>
+<h2 id="5-守护线程"><a href="#5-守护线程" class="headerlink" title="5.守护线程"></a>5.守护线程</h2><ul>
+<li><strong>概念</strong>：后台线程，专门为用户线程（如<code>main</code>线程）提供服务的线程。典型例子：<strong>垃圾回收线程（GC）</strong>。</li>
+<li><strong>特性</strong>：当所有的用户线程都执行结束退出时，守护线程就算没执行完，也会自动随之结束。</li>
+<li><strong>使用</strong>：</li>
+</ul>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">Thread daemonThread = new Thread(() -&gt; &#123; /* 循环执行某服务 */ &#125;);</span><br><span class="line">daemonThread.setDaemon(true); // 必须在 start() 之前设置！</span><br><span class="line">daemonThread.start();</span><br></pre></td></tr></table></figure>
+<h2 id="6-线程同步机制"><a href="#6-线程同步机制" class="headerlink" title="6.线程同步机制"></a>6.线程同步机制</h2><h3 id="同步是什么？"><a href="#同步是什么？" class="headerlink" title="同步是什么？"></a>同步是什么？</h3><p>当多个线程访问同一个共享资源时，<strong>排队</strong>依次访问。它保证了并发环境下同一时刻只有一个线程能进入临界区执行代码，从而保证数据的一致性和安全性。</p>
+<h3 id="Java中实现同步的方法——synchronize"><a href="#Java中实现同步的方法——synchronize" class="headerlink" title="Java中实现同步的方法——synchronize"></a>Java中实现同步的方法——synchronize</h3><h5 id="同步代码块"><a href="#同步代码块" class="headerlink" title="同步代码块"></a>同步代码块</h5><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">// 语法：synchronized(同步监视器/锁对象) &#123; // 需同步的代码 &#125;</span><br><span class="line">class TicketWindow implements Runnable &#123;</span><br><span class="line">    private int tickets = 10;</span><br><span class="line">    private final Object lock = new Object(); // 专门定义一个锁对象</span><br><span class="line"></span><br><span class="line">    @Override</span><br><span class="line">    public void run() &#123;</span><br><span class="line">        while (true) &#123;</span><br><span class="line">            synchronized (lock) &#123; // 多个线程必须竞争同一把锁！</span><br><span class="line">                if (tickets &gt; 0) &#123;</span><br><span class="line">                    try &#123; Thread.sleep(10); &#125; catch (InterruptedException e) &#123;&#125;</span><br><span class="line">                    System.out.println(Thread.currentThread().getName() + &quot; 卖出: &quot; + tickets--);</span><br><span class="line">                &#125; else &#123;</span><br><span class="line">                    break;</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h5 id="同步方法"><a href="#同步方法" class="headerlink" title="同步方法"></a>同步方法</h5><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">// 在方法声明上加上 synchronized 关键字</span><br><span class="line">class TicketWindow implements Runnable &#123;</span><br><span class="line">    private int tickets = 10;</span><br><span class="line">    </span><br><span class="line">    @Override</span><br><span class="line">    public void run() &#123;</span><br><span class="line">        while (tickets &gt; 0) &#123;</span><br><span class="line">            sell();</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 同步方法：此时的锁对象默认是 this（当前对象）</span><br><span class="line">    private synchronized void sell() &#123;</span><br><span class="line">        if (tickets &gt; 0) &#123;</span><br><span class="line">            System.out.println(Thread.currentThread().getName() + &quot; 卖出: &quot; + tickets--);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><em>注：如果是 <code>public static synchronized void sell()</code>，则其锁对象是当前类的 Class 对象（<code>TicketWindow.class</code>）。</em></p>
+<h2 id="7-同步关键字底层原理（对象锁-互斥锁）——决定了同步是否有效，使用高效"><a href="#7-同步关键字底层原理（对象锁-互斥锁）——决定了同步是否有效，使用高效" class="headerlink" title="7.同步关键字底层原理（对象锁/互斥锁）——决定了同步是否有效，使用高效"></a>7.同步关键字底层原理（对象锁/互斥锁）——决定了同步是否有效，使用高效</h2><ul>
+<li><strong>底层原理（Monitor）</strong>：Java中每一个对象天生就带着一把“锁”（对象监视器 Monitor）。当线程遇到 <code>synchronized</code> 时，会尝试去获取该对象的这把锁。<ul>
+<li>拿到了锁：进入同步块/方法执行代码，执行完后释放锁。</li>
+<li>没拿到锁：进入阻塞状态（<code>BLOCKED</code>），在锁池中等待，直到锁被其他线程释放后再去竞争。</li>
+</ul>
+</li>
+<li><strong>有效性的决定因素</strong>：多个线程是否需要排队，<strong>唯一判断标准是它们是否在竞争“同一个对象”的锁</strong>。如果各自拿各自的锁，同步依然无效。</li>
+<li><strong>高效使用原则</strong>：加锁会牺牲程序的并发性能，造成线程等待开销。因此应当尽可能<strong>缩小同步代码块的范围</strong>，只将真正操作共享数据的关键代码包围起来，避免不必要的阻塞。</li>
+</ul>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="http://example.com/2026/04/06/Java-%E5%A4%9A%E7%BA%BF%E7%A8%8B%E7%9A%84%E5%9F%BA%E6%9C%AC%E4%BD%BF%E7%94%A8/" data-id="cuidaBEjwzkKLBHm4qIkRz-4N" data-title="Java-多线程的基本使用" class="article-share-link"><span class="fa fa-share">Share</span></a>
+      
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/JavaSE/" rel="tag">JavaSE</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%A4%9A%E7%BA%BF%E7%A8%8B/" rel="tag">多线程</a></li></ul>
+
+    </footer>
+  </div>
+  
+</article>
+
+
+
+  
     <article id="post-Java-多线程与-JVM-内存模型基础笔记" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
   <div class="article-meta">
     <a href="/2026/04/05/Java-%E5%A4%9A%E7%BA%BF%E7%A8%8B%E4%B8%8E-JVM-%E5%86%85%E5%AD%98%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E7%AC%94%E8%AE%B0/" class="article-date">
@@ -655,449 +950,6 @@
 
 
   
-    <article id="post-论文复现清单" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
-  <div class="article-meta">
-    <a href="/2026/03/31/%E8%AE%BA%E6%96%87%E5%A4%8D%E7%8E%B0%E6%B8%85%E5%8D%95/" class="article-date">
-  <time class="dt-published" datetime="2026-03-31T08:58:06.000Z" itemprop="datePublished">2026-03-31</time>
-</a>
-    
-  </div>
-  <div class="article-inner">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="p-name article-title" href="/2026/03/31/%E8%AE%BA%E6%96%87%E5%A4%8D%E7%8E%B0%E6%B8%85%E5%8D%95/">论文复现清单</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="e-content article-entry" itemprop="articleBody">
-      
-        <h3 id="📂-第一部分：你需要复现的论文目录清单"><a href="#📂-第一部分：你需要复现的论文目录清单" class="headerlink" title="📂 第一部分：你需要复现的论文目录清单"></a><strong>📂 第一部分：你需要复现的论文目录清单</strong></h3><p>这份清单的筛选标准是：<strong>模型轻量、代码开源、在航空/垂直领域有验证、且代表了2025-2026年的主流方向（如知识蒸馏、小样本、抗噪）。</strong></p>
-<h4 id="1-基石模型（必须跑通，作为对比基准）"><a href="#1-基石模型（必须跑通，作为对比基准）" class="headerlink" title="1. 基石模型（必须跑通，作为对比基准）"></a><strong>1. 基石模型（必须跑通，作为对比基准）</strong></h4><ul>
-<li><strong>论文标题：</strong> <strong>《航空事故领域的知识抽取方法研究与实现》</strong> (东北大学学报, 2026)</li>
-<li><strong>核心模型：</strong> <strong>BERT + BiGRU-IDCNN-CRF</strong></li>
-<li><strong>推荐理由：</strong><ul>
-<li><strong>最贴合你的背景：</strong> 这是专门针对“航空事故”领域的研究，直接解决了你“做什么数据”的问题。</li>
-<li><strong>低配友好：</strong> 这是一个典型的“预训练模型+轻量级特征提取器”架构。IDCNN（膨胀卷积）比LSTM并行计算更快，CRF保证了标签的合法性。</li>
-<li><strong>复现价值：</strong> 它的NER（命名实体识别）精确率达到了94.69%。你需要复现它，作为你后续改进的“基线（Baseline）”。</li>
-</ul>
-</li>
-<li><strong>硬件需求：</strong> 单张 1080Ti 或 3060 即可轻松运行。</li>
-</ul>
-<h4 id="2-进阶模型（针对低资源-少样本场景）"><a href="#2-进阶模型（针对低资源-少样本场景）" class="headerlink" title="2. 进阶模型（针对低资源/少样本场景）"></a><strong>2. 进阶模型（针对低资源/少样本场景）</strong></h4><ul>
-<li><strong>论文标题：</strong> <strong>《大小模型协同训练的少样本命名实体识别方法》</strong> (武汉大学, 2025)</li>
-<li><strong>核心方法：</strong> <strong>Knowledge Distillation (知识蒸馏) / Co-training</strong></li>
-<li><strong>推荐理由：</strong><ul>
-<li><strong>解决痛点：</strong> 航空数据标注难。这篇论文展示了如何用大模型（老师）教小模型（学生），让小模型在只有少量数据的情况下达到高效果。</li>
-<li><strong>技术路线：</strong> 学习如何利用API（如ChatGPT/文心一言）生成伪标签，然后在本地训练小模型。这是低算力实验室的“生存之道”。</li>
-</ul>
-</li>
-<li><strong>硬件需求：</strong> 训练学生模型只需普通显卡；老师模型通过API调用（不耗本地显存）。</li>
-</ul>
-<h4 id="3-拓展模型（针对复杂关系抽取）"><a href="#3-拓展模型（针对复杂关系抽取）" class="headerlink" title="3. 拓展模型（针对复杂关系抽取）"></a><strong>3. 拓展模型（针对复杂关系抽取）</strong></h4><ul>
-<li><strong>论文标题：</strong> <strong>《基于图神经网络的A320飞行控制系统实体关系抽取方法研究》</strong> (2025)</li>
-<li><strong>核心模型：</strong> <strong>GCN (图卷积网络) + Attention</strong></li>
-<li><strong>推荐理由：</strong><ul>
-<li><strong>领域深度：</strong> 聚焦于“A320飞行控制系统”，非常垂直。</li>
-<li><strong>技术特点：</strong> 航空故障往往涉及组件之间的拓扑关系（如“传感器A”连接到“控制器B”）。GCN能很好地处理这种非欧几里得空间的数据。</li>
-<li><strong>创新点：</strong> 学习如何将飞机的系统原理图转化为图数据结构，辅助文本抽取。</li>
-</ul>
-</li>
-</ul>
-<h4 id="4-数据构建（磨刀不误砍柴工）"><a href="#4-数据构建（磨刀不误砍柴工）" class="headerlink" title="4. 数据构建（磨刀不误砍柴工）"></a><strong>4. 数据构建（磨刀不误砍柴工）</strong></h4><ul>
-<li><strong>论文标题：</strong> <strong>《Corpus Construction for Aviation Speech Recognition》</strong> (Springer, 2022/2025引用)</li>
-<li><strong>核心内容：</strong> <strong>航空专业语料库构建</strong></li>
-<li><strong>推荐理由：</strong> 虽然偏向语音，但其<strong>文本预处理、清洗和关键词提取</strong>的方法论完全适用于文本挖掘。你需要学习如何从杂乱的航空维修手册或通话记录中清洗出高质量的训练数据。</li>
-</ul>
-<hr>
-<h3 id="📖-第二部分：航空领域信息抽取综述（为你定制）"><a href="#📖-第二部分：航空领域信息抽取综述（为你定制）" class="headerlink" title="📖 第二部分：航空领域信息抽取综述（为你定制）"></a><strong>📖 第二部分：航空领域信息抽取综述（为你定制）</strong></h3><p>为了让你对该领域有全面了解，我基于最新的文献趋势，为你撰写了这篇综述摘要。你可以将其作为你开题报告或文献综述的框架基础。</p>
-<h4 id="🚀-航空领域信息抽取技术综述：从深度学习到大模型协同"><a href="#🚀-航空领域信息抽取技术综述：从深度学习到大模型协同" class="headerlink" title="🚀 航空领域信息抽取技术综述：从深度学习到大模型协同"></a><strong>🚀 航空领域信息抽取技术综述：从深度学习到大模型协同</strong></h4><p><strong>1. 领域背景与挑战</strong><br>航空领域的数据具有<strong>“高专业性、强逻辑性、多源异构”</strong>的特点。数据来源包括飞行手册（AMM）、故障隔离手册（FIM）、驾驶舱语音记录（CVR）以及事故调查报告。</p>
-<ul>
-<li><strong>核心难点：</strong><ul>
-<li><strong>术语复杂：</strong> 大量缩写（如V1, Vr, N1）和特定语境含义。</li>
-<li><strong>标注稀缺：</strong> 依赖航空专家标注，成本极高，导致“小样本”问题突出。</li>
-<li><strong>关系重叠：</strong> 一个故障现象可能对应多个原因，实体间关系复杂（重叠关系）。</li>
-</ul>
-</li>
-</ul>
-<p><strong>2. 技术演进路线</strong></p>
-<ul>
-<li><strong>阶段一：基于统计与规则（传统方法）</strong><ul>
-<li>早期依赖人工编写的词典和正则表达式。准确率高但召回率低，难以应对新词。</li>
-</ul>
-</li>
-<li><strong>阶段二：深度学习时代（当前主流）</strong><ul>
-<li><strong>命名实体识别（NER）：</strong> 目前<strong>BERT + BiLSTM + CRF</strong> 仍是航空领域的“黄金标准”。2026年的研究显示，通过引入IDCNN（膨胀卷积）替换LSTM，可以在保持精度的同时提升训练速度，非常适合工程落地。</li>
-<li><strong>关系抽取（RE）：</strong> 从管道式（先NER后RE）转向<strong>联合抽取（Joint Extraction）</strong>。例如，利用<strong>指针网络（Pointer Network）</strong>或<strong>表填充（Table Filling）</strong>方法，一次性解决实体识别和关系分类，有效解决了“误差传播”问题。</li>
-</ul>
-</li>
-<li><strong>阶段三：大模型与知识增强（2025-2026趋势）</strong><ul>
-<li><strong>远程监督与强化学习：</strong> 针对数据噪声问题，利用强化学习（RL）自动筛选高质量的训练样本（如东北大学2026年研究）。</li>
-<li><strong>生成式抽取：</strong> 利用T5或BART等生成式模型，将抽取任务转化为“问答”或“文本生成”任务（例如：输入“飞机引擎震动”，输出“&lt;故障&gt;引擎震动&lt;/故障&gt;”）。</li>
-<li><strong>知识图谱融合：</strong> 将航空维修手册构建成知识图谱，利用图神经网络（GNN）辅助文本理解。例如，当文本提到“液压泵压力低”时，图谱能提供“液压泵”属于“液压系统”的先验知识，提升模型理解力。</li>
-</ul>
-</li>
-</ul>
-<p><strong>3. 低算力环境下的最佳实践</strong></p>
-<p>对于设备有限的实验室，目前的最佳实践路径是：</p>
-<ol>
-<li><strong>数据层：</strong> 使用<strong>远程监督</strong>技术，利用现有的航空知识库自动标注大量无标签文本。</li>
-<li><strong>模型层：</strong> 采用<strong>“预训练模型（BERT/RoBERTa）+ 轻量化适配器（Adapter）”</strong>的模式。不要全量微调大模型，只训练少量的Adapter参数。</li>
-<li><strong>增强层：</strong> 引入<strong>知识蒸馏</strong>。用云端大模型（Teacher）对难例进行标注，指导本地小模型（Student）学习。</li>
-</ol>
-<p><strong>4. 总结与展望</strong><br>航空领域的信息抽取正处于从“感知智能”（识别文字）向“认知智能”（理解故障逻辑）跨越的阶段。未来的研究热点将集中在<strong>可解释性抽取</strong>（告诉维修人员为什么判定是这个故障）以及<strong>多模态融合</strong>（结合文本报告与传感器时序数据）。</p>
-
-      
-    </div>
-    <footer class="article-footer">
-      <a data-url="http://example.com/2026/03/31/%E8%AE%BA%E6%96%87%E5%A4%8D%E7%8E%B0%E6%B8%85%E5%8D%95/" data-id="cuidBQC-rDHaTim1vuKBNiTBf" data-title="论文复现清单" class="article-share-link"><span class="fa fa-share">Share</span></a>
-      
-      
-      
-  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E8%AE%BA%E6%96%87%E8%A7%84%E5%88%92/" rel="tag">论文规划</a></li></ul>
-
-    </footer>
-  </div>
-  
-</article>
-
-
-
-  
-    <article id="post-深入理解-Java——hashCode-真的只是内存地址吗？" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
-  <div class="article-meta">
-    <a href="/2026/03/31/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3-Java%E2%80%94%E2%80%94hashCode-%E7%9C%9F%E7%9A%84%E5%8F%AA%E6%98%AF%E5%86%85%E5%AD%98%E5%9C%B0%E5%9D%80%E5%90%97%EF%BC%9F/" class="article-date">
-  <time class="dt-published" datetime="2026-03-31T06:35:55.000Z" itemprop="datePublished">2026-03-31</time>
-</a>
-    
-  </div>
-  <div class="article-inner">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="p-name article-title" href="/2026/03/31/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3-Java%E2%80%94%E2%80%94hashCode-%E7%9C%9F%E7%9A%84%E5%8F%AA%E6%98%AF%E5%86%85%E5%AD%98%E5%9C%B0%E5%9D%80%E5%90%97%EF%BC%9F/">深入理解 Java——hashCode 真的只是内存地址吗？</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="e-content article-entry" itemprop="articleBody">
-      
-        <p>在 Java 开发中，我们经常会遇到这样一个问题：“<code>Object</code> 的 <code>hashCode()</code> 方法返回的到底是不是对象的内存地址？”</p>
-<p>很多人的第一反应是：<strong>不是，它只是一个为了支持哈希表（如 HashMap）快速查找的值。</strong> 这个回答在宏观业务逻辑上是完全正确的。但在深入探究 JVM 的底层实现后，我们会发现，<code>hashCode</code> 与内存地址之间，有着一段与 Java 垃圾回收（GC）机制紧密相关的“爱恨情仇”。</p>
-<h2 id="一、-核心误区：hashCode-真的和内存地址完全无关吗？"><a href="#一、-核心误区：hashCode-真的和内存地址完全无关吗？" class="headerlink" title="一、 核心误区：hashCode 真的和内存地址完全无关吗？"></a>一、 核心误区：hashCode 真的和内存地址完全无关吗？</h2><p>其实，<code>hashCode</code> 的生成策略取决于 JVM 的版本和具体实现：</p>
-<ol>
-<li><strong>早期 JVM 的历史遗留</strong>：在早期的 HotSpot JVM 中，默认的 <code>hashCode()</code>（Identity Hash Code）确实是<strong>基于对象的底层物理内存地址</strong>计算出来的。</li>
-<li><strong>现代 JVM 的进化（Java 8 及之后）</strong>：现代 HotSpot JVM 默认<strong>不再</strong>依赖内存地址。现在的默认策略是使用一个线程局部的伪随机数生成器（Xorshift 算法）来生成这个哈希值。</li>
-</ol>
-<p><strong>为什么现代 JVM 要抛弃使用内存地址作为 hashCode 呢？</strong> 这就不得不提到 Java 强大的垃圾回收器（GC）。</p>
-<h2 id="二、-为什么-GC-不只回收垃圾，还要“移动”存活对象？"><a href="#二、-为什么-GC-不只回收垃圾，还要“移动”存活对象？" class="headerlink" title="二、 为什么 GC 不只回收垃圾，还要“移动”存活对象？"></a>二、 为什么 GC 不只回收垃圾，还要“移动”存活对象？</h2><p>如果 GC 仅仅是简单地把没有引用的对象标记为“可用空间”（即<strong>标记-清除算法 Mark-Sweep</strong>），会产生一个致命的问题：<strong>内存碎片（Memory Fragmentation）</strong>。</p>
-<p>打个比方：想象一个电影院（内存），观众（对象）随机离场（变成垃圾）。这时候电影院里空出了很多零散的座位（内存碎片）。如果此时来了一个需要连坐的 5 人家庭（比如 Java 中申请一个大数组），虽然总空座位有 10 个，但因为不连续，他们根本坐不下，从而触发 <code>OutOfMemoryError</code>。</p>
-<p>为了腾出<strong>连续的内存空间</strong>，GC 会扮演电影院管理员的角色，把所有还在看电影的观众（存活的、被引用的对象）全部“赶”到电影院的一侧排排坐。这就是 GC 的<strong>标记-整理（Mark-Compact）</strong>或<strong>复制（Copying）</strong>算法。</p>
-<p><strong>结论：GC 移动的恰恰是那些存活的、被引用的对象。</strong> 死掉的对象不需要移动，它们占用的物理空间直接被覆盖掉即可。</p>
-<h2 id="三、-对象被移动后，引用变量怎么办？"><a href="#三、-对象被移动后，引用变量怎么办？" class="headerlink" title="三、 对象被移动后，引用变量怎么办？"></a>三、 对象被移动后，引用变量怎么办？</h2><p>当 GC 把一个对象从内存地址 A 移动到地址 B 时，JVM 必须同步更新所有指向该对象的引用。这是 JVM 在 GC 时做的最繁重的工作之一：</p>
-<ul>
-<li><strong>Stop-The-World (STW) 机制</strong>：在传统的垃圾回收器（如 Parallel GC, CMS）中，为了安全地完成“移动对象 + 更新引用”的操作，JVM 会暂停所有业务线程（STW）。在世界静止的这一刻，GC 偷偷把对象搬好，修改完所有引用指针，然后再让业务线程继续运行。</li>
-<li><strong>现代前沿 GC 的黑科技</strong>：在最新的垃圾回收器（如 ZGC 和 Shenandoah）中，为了避免长时间停顿，它们实现了<strong>并发移动</strong>。通过引入“读屏障（Load Barrier）”或“染色指针（Colored Pointers）”等技术，当业务线程试图通过旧地址访问被移动的对象时，JVM 能够瞬间拦截并重定向到新地址，同时顺手更新旧引用。</li>
-</ul>
-<h2 id="四、-致命冲突：如果-hashCode-内存地址，会发生什么？"><a href="#四、-致命冲突：如果-hashCode-内存地址，会发生什么？" class="headerlink" title="四、 致命冲突：如果 hashCode = 内存地址，会发生什么？"></a>四、 致命冲突：如果 hashCode = 内存地址，会发生什么？</h2><p>现在我们把逻辑闭环连上：</p>
-<ol>
-<li><code>HashMap</code> 等散列表依赖对象的 <code>hashCode</code> 来计算存储位置（Bucket）。Java 规范要求：一个对象只要没被修改，其 <code>hashCode</code> 在同一次执行中<strong>必须保持不变</strong>。</li>
-<li>GC 为了解决内存碎片，会<strong>频繁移动存活对象</strong>，导致对象的<strong>物理内存地址不断变化</strong>。</li>
-</ol>
-<p><strong>冲突点爆发：</strong> 如果 <code>hashCode()</code> 每次都去读取对象当前的真实内存地址，那么每次 GC 之后，对象的 <code>hashCode</code> 就会改变。这会导致对象在 <code>HashMap</code> 里彻底迷失！ （存进去的时候算出了一个位置，GC 之后再用同一个对象去查，因为地址变了，算出了另一个位置，结果就是 <code>get()</code> 返回 <code>null</code>）。</p>
-<h2 id="五、-JVM-的终极解决方案：缓存机制"><a href="#五、-JVM-的终极解决方案：缓存机制" class="headerlink" title="五、 JVM 的终极解决方案：缓存机制"></a>五、 JVM 的终极解决方案：缓存机制</h2><p>为了解决这个冲突，现代 JVM 采取了以下策略：</p>
-<ol>
-<li><strong>首次计算</strong>：当第一次调用对象的 <code>hashCode()</code> 时，JVM 利用伪随机数算法生成一个 Hash 值。</li>
-<li><strong>永久缓存</strong>：生成完毕后，JVM 会将这个值<strong>永久写入到该对象的对象头（Mark Word）中</strong>。</li>
-<li><strong>后续读取</strong>：之后再次调用 <code>hashCode()</code> 时，直接从对象头中读取这个缓存好的值，不再重新计算。</li>
-</ol>
-<p>这样一来，无论 GC 怎么把这个对象在内存中搬来搬去，它头顶上顶着的这个 <code>hashCode</code> 永远不会变，完美保证了哈希表等数据结构的稳定性！</p>
-<p><strong>总结</strong> 从写代码的业务视角来看，<code>hashCode</code> 确实只是为了支持哈希表的一个值，不应被视为地址。但从底层探究，正是因为 GC 的内存整理机制导致了对象物理地址的动态性，才倒逼 JVM 放弃了“地址即哈希”的朴素设定，演化出了今天对象头缓存伪随机数的优雅设计。</p>
-
-      
-    </div>
-    <footer class="article-footer">
-      <a data-url="http://example.com/2026/03/31/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3-Java%E2%80%94%E2%80%94hashCode-%E7%9C%9F%E7%9A%84%E5%8F%AA%E6%98%AF%E5%86%85%E5%AD%98%E5%9C%B0%E5%9D%80%E5%90%97%EF%BC%9F/" data-id="cuidplXKaVyWfhk1HB9zqccbV" data-title="深入理解 Java——hashCode 真的只是内存地址吗？" class="article-share-link"><span class="fa fa-share">Share</span></a>
-      
-      
-      
-  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/JVM/" rel="tag">JVM</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Java/" rel="tag">Java</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6-GC/" rel="tag">垃圾回收(GC)</a></li></ul>
-
-    </footer>
-  </div>
-  
-</article>
-
-
-
-  
-    <article id="post-英语阅读-2025-12-3-new" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
-  <div class="article-meta">
-    <a href="/2026/03/31/%E8%8B%B1%E8%AF%AD%E9%98%85%E8%AF%BB-2025-12-3-new/" class="article-date">
-  <time class="dt-published" datetime="2026-03-31T00:46:39.000Z" itemprop="datePublished">2026-03-31</time>
-</a>
-    
-  </div>
-  <div class="article-inner">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="p-name article-title" href="/2026/03/31/%E8%8B%B1%E8%AF%AD%E9%98%85%E8%AF%BB-2025-12-3-new/">英语阅读-2025-12-3-new</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="e-content article-entry" itemprop="articleBody">
-      
-        <h1 id="英语阅读精读报告：45岁之后的求职之路-Looking-for-a-job-after-45"><a href="#英语阅读精读报告：45岁之后的求职之路-Looking-for-a-job-after-45" class="headerlink" title="英语阅读精读报告：45岁之后的求职之路 (Looking for a job after 45)"></a>英语阅读精读报告：45岁之后的求职之路 (Looking for a job after 45)</h1><img src="/2026/03/31/%E8%8B%B1%E8%AF%AD%E9%98%85%E8%AF%BB-2025-12-3-new/read1.png" class="" title="文章">
-<h2 id="📍-文章核心主旨与现实意义-Main-Idea-amp-Significance"><a href="#📍-文章核心主旨与现实意义-Main-Idea-amp-Significance" class="headerlink" title="📍 文章核心主旨与现实意义 (Main Idea &amp; Significance)"></a>📍 文章核心主旨与现实意义 (Main Idea &amp; Significance)</h2><ul>
-<li><strong>核心主旨</strong>：深度探讨了 45 岁以上中年求职者在职场中面临的严峻“年龄歧视（Ageism）”和长期失业困境。</li>
-<li><strong>现象揭秘</strong>：文章通过一份涵盖七国、五千多人的权威全球调查，无情地揭露了招聘市场的一个“魔幻现实”——招聘经理们虽然在理智上承认老员工的能力不输年轻人，但在实际操作中却深受“认知偏见（perception bias）”的驱使，极度排斥雇佣 45 岁以上的求职者。</li>
-</ul>
-<h2 id="📖-段落大意梳理-Paragraph-Summary"><a href="#📖-段落大意梳理-Paragraph-Summary" class="headerlink" title="📖 段落大意梳理 (Paragraph Summary)"></a>📖 段落大意梳理 (Paragraph Summary)</h2><ul>
-<li><strong>A段：残酷的职场困境</strong><ul>
-<li>提出问题：45 岁以上人群构成了长期失业者的绝大多数。招聘经理极不情愿雇佣他们，借口是他们“不合群、经验过时、不愿学新东西”。</li>
-</ul>
-</li>
-<li><strong>B段：唯一的破局之道与调查背景</strong><ul>
-<li>指明出路：继续教育和培训（More education and training）是真正能带来改变的方法。随后引出前麦肯锡顾问创立的非营利组织 Generation 发布的全球调查报告。</li>
-</ul>
-</li>
-<li><strong>C段：令人窒息的失业数据</strong><ul>
-<li>数据支撑：45岁以上者占长期失业人数的 40% 以上；一旦失业，有近 2/3 的概率失业超一年。年龄是他们重返职场的“最大障碍”。</li>
-</ul>
-</li>
-<li><strong>D段：招聘经理的“神逻辑”</strong><ul>
-<li>揭示根源：求职难的很大一部分原因在于招聘经理的“认知偏见”。他们即使承认老员工表现得一样好甚至更好，也依然拒绝雇佣，固执地认为老员工技能差、适应力低。</li>
-</ul>
-</li>
-<li><strong>E段：极度双标的评分结果</strong><ul>
-<li>荒谬的对比：近 90% 的经理承认老员工能力强，却在打分时把 45 岁以上求职者的各项指标（竟然连“经验”也算在内）打得比 18-34 岁的年轻人还要低。</li>
-</ul>
-</li>
-</ul>
-<h2 id="📚-核心生词本-Vocabulary-Builder"><a href="#📚-核心生词本-Vocabulary-Builder" class="headerlink" title="📚 核心生词本 (Vocabulary Builder)"></a>📚 核心生词本 (Vocabulary Builder)</h2><h3 id="🌟-重点名词-Nouns"><a href="#🌟-重点名词-Nouns" class="headerlink" title="🌟 重点名词 (Nouns)"></a>🌟 重点名词 (Nouns)</h3><ul>
-<li><strong>ageism</strong> <code>/ˈeɪdʒɪzəm/</code> n. 年龄歧视</li>
-<li><strong>bulk</strong> <code>/bʌlk/</code> n. 大部分，主体 (the bulk of…)</li>
-<li><strong>consultant</strong> <code>/kənˈsʌltənt/</code> n. 顾问</li>
-<li><strong>analyst</strong> <code>/ˈænəlɪst/</code> n. 分析师</li>
-<li><strong>barrier</strong> <code>/ˈbæriər/</code> n. 障碍，壁垒</li>
-<li><strong>bias</strong> <code>/ˈbaɪəs/</code> n. 偏见，偏心</li>
-<li><strong>perception</strong> <code>/pərˈsepʃn/</code> n. 认知，感知，看法</li>
-<li><strong>candidate</strong> <code>/ˈkændɪdət/</code> n. 候选人，求职者 (同义词：applicant / job seeker)</li>
-<li><strong>adaptability</strong> <code>/əˌdæptəˈbɪləti/</code> n. 适应能力 (职场核心软技能)</li>
-<li><strong>measure</strong> <code>/ˈmeʒər/</code> n. 衡量标准，指标</li>
-</ul>
-<h3 id="🌟-重点动词-Verbs"><a href="#🌟-重点动词-Verbs" class="headerlink" title="🌟 重点动词 (Verbs)"></a>🌟 重点动词 (Verbs)</h3><ul>
-<li><strong>lay off</strong> 裁员，解雇 (被动语态：be laid off)</li>
-<li><strong>comprise</strong> <code>/kəmˈpraɪz/</code> v. 包含，由…组成，占…比例</li>
-<li><strong>hire</strong> <code>/haɪər/</code> v./n. 雇佣 / 新招的员工</li>
-<li><strong>rate</strong> <code>/reɪt/</code> v. 评估，评价，打分</li>
-</ul>
-<h3 id="🌟-重点形容词-Adjectives"><a href="#🌟-重点形容词-Adjectives" class="headerlink" title="🌟 重点形容词 (Adjectives)"></a>🌟 重点形容词 (Adjectives)</h3><ul>
-<li><strong>damaging</strong> <code>/ˈdæmɪdʒɪŋ/</code> adj. 造成破坏的，有害的</li>
-<li><strong>reluctant</strong> <code>/rɪˈlʌktənt/</code> adj. 不情愿的，勉强的</li>
-<li><strong>persistent</strong> <code>/pərˈsɪstənt/</code> adj. 持续的，坚持不懈的</li>
-<li><strong>substantial</strong> <code>/səbˈstænʃl/</code> adj. 大量的，实质的，重大的</li>
-<li><strong>widespread</strong> <code>/ˈwaɪdspred/</code> adj. 普遍的，广泛的</li>
-<li><strong>remarkable</strong> <code>/rɪˈmɑːrkəbl/</code> adj. 显著的，令人惊讶的</li>
-</ul>
-<h2 id="🔗-高频句型与地道搭配-Key-Collocations-amp-Phrases"><a href="#🔗-高频句型与地道搭配-Key-Collocations-amp-Phrases" class="headerlink" title="🔗 高频句型与地道搭配 (Key Collocations &amp; Phrases)"></a>🔗 高频句型与地道搭配 (Key Collocations &amp; Phrases)</h2><ol>
-<li><strong>the second half of one’s career</strong>：职业生涯的下半场</li>
-<li><strong>make up the bulk of…</strong>：构成…的大部分/绝大多数 (<em>极佳的图表/数据描述词组</em>)</li>
-<li><strong>make a difference</strong>：产生影响，带来改变，起作用 (<em>万能写作金句</em>)</li>
-<li><strong>based on…</strong>：基于，根据…</li>
-<li><strong>out of work</strong>：失业 (<em>替换 unemployed</em>)</li>
-<li><strong>find it + adj. + to do sth.</strong>：发现/觉得做某事很… (如 find it harder to get jobs)</li>
-<li><strong>a barrier to doing sth.</strong>：做某事的障碍 (<em>注意 to 是介词！后面接 doing</em>)</li>
-<li><strong>on the part of sb.</strong>：在某人那方面，由某人表现出的</li>
-<li><strong>turn out to be…</strong>：结果是，证明是</li>
-<li><strong>as good as or better than…</strong>：和…一样好甚至更好 (<em>完美的比较级并列结构</em>)</li>
-<li><strong>perception bias against…</strong>：对…的认知偏见</li>
-<li><strong>A is three times as likely to do sth. as B</strong>：A 做某事的可能性是 B 的三倍 (<em>高级倍数表达法</em>)</li>
-<li><strong>on average</strong>：平均而言</li>
-<li><strong>nine in 10</strong>：十分之九 (<em>极地道的比例表达法</em>)</li>
-</ol>
-<h1 id="英语阅读精读报告：45岁之后的求职之路-下半部分-F-J段"><a href="#英语阅读精读报告：45岁之后的求职之路-下半部分-F-J段" class="headerlink" title="英语阅读精读报告：45岁之后的求职之路 (下半部分 F-J段)"></a>英语阅读精读报告：45岁之后的求职之路 (下半部分 F-J段)</h1><img src="/2026/03/31/%E8%8B%B1%E8%AF%AD%E9%98%85%E8%AF%BB-2025-12-3-new/read2.png" class="" title="文章">
-<h2 id="📍-文章核心主旨与现实意义-Main-Idea-amp-Significance-1"><a href="#📍-文章核心主旨与现实意义-Main-Idea-amp-Significance-1" class="headerlink" title="📍 文章核心主旨与现实意义 (Main Idea &amp; Significance)"></a>📍 文章核心主旨与现实意义 (Main Idea &amp; Significance)</h2><ul>
-<li><strong>核心主旨</strong>：文章后半部分主要探讨了打破年龄歧视的“终极武器”——<strong>教育与再培训（Education and training）</strong>，同时也指出了一个残酷的社会现实——教育资源的阶层差异。</li>
-<li><strong>现象揭秘</strong>：虽然招聘经理对大龄求职者有“不愿学新技术”的偏见，但只要大龄求职者主动参与培训，就能“逆风翻盘”。然而，培训需要时间和金钱，这导致低收入群体更难获得转型的机会，从而陷入“越穷越难转型”的困境。</li>
-</ul>
-<h2 id="📖-段落大意梳理-Paragraph-Summary-1"><a href="#📖-段落大意梳理-Paragraph-Summary-1" class="headerlink" title="📖 段落大意梳理 (Paragraph Summary)"></a>📖 段落大意梳理 (Paragraph Summary)</h2><ul>
-<li><strong>F段：招聘经理的深层担忧</strong><ul>
-<li>经理们不仅担心老员工不愿学新技术，而且因为经理自己大多不到45岁，所以本能地排斥招比自己年纪大的人。</li>
-</ul>
-</li>
-<li><strong>G段：逆风翻盘的好消息</strong><ul>
-<li>只要45岁以上的人积极参加相关培训或拿到证书，就能彻底扭转劣势。74%的成功转行者表示，培训帮了大忙。</li>
-</ul>
-</li>
-<li><strong>H段：保持学习热情的惊人回报</strong><ul>
-<li>对培训感到“兴奋/有热情”的人，失业时间更短，拿到的工作邀约（Offer）更多，对工作也更满意。</li>
-</ul>
-</li>
-<li><strong>I段：什么类型的培训最管用？</strong><ul>
-<li>培训比政府补贴有用得多。虽然学校的行业资格证最打动人，但耗时耗钱。其实面对面培训、在职培训、甚至网课（不管有没有证书）都非常有帮助。</li>
-</ul>
-</li>
-<li><strong>J段：残酷的社会资源差异（不利的一面）</strong><ul>
-<li>仅仅展现出“我在学习新技能”这个态度本身就很有用。但缺点是，低收入、学历低、来自弱势社区的人往往最缺乏再培训的资源和兴趣，导致穷人更难转型。</li>
-</ul>
-</li>
-</ul>
-<h2 id="📚-核心生词本-Vocabulary-Builder-扩充版"><a href="#📚-核心生词本-Vocabulary-Builder-扩充版" class="headerlink" title="📚 核心生词本 (Vocabulary Builder - 扩充版)"></a>📚 核心生词本 (Vocabulary Builder - 扩充版)</h2><h3 id="🌟-重点名词-Nouns-1"><a href="#🌟-重点名词-Nouns-1" class="headerlink" title="🌟 重点名词 (Nouns)"></a>🌟 重点名词 (Nouns)</h3><ul>
-<li><strong>fear</strong> <code>/fɪr/</code> n. 担忧，恐惧，害怕</li>
-<li><strong>technology</strong> <code>/tekˈnɑːlədʒi/</code> n. 技术，科技</li>
-<li><strong>majority</strong> <code>/məˈdʒɔːrəti/</code> n. 大多数，大部分</li>
-<li><strong>credential</strong> <code>/krəˈdenʃl/</code> n. 资历，文凭，证书</li>
-<li><strong>career</strong> <code>/kəˈrɪr/</code> n. 职业，事业</li>
-<li><strong>path</strong> <code>/pæθ/</code> n. 道路，路径 (career path 职业道路)</li>
-<li><strong>attitude</strong> <code>/ˈætɪtuːd/</code> n. 态度，看法</li>
-<li><strong>offer</strong> <code>/ˈɔːfər/</code> n. 提供，工作邀约 (job offer)</li>
-<li><strong>subsidy</strong> <code>/ˈsʌbsədi/</code> n. 补贴，补助金</li>
-<li><strong>qualification</strong> <code>/ˌkwɑːlɪfɪˈkeɪʃn/</code> n. 资格，学历，证明</li>
-<li><strong>certification</strong> <code>/ˌsɜːrtɪfɪˈkeɪʃn/</code> n. 认证，证书</li>
-<li><strong>downside</strong> <code>/ˈdaʊnsaɪd/</code> n. 缺点，不利的一面</li>
-<li><strong>community</strong> <code>/kəˈmjuːnəti/</code> n. 社区，群体</li>
-<li><strong>income</strong> <code>/ˈɪnˌkʌm/</code> n. 收入 (high/low income 高/低收入)</li>
-<li><strong>diploma</strong> <code>/dɪˈploʊmə/</code> n. 毕业文凭，学位证书</li>
-<li><strong>program</strong> <code>/ˈproʊɡræm/</code> n. 项目，计划，程序</li>
-</ul>
-<h3 id="🌟-重点动词-Verbs-1"><a href="#🌟-重点动词-Verbs-1" class="headerlink" title="🌟 重点动词 (Verbs)"></a>🌟 重点动词 (Verbs)</h3><ul>
-<li><strong>worry</strong> <code>/ˈwɜːri/</code> v. 担心，发愁</li>
-<li><strong>try</strong> <code>/traɪ/</code> v. 尝试，努力</li>
-<li><strong>switch</strong> <code>/swɪtʃ/</code> v. 转换，改变 (switch careers 转行)</li>
-<li><strong>enable</strong> <code>/ɪˈneɪbl/</code> v. 使能够，使成为可能</li>
-<li><strong>shift</strong> <code>/ʃɪft/</code> v. 转移，转向</li>
-<li><strong>depend</strong> <code>/dɪˈpend/</code> v. 取决于，依赖 (depend on…)</li>
-<li><strong>cost</strong> <code>/kɔːst/</code> v. 花费，消耗 (cost money and time 耗时耗钱)</li>
-<li><strong>participate</strong> <code>/pɑːrˈtɪsɪpeɪt/</code> v. 参加，参与</li>
-</ul>
-<h3 id="🌟-重点形容词-副词-Adjectives-amp-Adverbs"><a href="#🌟-重点形容词-副词-Adjectives-amp-Adverbs" class="headerlink" title="🌟 重点形容词/副词 (Adjectives &amp; Adverbs)"></a>🌟 重点形容词/副词 (Adjectives &amp; Adverbs)</h3><ul>
-<li><strong>unable</strong> <code>/ʌnˈeɪbl/</code> adj. 不能的，无法的</li>
-<li><strong>active</strong> <code>/ˈæktɪv/</code> adj. 积极的，活跃的 (副词 actively)</li>
-<li><strong>relevant</strong> <code>/ˈreləvənt/</code> adj. 相关的，切题的</li>
-<li><strong>excited</strong> <code>/ɪkˈsaɪtɪd/</code> adj. 兴奋的，激动的</li>
-<li><strong>satisfied</strong> <code>/ˈsætɪsfaɪd/</code> adj. 满意的，满足的</li>
-<li><strong>obviously</strong> <code>/ˈɑːbviəsli/</code> adv. 显然地，明显地</li>
-<li><strong>helpful</strong> <code>/ˈhelpfl/</code> adj. 有帮助的，有益的</li>
-<li><strong>informal</strong> <code>/ɪnˈfɔːrml/</code> adj. 非正式的 (反义词 formal)</li>
-<li><strong>historically</strong> <code>/hɪˈstɔːrɪkli/</code> adv. 历史上地，历来</li>
-<li><strong>disadvantaged</strong> <code>/ˌdɪsədˈvæntɪdʒd/</code> adj. 处于劣势的，弱势的，贫困的</li>
-</ul>
-<h2 id="🔗-高频句型与地道搭配-Key-Collocations-amp-Phrases-1"><a href="#🔗-高频句型与地道搭配-Key-Collocations-amp-Phrases-1" class="headerlink" title="🔗 高频句型与地道搭配 (Key Collocations &amp; Phrases)"></a>🔗 高频句型与地道搭配 (Key Collocations &amp; Phrases)</h2><ol>
-<li><strong>be reluctant to do sth.</strong>：不情愿做某事 (<em>全文灵魂词组</em>)</li>
-<li><strong>besides</strong>：此外，而且 (<em>非常基础且好用的逻辑连接词</em>)</li>
-<li><strong>the majority of…</strong>：…的大多数</li>
-<li><strong>engage in</strong>：参与，从事于</li>
-<li><strong>turn sth. on its head</strong>：彻底改变某事，完全推翻 (<em>高级俚语</em>)</li>
-<li><strong>three-quarters</strong>：四分之三</li>
-<li><strong>be likely to do sth.</strong>：有可能做某事</li>
-<li><strong>overwhelmingly say that…</strong>：压倒性地/绝大多数表示…</li>
-<li><strong>enable sb. to do sth.</strong>：使某人能够做某事 (<em>万能提分句型</em>)</li>
-<li><strong>be excited by…</strong>：对…感到兴奋/充满热情</li>
-<li><strong>be satisfied by/with…</strong>：对…感到满意</li>
-<li><strong>depend on…</strong>：取决于…</li>
-<li><strong>be impressed by…</strong>：对…留下深刻印象，被…打动</li>
-<li><strong>in-person</strong>：面对面的，亲身参与的 (如 in-person training)</li>
-<li><strong>on-the-job training</strong>：在职培训</li>
-<li><strong>have an effect (on)</strong>：产生效果，有影响</li>
-<li><strong>on its own</strong>：其本身，单凭它自己</li>
-<li><strong>on average</strong>：平均而言</li>
-</ol>
-<h1 id="英语阅读精读报告：45岁之后的求职之路-大结局-K-M段"><a href="#英语阅读精读报告：45岁之后的求职之路-大结局-K-M段" class="headerlink" title="英语阅读精读报告：45岁之后的求职之路 (大结局 K-M段)"></a>英语阅读精读报告：45岁之后的求职之路 (大结局 K-M段)</h1><img src="/2026/03/31/%E8%8B%B1%E8%AF%AD%E9%98%85%E8%AF%BB-2025-12-3-new/read3.png" class="" title="文章">
-<h2 id="📍-文章核心主旨与最终结论-Main-Idea-amp-Conclusion"><a href="#📍-文章核心主旨与最终结论-Main-Idea-amp-Conclusion" class="headerlink" title="📍 文章核心主旨与最终结论 (Main Idea &amp; Conclusion)"></a>📍 文章核心主旨与最终结论 (Main Idea &amp; Conclusion)</h2><ul>
-<li><strong>核心主旨</strong>：文章的最后三段从理论分析转向了<strong>实际行动指南</strong>。作者用生动的例子说明了“经验胜于文凭”，并一针见血地指出：抱怨年龄歧视是毫无用处的（get us nowhere）。</li>
-<li><strong>最终结论（Bottom line）</strong>：面对残酷的现实，中年求职者最好的自救方式就是利用互联网进行低成本的技能培训，从而向雇主证明自己“能解决问题”。同时，文章在结尾升华了主题，指出了缺乏学习意愿的底层群体给整个社会带来的挑战。</li>
-</ul>
-<h2 id="📖-段落大意梳理-Paragraph-Summary-2"><a href="#📖-段落大意梳理-Paragraph-Summary-2" class="headerlink" title="📖 段落大意梳理 (Paragraph Summary)"></a>📖 段落大意梳理 (Paragraph Summary)</h2><ul>
-<li><strong>K段：实际经验 &gt; 一纸文凭</strong><ul>
-<li>雇主更看重求职者的实际工作经验，而不是一个好听的学位。因为有过实践经验的人往往从入职的第一天起（from day 1）就能立刻上手干活、融入团队。</li>
-</ul>
-</li>
-<li><strong>L段：停止抱怨，立刻行动</strong><ul>
-<li>抱怨“年龄歧视”解决不了任何问题。雇主面临着时间压力，他们只是想招能解决问题的人。如今多亏了互联网（如 YouTube 等），获取免费或廉价的技能培训变得前所未有的容易。</li>
-</ul>
-</li>
-<li><strong>M段：最终结论与社会挑战</strong><ul>
-<li>结论：45岁之后找工作确实难，上网学新技能是最好的出路。遗憾的是，最需要学习的人往往最不去学，这不仅是对个体生命的浪费，也变成了全社会的损失。因为只有当更多人就业时，所有人才能受益。</li>
-</ul>
-</li>
-</ul>
-<h2 id="📚-核心生词本-Vocabulary-Builder-基础与高阶并重"><a href="#📚-核心生词本-Vocabulary-Builder-基础与高阶并重" class="headerlink" title="📚 核心生词本 (Vocabulary Builder - 基础与高阶并重)"></a>📚 核心生词本 (Vocabulary Builder - 基础与高阶并重)</h2><h3 id="🌟-重点名词-Nouns-2"><a href="#🌟-重点名词-Nouns-2" class="headerlink" title="🌟 重点名词 (Nouns)"></a>🌟 重点名词 (Nouns)</h3><ul>
-<li><strong>employer</strong> <code>/ɪmˈplɔɪər/</code> n. 雇主，老板 (反义词: employee 员工)</li>
-<li><strong>graduate</strong> <code>/ˈɡrædʒuət/</code> n. 毕业生 (college graduate 大学毕业生)</li>
-<li><strong>industry</strong> <code>/ˈɪndəstri/</code> n. 行业，工业</li>
-<li><strong>degree</strong> <code>/dɪˈɡriː/</code> n. 学位，程度</li>
-<li><strong>literature</strong> <code>/ˈlɪtrətʃər/</code> n. 文学 (literature graduate 文科毕业生)</li>
-<li><strong>finance</strong> <code>/ˈfaɪnæns/</code> n. 金融，财务</li>
-<li><strong>economics</strong> <code>/ˌiːkəˈnɑːmɪks/</code> n. 经济学</li>
-<li><strong>pressure</strong> <code>/ˈpreʃər/</code> n. 压力 (under pressure 在压力下)</li>
-<li><strong>instruction</strong> <code>/ɪnˈstrʌkʃn/</code> n. 指导，教学，说明</li>
-<li><strong>course</strong> <code>/kɔːrs/</code> n. 课程 (online courses 网课)</li>
-<li><strong>society</strong> <code>/səˈsaɪəti/</code> n. 社会</li>
-<li><strong>benefit</strong> <code>/ˈbenɪfɪt/</code> n./v. 好处 / 受益，得益</li>
-</ul>
-<h3 id="🌟-重点动词-Verbs-2"><a href="#🌟-重点动词-Verbs-2" class="headerlink" title="🌟 重点动词 (Verbs)"></a>🌟 重点动词 (Verbs)</h3><ul>
-<li><strong>surf</strong> <code>/sɜːrf/</code> v. 冲浪 (surf the internet 网上冲浪)</li>
-<li><strong>travel</strong> <code>/ˈtrævl/</code> v. 旅行 (travel around 环游)</li>
-<li><strong>solve</strong> <code>/sɑːlv/</code> v. 解决 (solve problems 解决问题)</li>
-<li><strong>resolve</strong> <code>/rɪˈzɑːlv/</code> v. 解决，消除 (resolve their worries 消除他们的担忧)</li>
-<li><strong>gain</strong> <code>/ɡeɪn/</code> v. 获得，获取 (gain instruction 获取指导)</li>
-<li><strong>raise</strong> <code>/reɪz/</code> v. 引起，提出 (raise a challenge 引发挑战)</li>
-</ul>
-<h3 id="🌟-重点形容词-副词-Adjectives-amp-Adverbs-1"><a href="#🌟-重点形容词-副词-Adjectives-amp-Adverbs-1" class="headerlink" title="🌟 重点形容词/副词 (Adjectives &amp; Adverbs)"></a>🌟 重点形容词/副词 (Adjectives &amp; Adverbs)</h3><ul>
-<li><strong>willing</strong> <code>/ˈwɪlɪŋ/</code> adj. 愿意的，乐意的</li>
-<li><strong>inexpensive</strong> <code>/ˌɪnɪkˈspensɪv/</code> adj. 不贵的，廉价的</li>
-<li><strong>free</strong> <code>/friː/</code> adj. 免费的，自由的</li>
-<li><strong>sadly</strong> <code>/ˈsædli/</code> adv. 悲哀地，遗憾地</li>
-<li><strong>unemployed</strong> <code>/ˌʌnɪmˈplɔɪd/</code> adj. 失业的</li>
-</ul>
-<h2 id="🔗-高频句型与地道搭配-Key-Collocations-amp-Phrases-2"><a href="#🔗-高频句型与地道搭配-Key-Collocations-amp-Phrases-2" class="headerlink" title="🔗 高频句型与地道搭配 (Key Collocations &amp; Phrases)"></a>🔗 高频句型与地道搭配 (Key Collocations &amp; Phrases)</h2><ol>
-<li><strong>more likely to hire A than B</strong>：更有可能雇佣 A 而不是 B (<em>极其重要的比较句型</em>)</li>
-<li><strong>spend time doing sth.</strong>：花时间做某事 (如 spend their summers working)</li>
-<li><strong>from day 1</strong>：从第一天起，立刻上手 (<em>非常实用的职场口语</em>)</li>
-<li><strong>rail against</strong>：抱怨，强烈抗议 (<em>高级书面表达，替换 complain about</em>)</li>
-<li><strong>get sb. nowhere</strong>：对某人毫无用处，行不通 (<em>高分地道短语！如 It gets us nowhere 这毫无用处</em>)</li>
-<li><strong>under pressure</strong>：面临压力，在压力下 (under time pressure 时间紧迫)</li>
-<li><strong>thanks to</strong>：多亏了…，因为… (<em>表示原因的积极表达</em>)</li>
-<li><strong>bottom line</strong>：底线，最终结果，<strong>结论 (最重要的一点)</strong></li>
-<li><strong>let alone</strong>：更不用说，遑论 (<em>进阶加分短语！如 difficult getting a job, let alone changing careers 找工作都难，更别说转行了</em>)</li>
-<li><strong>as a whole</strong>：作为一个整体 (society as a whole 整个社会)</li>
-<li><strong>go to waste</strong>：被浪费掉，白白浪费</li>
-<li><strong>Not only do we not want to…, but…</strong>：我们不仅不想…，而且… (<em>Not only 在句首引起的部分倒装结构，写作满分句型</em>)</li>
-</ol>
-
-      
-    </div>
-    <footer class="article-footer">
-      <a data-url="http://example.com/2026/03/31/%E8%8B%B1%E8%AF%AD%E9%98%85%E8%AF%BB-2025-12-3-new/" data-id="cuidNHNykdeJ398tB6nr4sX3U" data-title="英语阅读-2025-12-3-new" class="article-share-link"><span class="fa fa-share">Share</span></a>
-      
-      
-      
-  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E8%8B%B1%E8%AF%AD/" rel="tag">英语</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E9%98%85%E8%AF%BB/" rel="tag">阅读</a></li></ul>
-
-    </footer>
-  </div>
-  
-</article>
-
-
-
-  
 
 
   <nav id="page-nav">
@@ -1123,7 +975,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">Tags</h3>
     <div class="widget">
-      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/EDT-%E4%BA%8B%E4%BB%B6%E5%88%86%E5%8F%91%E7%BA%BF%E7%A8%8B/" rel="tag">EDT(事件分发线程)</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/GUI/" rel="tag">GUI</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/JVM/" rel="tag">JVM</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Java/" rel="tag">Java</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/JavaSE/" rel="tag">JavaSE</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/JavaWeb/" rel="tag">JavaWeb</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Junit/" rel="tag">Junit</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/KeyListener/" rel="tag">KeyListener</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Swing-AWT/" rel="tag">Swing&#x2F;AWT</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Tomcat/" rel="tag">Tomcat</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E4%BA%8B%E4%BB%B6%E5%A4%84%E7%90%86%E6%9C%BA%E5%88%B6/" rel="tag">事件处理机制</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%86%85%E5%AD%98%E6%A8%A1%E5%9E%8B/" rel="tag">内存模型</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%90%8E%E7%AB%AF%E5%9F%BA%E7%A1%80/" rel="tag">后端基础</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6-GC/" rel="tag">垃圾回收(GC)</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%9F%BA%E6%9C%AC%E8%AF%AD%E6%B3%95/" rel="tag">基本语法</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%A4%9A%E7%BA%BF%E7%A8%8B/" rel="tag">多线程</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%A7%94%E6%89%98%E4%BA%8B%E4%BB%B6%E6%A8%A1%E5%9E%8B/" rel="tag">委托事件模型</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B/" rel="tag">并发编程</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%BA%95%E5%B1%82%E5%8E%9F%E7%90%86/" rel="tag">底层原理</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%BC%82%E5%B8%B8%E5%A4%84%E7%90%86/" rel="tag">异常处理</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%BE%85%E5%AE%8C%E5%96%84/" rel="tag">待完善</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/" rel="tag">性能优化</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%8E%92%E5%BA%8F/" rel="tag">排序</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%8E%A7%E5%88%B6%E5%8F%8D%E8%BD%AC-IoC/" rel="tag">控制反转(IoC)</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F/" rel="tag">操作系统</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%A0%B8%E5%BF%83%E8%BF%9B%E9%98%B6/" rel="tag">核心进阶</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%AE%97%E6%B3%95/" rel="tag">算法</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%B1%BB%E5%8A%A0%E8%BD%BD%E5%99%A8/" rel="tag">类加载器</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%BB%98%E5%9B%BE/" rel="tag">绘图</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%8B%B1%E8%AF%AD/" rel="tag">英语</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%AE%A1%E5%88%92/" rel="tag">计划</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E4%BD%93%E7%B3%BB%E7%BB%93%E6%9E%84/" rel="tag">计算机体系结构</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%AE%BA%E6%96%87%E8%A7%84%E5%88%92/" rel="tag">论文规划</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%BD%AF%E4%BB%B6%E6%9E%B6%E6%9E%84/" rel="tag">软件架构</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%BF%AD%E4%BB%A3/" rel="tag">迭代</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E9%80%92%E5%BD%92/" rel="tag">递归</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E9%98%85%E8%AF%BB/" rel="tag">阅读</a></li></ul>
+      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/EDT-%E4%BA%8B%E4%BB%B6%E5%88%86%E5%8F%91%E7%BA%BF%E7%A8%8B/" rel="tag">EDT(事件分发线程)</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/GUI/" rel="tag">GUI</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/JVM/" rel="tag">JVM</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Java/" rel="tag">Java</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/JavaSE/" rel="tag">JavaSE</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/JavaWeb/" rel="tag">JavaWeb</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Junit/" rel="tag">Junit</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/KeyListener/" rel="tag">KeyListener</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Swing-AWT/" rel="tag">Swing&#x2F;AWT</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Tomcat/" rel="tag">Tomcat</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/interrupt/" rel="tag">interrupt</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E4%B8%AD%E6%96%AD/" rel="tag">中断</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E4%BA%8B%E4%BB%B6%E5%A4%84%E7%90%86%E6%9C%BA%E5%88%B6/" rel="tag">事件处理机制</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%86%85%E5%AD%98%E6%A8%A1%E5%9E%8B/" rel="tag">内存模型</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%90%8E%E7%AB%AF%E5%9F%BA%E7%A1%80/" rel="tag">后端基础</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6-GC/" rel="tag">垃圾回收(GC)</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%9F%BA%E6%9C%AC%E8%AF%AD%E6%B3%95/" rel="tag">基本语法</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%A4%9A%E7%BA%BF%E7%A8%8B/" rel="tag">多线程</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%A4%9A%E7%BA%BF%E7%A8%8B%E7%8A%B6%E6%80%81/" rel="tag">多线程状态</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%A7%94%E6%89%98%E4%BA%8B%E4%BB%B6%E6%A8%A1%E5%9E%8B/" rel="tag">委托事件模型</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B/" rel="tag">并发编程</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%BA%95%E5%B1%82%E5%8E%9F%E7%90%86/" rel="tag">底层原理</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%BC%82%E5%B8%B8%E5%A4%84%E7%90%86/" rel="tag">异常处理</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%BE%85%E5%AE%8C%E5%96%84/" rel="tag">待完善</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/" rel="tag">性能优化</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%8E%92%E5%BA%8F/" rel="tag">排序</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%8E%A7%E5%88%B6%E5%8F%8D%E8%BD%AC-IoC/" rel="tag">控制反转(IoC)</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F/" rel="tag">操作系统</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%A0%B8%E5%BF%83%E8%BF%9B%E9%98%B6/" rel="tag">核心进阶</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%AE%97%E6%B3%95/" rel="tag">算法</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%B1%BB%E5%8A%A0%E8%BD%BD%E5%99%A8/" rel="tag">类加载器</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%BB%98%E5%9B%BE/" rel="tag">绘图</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%8B%B1%E8%AF%AD/" rel="tag">英语</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%AE%A1%E5%88%92/" rel="tag">计划</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E4%BD%93%E7%B3%BB%E7%BB%93%E6%9E%84/" rel="tag">计算机体系结构</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%AE%BA%E6%96%87%E8%A7%84%E5%88%92/" rel="tag">论文规划</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%BD%AF%E4%BB%B6%E6%9E%B6%E6%9E%84/" rel="tag">软件架构</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%BF%AD%E4%BB%A3/" rel="tag">迭代</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E9%80%92%E5%BD%92/" rel="tag">递归</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E9%98%85%E8%AF%BB/" rel="tag">阅读</a></li></ul>
     </div>
   </div>
 
@@ -1133,7 +985,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">Tag Cloud</h3>
     <div class="widget tagcloud">
-      <a href="/tags/EDT-%E4%BA%8B%E4%BB%B6%E5%88%86%E5%8F%91%E7%BA%BF%E7%A8%8B/" style="font-size: 10px;">EDT(事件分发线程)</a> <a href="/tags/GUI/" style="font-size: 10px;">GUI</a> <a href="/tags/JVM/" style="font-size: 13.33px;">JVM</a> <a href="/tags/Java/" style="font-size: 20px;">Java</a> <a href="/tags/JavaSE/" style="font-size: 16.67px;">JavaSE</a> <a href="/tags/JavaWeb/" style="font-size: 10px;">JavaWeb</a> <a href="/tags/Junit/" style="font-size: 10px;">Junit</a> <a href="/tags/KeyListener/" style="font-size: 10px;">KeyListener</a> <a href="/tags/Swing-AWT/" style="font-size: 10px;">Swing/AWT</a> <a href="/tags/Tomcat/" style="font-size: 10px;">Tomcat</a> <a href="/tags/%E4%BA%8B%E4%BB%B6%E5%A4%84%E7%90%86%E6%9C%BA%E5%88%B6/" style="font-size: 10px;">事件处理机制</a> <a href="/tags/%E5%86%85%E5%AD%98%E6%A8%A1%E5%9E%8B/" style="font-size: 10px;">内存模型</a> <a href="/tags/%E5%90%8E%E7%AB%AF%E5%9F%BA%E7%A1%80/" style="font-size: 10px;">后端基础</a> <a href="/tags/%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6-GC/" style="font-size: 10px;">垃圾回收(GC)</a> <a href="/tags/%E5%9F%BA%E6%9C%AC%E8%AF%AD%E6%B3%95/" style="font-size: 13.33px;">基本语法</a> <a href="/tags/%E5%A4%9A%E7%BA%BF%E7%A8%8B/" style="font-size: 13.33px;">多线程</a> <a href="/tags/%E5%A7%94%E6%89%98%E4%BA%8B%E4%BB%B6%E6%A8%A1%E5%9E%8B/" style="font-size: 10px;">委托事件模型</a> <a href="/tags/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B/" style="font-size: 10px;">并发编程</a> <a href="/tags/%E5%BA%95%E5%B1%82%E5%8E%9F%E7%90%86/" style="font-size: 10px;">底层原理</a> <a href="/tags/%E5%BC%82%E5%B8%B8%E5%A4%84%E7%90%86/" style="font-size: 10px;">异常处理</a> <a href="/tags/%E5%BE%85%E5%AE%8C%E5%96%84/" style="font-size: 10px;">待完善</a> <a href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/" style="font-size: 10px;">性能优化</a> <a href="/tags/%E6%8E%92%E5%BA%8F/" style="font-size: 10px;">排序</a> <a href="/tags/%E6%8E%A7%E5%88%B6%E5%8F%8D%E8%BD%AC-IoC/" style="font-size: 10px;">控制反转(IoC)</a> <a href="/tags/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F/" style="font-size: 13.33px;">操作系统</a> <a href="/tags/%E6%A0%B8%E5%BF%83%E8%BF%9B%E9%98%B6/" style="font-size: 10px;">核心进阶</a> <a href="/tags/%E7%AE%97%E6%B3%95/" style="font-size: 13.33px;">算法</a> <a href="/tags/%E7%B1%BB%E5%8A%A0%E8%BD%BD%E5%99%A8/" style="font-size: 10px;">类加载器</a> <a href="/tags/%E7%BB%98%E5%9B%BE/" style="font-size: 10px;">绘图</a> <a href="/tags/%E8%8B%B1%E8%AF%AD/" style="font-size: 20px;">英语</a> <a href="/tags/%E8%AE%A1%E5%88%92/" style="font-size: 10px;">计划</a> <a href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E4%BD%93%E7%B3%BB%E7%BB%93%E6%9E%84/" style="font-size: 10px;">计算机体系结构</a> <a href="/tags/%E8%AE%BA%E6%96%87%E8%A7%84%E5%88%92/" style="font-size: 10px;">论文规划</a> <a href="/tags/%E8%BD%AF%E4%BB%B6%E6%9E%B6%E6%9E%84/" style="font-size: 10px;">软件架构</a> <a href="/tags/%E8%BF%AD%E4%BB%A3/" style="font-size: 10px;">迭代</a> <a href="/tags/%E9%80%92%E5%BD%92/" style="font-size: 10px;">递归</a> <a href="/tags/%E9%98%85%E8%AF%BB/" style="font-size: 20px;">阅读</a>
+      <a href="/tags/EDT-%E4%BA%8B%E4%BB%B6%E5%88%86%E5%8F%91%E7%BA%BF%E7%A8%8B/" style="font-size: 10px;">EDT(事件分发线程)</a> <a href="/tags/GUI/" style="font-size: 10px;">GUI</a> <a href="/tags/JVM/" style="font-size: 12.5px;">JVM</a> <a href="/tags/Java/" style="font-size: 17.5px;">Java</a> <a href="/tags/JavaSE/" style="font-size: 20px;">JavaSE</a> <a href="/tags/JavaWeb/" style="font-size: 10px;">JavaWeb</a> <a href="/tags/Junit/" style="font-size: 10px;">Junit</a> <a href="/tags/KeyListener/" style="font-size: 10px;">KeyListener</a> <a href="/tags/Swing-AWT/" style="font-size: 10px;">Swing/AWT</a> <a href="/tags/Tomcat/" style="font-size: 10px;">Tomcat</a> <a href="/tags/interrupt/" style="font-size: 10px;">interrupt</a> <a href="/tags/%E4%B8%AD%E6%96%AD/" style="font-size: 10px;">中断</a> <a href="/tags/%E4%BA%8B%E4%BB%B6%E5%A4%84%E7%90%86%E6%9C%BA%E5%88%B6/" style="font-size: 10px;">事件处理机制</a> <a href="/tags/%E5%86%85%E5%AD%98%E6%A8%A1%E5%9E%8B/" style="font-size: 10px;">内存模型</a> <a href="/tags/%E5%90%8E%E7%AB%AF%E5%9F%BA%E7%A1%80/" style="font-size: 10px;">后端基础</a> <a href="/tags/%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6-GC/" style="font-size: 10px;">垃圾回收(GC)</a> <a href="/tags/%E5%9F%BA%E6%9C%AC%E8%AF%AD%E6%B3%95/" style="font-size: 12.5px;">基本语法</a> <a href="/tags/%E5%A4%9A%E7%BA%BF%E7%A8%8B/" style="font-size: 15px;">多线程</a> <a href="/tags/%E5%A4%9A%E7%BA%BF%E7%A8%8B%E7%8A%B6%E6%80%81/" style="font-size: 10px;">多线程状态</a> <a href="/tags/%E5%A7%94%E6%89%98%E4%BA%8B%E4%BB%B6%E6%A8%A1%E5%9E%8B/" style="font-size: 10px;">委托事件模型</a> <a href="/tags/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B/" style="font-size: 10px;">并发编程</a> <a href="/tags/%E5%BA%95%E5%B1%82%E5%8E%9F%E7%90%86/" style="font-size: 10px;">底层原理</a> <a href="/tags/%E5%BC%82%E5%B8%B8%E5%A4%84%E7%90%86/" style="font-size: 10px;">异常处理</a> <a href="/tags/%E5%BE%85%E5%AE%8C%E5%96%84/" style="font-size: 10px;">待完善</a> <a href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/" style="font-size: 10px;">性能优化</a> <a href="/tags/%E6%8E%92%E5%BA%8F/" style="font-size: 10px;">排序</a> <a href="/tags/%E6%8E%A7%E5%88%B6%E5%8F%8D%E8%BD%AC-IoC/" style="font-size: 10px;">控制反转(IoC)</a> <a href="/tags/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F/" style="font-size: 12.5px;">操作系统</a> <a href="/tags/%E6%A0%B8%E5%BF%83%E8%BF%9B%E9%98%B6/" style="font-size: 10px;">核心进阶</a> <a href="/tags/%E7%AE%97%E6%B3%95/" style="font-size: 12.5px;">算法</a> <a href="/tags/%E7%B1%BB%E5%8A%A0%E8%BD%BD%E5%99%A8/" style="font-size: 10px;">类加载器</a> <a href="/tags/%E7%BB%98%E5%9B%BE/" style="font-size: 10px;">绘图</a> <a href="/tags/%E8%8B%B1%E8%AF%AD/" style="font-size: 17.5px;">英语</a> <a href="/tags/%E8%AE%A1%E5%88%92/" style="font-size: 10px;">计划</a> <a href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E4%BD%93%E7%B3%BB%E7%BB%93%E6%9E%84/" style="font-size: 10px;">计算机体系结构</a> <a href="/tags/%E8%AE%BA%E6%96%87%E8%A7%84%E5%88%92/" style="font-size: 10px;">论文规划</a> <a href="/tags/%E8%BD%AF%E4%BB%B6%E6%9E%B6%E6%9E%84/" style="font-size: 10px;">软件架构</a> <a href="/tags/%E8%BF%AD%E4%BB%A3/" style="font-size: 10px;">迭代</a> <a href="/tags/%E9%80%92%E5%BD%92/" style="font-size: 10px;">递归</a> <a href="/tags/%E9%98%85%E8%AF%BB/" style="font-size: 17.5px;">阅读</a>
     </div>
   </div>
 
@@ -1155,23 +1007,23 @@
       <ul>
         
           <li>
+            <a href="/2026/04/06/Java%E7%BA%BF%E7%A8%8B%E4%B8%AD%E6%96%AD%E6%96%B9%E6%B3%95%E7%AC%94%E8%AE%B0/">Java线程中断方法笔记</a>
+          </li>
+        
+          <li>
+            <a href="/2026/04/06/Java-%E7%BA%BF%E7%A8%8B%E7%8A%B6%E6%80%81%E4%B8%8E%E8%BD%AC%E6%8D%A2%E5%85%A8%E8%A7%A3%E6%9E%90/">Java 线程状态与转换全解析</a>
+          </li>
+        
+          <li>
+            <a href="/2026/04/06/Java-%E5%A4%9A%E7%BA%BF%E7%A8%8B%E7%9A%84%E5%9F%BA%E6%9C%AC%E4%BD%BF%E7%94%A8/">Java-多线程的基本使用</a>
+          </li>
+        
+          <li>
             <a href="/2026/04/05/Java-%E5%A4%9A%E7%BA%BF%E7%A8%8B%E4%B8%8E-JVM-%E5%86%85%E5%AD%98%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E7%AC%94%E8%AE%B0/">Java 多线程与 JVM 内存模型基础笔记</a>
           </li>
         
           <li>
             <a href="/2026/04/04/%E8%BF%9B%E7%A8%8B%E4%B8%8E%E7%BA%BF%E7%A8%8B%E7%9A%84%E5%BA%95%E5%B1%82%E9%80%BB%E8%BE%91%E4%B8%8E%E6%9E%B6%E6%9E%84%E6%BC%94%E8%BF%9B/">进程与线程的底层逻辑与架构演进</a>
-          </li>
-        
-          <li>
-            <a href="/2026/04/04/Java%E4%BA%8B%E4%BB%B6%E5%A4%84%E7%90%86%E6%9C%BA%E5%88%B6-%E5%88%9D%E8%AF%86/">Java事件处理机制</a>
-          </li>
-        
-          <li>
-            <a href="/2026/04/03/%E5%88%9D%E8%AF%86JavaWeb/">初识JavaWeb</a>
-          </li>
-        
-          <li>
-            <a href="/2026/04/01/Java-GUI-%E7%BB%98%E5%9B%BE%E5%BA%95%E5%B1%82%E5%8E%9F%E7%90%86%E4%B8%8E%E4%BB%A3%E7%A0%81%E5%AE%9E%E6%88%98/">Java GUI 绘图底层原理与代码实战</a>
           </li>
         
       </ul>
