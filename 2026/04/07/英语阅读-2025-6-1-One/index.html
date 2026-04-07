@@ -4,25 +4,23 @@
   <meta charset="utf-8">
   
   
-  <title>进程与线程的底层逻辑与架构演进 | Hexo</title>
+  <title>英语阅读-2025-6-1-One | Hexo</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-  <meta name="description" content="并发与并行：进程与线程的底层逻辑与架构演进1. 核心概念：并发 (Concurrency) vs 并行 (Parallelism) 并行 (Parallelism)：物理上的“同时” 定义： 在同一时刻，有多条指令在不同的 CPU 核心上真正同时执行。 决定因素： 严格受限于硬件资源，即 CPU 的物理核心数（Cores）和逻辑处理器数（Threads，如超线程）。 上限： 如果 CPU 是 8">
+  <meta name="description" content="英语阅读精读报告：大熊猫不能过得太安逸 (Pandas &amp; Goldilocks Principle) 📍 文章核心主旨与现实意义 (Main Idea &amp; Significance) 核心主旨：文章打破了传统环保观念，提出大熊猫（以及其他大型动物）的栖息地如果过于舒适完美，会导致它们失去寻找新配偶的动力，从而降低基因多样性。 核心概念引入：文章借此引入了著名的跨学科概念——金发">
 <meta property="og:type" content="article">
-<meta property="og:title" content="进程与线程的底层逻辑与架构演进">
-<meta property="og:url" content="http://example.com/2026/04/04/%E8%BF%9B%E7%A8%8B%E4%B8%8E%E7%BA%BF%E7%A8%8B%E7%9A%84%E5%BA%95%E5%B1%82%E9%80%BB%E8%BE%91%E4%B8%8E%E6%9E%B6%E6%9E%84%E6%BC%94%E8%BF%9B/index.html">
+<meta property="og:title" content="英语阅读-2025-6-1-One">
+<meta property="og:url" content="http://example.com/2026/04/07/%E8%8B%B1%E8%AF%AD%E9%98%85%E8%AF%BB-2025-6-1-One/index.html">
 <meta property="og:site_name" content="Hexo">
-<meta property="og:description" content="并发与并行：进程与线程的底层逻辑与架构演进1. 核心概念：并发 (Concurrency) vs 并行 (Parallelism) 并行 (Parallelism)：物理上的“同时” 定义： 在同一时刻，有多条指令在不同的 CPU 核心上真正同时执行。 决定因素： 严格受限于硬件资源，即 CPU 的物理核心数（Cores）和逻辑处理器数（Threads，如超线程）。 上限： 如果 CPU 是 8">
+<meta property="og:description" content="英语阅读精读报告：大熊猫不能过得太安逸 (Pandas &amp; Goldilocks Principle) 📍 文章核心主旨与现实意义 (Main Idea &amp; Significance) 核心主旨：文章打破了传统环保观念，提出大熊猫（以及其他大型动物）的栖息地如果过于舒适完美，会导致它们失去寻找新配偶的动力，从而降低基因多样性。 核心概念引入：文章借此引入了著名的跨学科概念——金发">
 <meta property="og:locale" content="en_US">
-<meta property="article:published_time" content="2026-04-04T11:03:29.000Z">
-<meta property="article:modified_time" content="2026-04-04T11:09:25.262Z">
+<meta property="og:image" content="http://example.com/2026/04/07/%E8%8B%B1%E8%AF%AD%E9%98%85%E8%AF%BB-2025-6-1-One/read.png">
+<meta property="article:published_time" content="2026-04-07T00:19:56.000Z">
+<meta property="article:modified_time" content="2026-04-07T00:20:52.953Z">
 <meta property="article:author" content="John Doe">
-<meta property="article:tag" content="Java">
-<meta property="article:tag" content="多线程">
-<meta property="article:tag" content="并发编程">
-<meta property="article:tag" content="操作系统">
-<meta property="article:tag" content="计算机体系结构">
-<meta property="article:tag" content="软件架构">
+<meta property="article:tag" content="英语">
+<meta property="article:tag" content="阅读">
 <meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/2026/04/07/%E8%8B%B1%E8%AF%AD%E9%98%85%E8%AF%BB-2025-6-1-One/read.png">
   
     <link rel="alternate" href="/atom.xml" title="Hexo" type="application/atom+xml">
   
@@ -81,10 +79,10 @@
 </header>
 
       <div class="outer">
-        <section id="main"><article id="post-进程与线程的底层逻辑与架构演进" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
+        <section id="main"><article id="post-英语阅读-2025-6-1-One" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
   <div class="article-meta">
-    <a href="/2026/04/04/%E8%BF%9B%E7%A8%8B%E4%B8%8E%E7%BA%BF%E7%A8%8B%E7%9A%84%E5%BA%95%E5%B1%82%E9%80%BB%E8%BE%91%E4%B8%8E%E6%9E%B6%E6%9E%84%E6%BC%94%E8%BF%9B/" class="article-date">
-  <time class="dt-published" datetime="2026-04-04T11:03:29.000Z" itemprop="datePublished">2026-04-04</time>
+    <a href="/2026/04/07/%E8%8B%B1%E8%AF%AD%E9%98%85%E8%AF%BB-2025-6-1-One/" class="article-date">
+  <time class="dt-published" datetime="2026-04-07T00:19:56.000Z" itemprop="datePublished">2026-04-07</time>
 </a>
     
   </div>
@@ -95,7 +93,7 @@
         
   
     <h1 class="p-name article-title" itemprop="headline name">
-      进程与线程的底层逻辑与架构演进
+      英语阅读-2025-6-1-One
     </h1>
   
 
@@ -103,74 +101,115 @@
     
     <div class="e-content article-entry" itemprop="articleBody">
       
-        <h1 id="并发与并行：进程与线程的底层逻辑与架构演进"><a href="#并发与并行：进程与线程的底层逻辑与架构演进" class="headerlink" title="并发与并行：进程与线程的底层逻辑与架构演进"></a>并发与并行：进程与线程的底层逻辑与架构演进</h1><h2 id="1-核心概念：并发-Concurrency-vs-并行-Parallelism"><a href="#1-核心概念：并发-Concurrency-vs-并行-Parallelism" class="headerlink" title="1. 核心概念：并发 (Concurrency) vs 并行 (Parallelism)"></a>1. 核心概念：并发 (Concurrency) vs 并行 (Parallelism)</h2><ul>
-<li><strong>并行 (Parallelism)：物理上的“同时”</strong><ul>
-<li><strong>定义：</strong> 在同一时刻，有多条指令在不同的 CPU 核心上真正同时执行。</li>
-<li><strong>决定因素：</strong> 严格受限于硬件资源，即 CPU 的物理核心数（Cores）和逻辑处理器数（Threads，如超线程）。</li>
-<li><strong>上限：</strong> 如果 CPU 是 8 核 16 线程，任何瞬间的并行极限就是 16。</li>
+        <h1 id="英语阅读精读报告：大熊猫不能过得太安逸-Pandas-amp-Goldilocks-Principle"><a href="#英语阅读精读报告：大熊猫不能过得太安逸-Pandas-amp-Goldilocks-Principle" class="headerlink" title="英语阅读精读报告：大熊猫不能过得太安逸 (Pandas &amp; Goldilocks Principle)"></a>英语阅读精读报告：大熊猫不能过得太安逸 (Pandas &amp; Goldilocks Principle)</h1><img src="/2026/04/07/%E8%8B%B1%E8%AF%AD%E9%98%85%E8%AF%BB-2025-6-1-One/read.png" class="" title="文章">
+<h2 id="📍-文章核心主旨与现实意义-Main-Idea-amp-Significance"><a href="#📍-文章核心主旨与现实意义-Main-Idea-amp-Significance" class="headerlink" title="📍 文章核心主旨与现实意义 (Main Idea &amp; Significance)"></a>📍 文章核心主旨与现实意义 (Main Idea &amp; Significance)</h2><ul>
+<li><strong>核心主旨</strong>：文章打破了传统环保观念，提出大熊猫（以及其他大型动物）的栖息地如果过于舒适完美，会导致它们失去寻找新配偶的动力，从而降低基因多样性。</li>
+<li><strong>核心概念引入</strong>：文章借此引入了著名的跨学科概念——<strong>金发姑娘原则 (The Goldilocks principle)</strong>，即保护动物的环境不能太好，也不能太恶劣，必须保持“恰到好处的挑战（不适感）”，才能迫使它们扩大活动范围，保持种群的繁荣。</li>
+</ul>
+<h2 id="📖-段落大意梳理-Paragraph-Summary"><a href="#📖-段落大意梳理-Paragraph-Summary" class="headerlink" title="📖 段落大意梳理 (Paragraph Summary)"></a>📖 段落大意梳理 (Paragraph Summary)</h2><ul>
+<li><strong>第 1-2 段：打破常识的新发现</strong><ul>
+<li>传统观念认为人类活动破坏栖息地会威胁大熊猫生存。但新研究表明，大熊猫过得太舒服反而有灭绝风险，适度的不适和栖息地碎片化其实有助于保护种群。</li>
 </ul>
 </li>
-<li><strong>并发 (Concurrency)：宏观上的“同时”，微观上的“轮换”</strong><ul>
-<li><strong>定义：</strong> 在一段时间内，多个任务都在推进，但在微观的极短时间内，只有一个任务在执行。</li>
-<li><strong>决定因素：</strong> 操作系统调度算法（时间片轮转）、内存大小。</li>
-<li><strong>上限：</strong> 取决于软件建模和系统资源（主要是内存），可以创建成千上万个并发任务。</li>
+<li><strong>第 3-4 段：揭示科学原理与“黄金比例”</strong><ul>
+<li>密歇根州立大学的研究指出，如果环境太完美，大熊猫就不愿走出去交配，导致缺乏基因多样性。完美的栖息地比例应该是：80% 宜居，剩下 20% 环境恶劣或受人类活动影响。</li>
 </ul>
 </li>
-</ul>
-<h2 id="2-硬件执行的物理铁律"><a href="#2-硬件执行的物理铁律" class="headerlink" title="2. 硬件执行的物理铁律"></a>2. 硬件执行的物理铁律</h2><ul>
-<li><strong>单核单任务：</strong> 在物理层面，一个 CPU 核心（逻辑核）在绝对的同一瞬时，只能处理 1 个执行单位。</li>
-<li><strong>分时复用 (Time Slicing)：</strong> 操作系统通过极快地切换任务（纳秒/微秒级），让多个任务轮流使用核心，产生“同时运行”的错觉，这就是并发的本质。</li>
-<li><strong>超线程技术 (Hyper-Threading)：</strong> 硬件厂商在单核内增加一组寄存器，使得核心内的运算单元可以在不同线程间快速切换（伪并行），提高核心部件利用率，但这并未突破“单运算单元单时刻单任务”的物理限制。</li>
-</ul>
-<h2 id="3-基本执行单位的演进：从进程到线程"><a href="#3-基本执行单位的演进：从进程到线程" class="headerlink" title="3. 基本执行单位的演进：从进程到线程"></a>3. 基本执行单位的演进：从进程到线程</h2><ul>
-<li><strong>过去（单核主导）：进程是基本单位。</strong><ul>
-<li>多个进程在单个核心上轮流抢占时间片，实现纯并发。</li>
+<li><strong>第 5-6 段：引入“金发姑娘原则”</strong><ul>
+<li>专家总结，大熊猫的快乐必须有个度。这完全符合“金发姑娘原则（甜点/最佳平衡点）”——凡事讲究恰到好处。这个概念也广泛应用于心理学和经济学等领域。</li>
 </ul>
 </li>
-<li><strong>现在（多核主导）：线程是基本单位。</strong><ul>
-<li>操作系统将一个进程内的多个线程分配到不同的空闲物理核心上，实现<strong>真正的物理并行</strong>。</li>
-<li>超出核心数的线程，则在各核心上排队轮换，产生<strong>并发</strong>。</li>
+<li><strong>第 7-8 段：理论升华与现状总结</strong><ul>
+<li>牛津大学教授指出，这个理论适用于绝大多数大型食肉动物。人类活动带来的复杂环境，客观上促使动物走得更远，增加了基因连接。文章最后补充，大熊猫目前有 1800 多只，属于“易危”但非“濒危”物种。</li>
 </ul>
 </li>
 </ul>
-<h2 id="4-为什么倾向于“同进程多线程”而非“多进程并行”？"><a href="#4-为什么倾向于“同进程多线程”而非“多进程并行”？" class="headerlink" title="4. 为什么倾向于“同进程多线程”而非“多进程并行”？"></a>4. 为什么倾向于“同进程多线程”而非“多进程并行”？</h2><p>在单一业务处理中，多线程成为主流，主要基于<strong>开销和性能</strong>的考量：</p>
-<ul>
-<li><strong>极低切换成本：</strong> 线程共享所属进程的内存空间。切换线程只需保存寄存器和栈信息，而切换进程需要更换虚拟内存映射表（TLB 刷新），开销巨大。</li>
-<li><strong>高效数据共享：</strong> 线程间共享内存数据，读写极快（如 Java 堆内存）；进程间共享需要复杂的跨进程通信（IPC），速度较慢。</li>
+<h2 id="📚-核心生词本-Vocabulary-Builder-生态与学术高频词"><a href="#📚-核心生词本-Vocabulary-Builder-生态与学术高频词" class="headerlink" title="📚 核心生词本 (Vocabulary Builder - 生态与学术高频词)"></a>📚 核心生词本 (Vocabulary Builder - 生态与学术高频词)</h2><h3 id="🌟-重点名词-Nouns"><a href="#🌟-重点名词-Nouns" class="headerlink" title="🌟 重点名词 (Nouns)"></a>🌟 重点名词 (Nouns)</h3><ul>
+<li><strong>habitat</strong> <code>/ˈhæbɪtæt/</code> n. 栖息地</li>
+<li><strong>population</strong> <code>/ˌpɑːpjuˈleɪʃn/</code> n. 种群 (在生物学话题中)，人口</li>
+<li><strong>diversity</strong> <code>/daɪˈvɜːrsəti/</code> n. 多样性 (genetic diversity 基因多样性)</li>
+<li><strong>implication</strong> <code>/ˌɪmplɪˈkeɪʃn/</code> n. 可能引发的后果，深远影响</li>
+<li><strong>discipline</strong> <code>/ˈdɪsəplɪn/</code> n. 学科，专业领域 (a wide range of disciplines 广泛的学科)</li>
+<li><strong>connectivity</strong> <code>/ˌkɑːnekˈtɪvəti/</code> n. 连接性</li>
+<li><strong>persistence</strong> <code>/pərˈsɪstəns/</code> n. 持久性，存留能力</li>
+<li><strong>species</strong> <code>/ˈspiːʃiːz/</code> n. 物种</li>
+<li><strong>outline</strong> <code>/ˈaʊtlaɪn/</code>：v. 概述，略述。n. 提纲</li>
+<li><strong>spread</strong> <code>/spred/</code>：n./v. 扩散，传播，分布</li>
 </ul>
-<blockquote>
-<p><strong>结论：</strong> Java 等应用被设计为单进程多线程模式，是为了在突破单进程性能瓶颈的同时，极致追求共享数据的效率和降低上下文切换的损耗。</p>
-</blockquote>
-<h2 id="5-架构的现代分工：单进程-多线程-vs-多进程"><a href="#5-架构的现代分工：单进程-多线程-vs-多进程" class="headerlink" title="5. 架构的现代分工：单进程(多线程) vs 多进程"></a>5. 架构的现代分工：单进程(多线程) vs 多进程</h2><p>虽然多线程在局部性能上占优，但<strong>多进程架构并没有被淘汰，反而在现代架构中不可或缺</strong>，主要用于解决多线程的致命弱点：<strong>隔离性差</strong>（一损俱损）。</p>
-<h3 id="现代软件架构的协同："><a href="#现代软件架构的协同：" class="headerlink" title="现代软件架构的协同："></a>现代软件架构的协同：</h3><ol>
-<li><strong>微观层面（Scale Up / 垂直扩展） —— 追求“快”</strong><ul>
-<li><strong>手段：</strong> 在单个应用实例内（如一个 JVM），极度依赖<strong>单进程多线程</strong>模型（线程池、并发库）。</li>
-<li><strong>目的：</strong> 榨干单台服务器的 CPU 和内存资源，追求局部最高计算性能。</li>
+<h3 id="🌟-重点动词-Verbs"><a href="#🌟-重点动词-Verbs" class="headerlink" title="🌟 重点动词 (Verbs)"></a>🌟 重点动词 (Verbs)</h3><ul>
+<li><strong>threaten</strong> <code>/ˈθretn/</code> v. 威胁 (threaten one’s survival 威胁某物种生存)</li>
+<li><strong>fragment</strong> <code>/ˈfræɡmənt/</code> v. 使成碎片，使分裂 (核心环保词汇)</li>
+<li><strong>preserve</strong> <code>/prɪˈzɜːrv/</code> v. 保护，保存，维持</li>
+<li><strong>conduct</strong> <code>/kənˈdʌkt/</code> v. 进行，开展 (conduct a research 进行研究)</li>
+<li><strong>wander</strong> <code>/ˈwɑːndər/</code> v. 漫游，闲逛 (wander off 走失，偏离)</li>
+<li><strong>thrive</strong> <code>/θraɪv/</code> v. 繁荣，茁壮成长 (极其重要的褒义词)</li>
+<li><strong>induce</strong> <code>/ɪnˈduːs/</code> v. 诱导，促使 (induce sb. to do sth.)</li>
 </ul>
-</li>
-<li><strong>宏观层面（Scale Out / 水平扩展） —— 追求“稳”与“大”</strong><ul>
-<li><strong>手段：</strong> 在整体系统架构上，绝对依赖<strong>多进程架构</strong>（甚至是跨机器的分布式进程，如微服务、K8s 容器编排）。</li>
-<li><strong>优势：</strong><ul>
-<li><strong>高可用性/容灾：</strong> 一个进程崩溃（如 Chrome 某个标签页、微服务某个节点）不影响全局。</li>
-<li><strong>无限横向扩展：</strong> 突破单机硬件极限，将负载分散到海量服务器。</li>
-<li><strong>语言特性弥补：</strong> 如 Python (受限于 GIL)、Node.js / Redis (单线程模型)，必须依赖多进程机制来利用多核。</li>
+<h3 id="🌟-重点形容词-副词-Adjectives-amp-Adverbs"><a href="#🌟-重点形容词-副词-Adjectives-amp-Adverbs" class="headerlink" title="🌟 重点形容词/副词 (Adjectives &amp; Adverbs)"></a>🌟 重点形容词/副词 (Adjectives &amp; Adverbs)</h3><ul>
+<li><strong>modest</strong> <code>/ˈmɑːdɪst/</code> adj. 适度的，温和的</li>
+<li><strong>vital</strong> <code>/ˈvaɪtl/</code> adj. 极其重要的，生死攸关的</li>
+<li><strong>increasingly</strong> <code>/ɪnˈkriːsɪŋli/</code> adv. 日益，越来越多地 (替换 more and more)</li>
+<li><strong>vulnerable</strong> <code>/ˈvʌlnərəbl/</code> adj. 易受伤害的，脆弱的 (动物定级：易危)</li>
+<li><strong>endangered</strong> <code>/ɪnˈdeɪndʒərd/</code> adj. 濒危的</li>
+<li><strong>harsh</strong> <code>/hɑːrʃ/</code>：adj. 恶劣的，严酷的，刺耳的</li>
 </ul>
-</li>
-</ul>
-</li>
+<h2 id="🔗-高频地道搭配-Key-Collocations-amp-Phrases"><a href="#🔗-高频地道搭配-Key-Collocations-amp-Phrases" class="headerlink" title="🔗 高频地道搭配 (Key Collocations &amp; Phrases)"></a>🔗 高频地道搭配 (Key Collocations &amp; Phrases)</h2><ol>
+<li><strong>at risk of dying out</strong>：面临灭绝的风险</li>
+<li><strong>stop/prevent sb. from doing sth.</strong>：阻止某人做某事</li>
+<li><strong>a modest degree of…</strong>：适度/少量的…</li>
+<li><strong>fail to do sth.</strong>：未能做某事 (委婉表达“不去做”)</li>
+<li><strong>in search of…</strong>：寻找…</li>
+<li><strong>result in…</strong>：导致，造成 (后接结果)</li>
+<li><strong>be in line with…</strong>：与…一致，与…相符 (<em>极佳的写作替换词</em>)</li>
+<li><strong>apply to…</strong>：应用于…，适用于…</li>
+<li><strong>beyond…</strong>：超出…的范围</li>
+<li><strong>It may well be that… : 很可能是因为…</strong></li>
+<li><strong>sweet spot: 最佳平衡点</strong></li>
+<li><strong>just the right amount: 刚刚好</strong></li>
+<li><strong>wander off</strong>：漫游，走失，偏离</li>
+<li><strong>die out</strong>：灭绝，消失。（替换 become extinct 的地道表达）。</li>
 </ol>
+<h2 id="🌟-写作提分金句（可直接背诵套用）"><a href="#🌟-写作提分金句（可直接背诵套用）" class="headerlink" title="🌟 写作提分金句（可直接背诵套用）"></a>🌟 写作提分金句（可直接背诵套用）</h2><p><strong>1. 引出最新研究/新观点的句型</strong></p>
 <blockquote>
-<p><strong>总结：</strong> 多线程负责单点的高效执行，多进程负责全局的稳定与扩展。两者协同，构成了现代高并发、高可用架构的基石。</p>
+<p><em>原句：New research suggests that pandas may be at risk of dying out because they are too comfortable.</em></p>
 </blockquote>
+<ul>
+<li><strong>套用模板</strong>：<strong>New research suggests that</strong> [某个普遍现象] <strong>may be</strong> [面临的风险/带来的后果] <strong>because</strong> [原因].</li>
+<li><strong>造句示范</strong>：最新研究表明，现代人可能面临严重的健康风险，因为他们过度依赖科技产品。 (<em>New research suggests that modern people may be at high health risks because they over-rely on technological devices.</em>)</li>
+</ul>
+<p><strong>2. 表达“平衡点/过犹不及”的经典从句结构 (enough to… but not so… that…)</strong></p>
+<blockquote>
+<p><em>原句：Pandas should ideally be happy enough to thrive, but not so content that they don’t want to move around.</em></p>
+</blockquote>
+<ul>
+<li><strong>套用模板</strong>：[某事物] <strong>should ideally be</strong> [形容词] <strong>enough to</strong> [好的结果]<strong>, but not so</strong> [形容词] <strong>that</strong> [坏的结果].</li>
+<li><strong>造句示范</strong>：理想情况下，给儿童的压力应该足以激发他们的潜能，但又不能大到让他们产生厌学情绪。 (<em>Pressure on children should ideally be high enough to stimulate their potential, but not so heavy that they lose interest in learning.</em>)</li>
+</ul>
+<p><strong>3. 表达现象/理论跨领域应用的句型</strong></p>
+<blockquote>
+<p><em>原句：The concept has been applied to a wide range of disciplines, from developmental psychology to economics and engineering.</em></p>
+</blockquote>
+<ul>
+<li><strong>套用模板</strong>：<strong>The concept / technology has been applied to a wide range of</strong> [领域名词]<strong>, from</strong> [A领域] <strong>to</strong> [B领域].</li>
+<li><strong>造句示范</strong>：人工智能技术已被广泛应用于从医疗保健到教育和交通的各个领域。 (<em>Artificial intelligence technology has been applied to a wide range of industries, from healthcare to education and transportation.</em>)</li>
+</ul>
+<p><strong>4. 表达“现在的行为导致未来的状态（现在分词作结果状语）”</strong></p>
+<blockquote>
+<p><em>原句：The count found there were 1,800 left, putting them on the list of vulnerable species.</em></p>
+</blockquote>
+<ul>
+<li><strong>套用模板</strong>：[完整句子描述一个事实]<strong>, resulting in / putting…</strong> [导致的结果].</li>
+<li><strong>造句示范</strong>：大量废气被排放到空气中，将我们的城市置于严重的污染危机之下。 (<em>Large amounts of exhaust gas are emitted into the air, putting our cities under a severe pollution crisis.</em>)</li>
+</ul>
 
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://example.com/2026/04/04/%E8%BF%9B%E7%A8%8B%E4%B8%8E%E7%BA%BF%E7%A8%8B%E7%9A%84%E5%BA%95%E5%B1%82%E9%80%BB%E8%BE%91%E4%B8%8E%E6%9E%B6%E6%9E%84%E6%BC%94%E8%BF%9B/" data-id="cuidLZCjAr_wPFoB8nXlXcepb" data-title="进程与线程的底层逻辑与架构演进" class="article-share-link"><span class="fa fa-share">Share</span></a>
+      <a data-url="http://example.com/2026/04/07/%E8%8B%B1%E8%AF%AD%E9%98%85%E8%AF%BB-2025-6-1-One/" data-id="cuidlhTRFH6XEsNwSKsI4caX6" data-title="英语阅读-2025-6-1-One" class="article-share-link"><span class="fa fa-share">Share</span></a>
       
       
       
-  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Java/" rel="tag">Java</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%A4%9A%E7%BA%BF%E7%A8%8B/" rel="tag">多线程</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B/" rel="tag">并发编程</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F/" rel="tag">操作系统</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E4%BD%93%E7%B3%BB%E7%BB%93%E6%9E%84/" rel="tag">计算机体系结构</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E8%BD%AF%E4%BB%B6%E6%9E%B6%E6%9E%84/" rel="tag">软件架构</a></li></ul>
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E8%8B%B1%E8%AF%AD/" rel="tag">英语</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E9%98%85%E8%AF%BB/" rel="tag">阅读</a></li></ul>
 
     </footer>
   </div>
@@ -178,19 +217,10 @@
     
 <nav id="article-nav">
   
-    <a href="/2026/04/05/Java-%E5%A4%9A%E7%BA%BF%E7%A8%8B%E4%B8%8E-JVM-%E5%86%85%E5%AD%98%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E7%AC%94%E8%AE%B0/" id="article-nav-newer" class="article-nav-link-wrap">
-      <strong class="article-nav-caption">Newer</strong>
-      <div class="article-nav-title">
-        
-          Java 多线程与 JVM 内存模型基础笔记
-        
-      </div>
-    </a>
   
-  
-    <a href="/2026/04/04/Java%E4%BA%8B%E4%BB%B6%E5%A4%84%E7%90%86%E6%9C%BA%E5%88%B6-%E5%88%9D%E8%AF%86/" id="article-nav-older" class="article-nav-link-wrap">
+    <a href="/2026/04/06/Java%E7%BA%BF%E7%A8%8B%E4%B8%AD%E6%96%AD%E6%96%B9%E6%B3%95%E7%AC%94%E8%AE%B0/" id="article-nav-older" class="article-nav-link-wrap">
       <strong class="article-nav-caption">Older</strong>
-      <div class="article-nav-title">Java事件处理机制</div>
+      <div class="article-nav-title">Java线程中断方法笔记</div>
     </a>
   
 </nav>
