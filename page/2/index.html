@@ -185,6 +185,83 @@ mjx-container[display="true"] + br {
       <div class="outer">
         <section id="main">
   
+    <article id="post-Java-资源加载空指针异常" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
+  <div class="article-meta">
+    <a href="/2026/04/01/Java-%E8%B5%84%E6%BA%90%E5%8A%A0%E8%BD%BD%E7%A9%BA%E6%8C%87%E9%92%88%E5%BC%82%E5%B8%B8/" class="article-date">
+  <time class="dt-published" datetime="2026-04-01T07:19:32.000Z" itemprop="datePublished">2026-04-01</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="p-name article-title" href="/2026/04/01/Java-%E8%B5%84%E6%BA%90%E5%8A%A0%E8%BD%BD%E7%A9%BA%E6%8C%87%E9%92%88%E5%BC%82%E5%B8%B8/">Java 资源加载空指针异常</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="e-content article-entry" itemprop="articleBody">
+      
+        <ol>
+<li><h1 id="Java-资源加载深度解析：从-NullPointerException-到类加载机制"><a href="#Java-资源加载深度解析：从-NullPointerException-到类加载机制" class="headerlink" title="Java 资源加载深度解析：从 NullPointerException 到类加载机制"></a>Java 资源加载深度解析：从 NullPointerException 到类加载机制</h1><p>在 Java 开发（尤其是 Swing 绘图）中，加载图片、配置文件等资源时经常遇到 <code>NullPointerException</code>。通过分析 <code>com.csy.draw.MyPanel</code> 的案例，我们总结如下知识点。</p>
+<h2 id="1-遇到的问题-The-Problem"><a href="#1-遇到的问题-The-Problem" class="headerlink" title="1. 遇到的问题 (The Problem)"></a>1. 遇到的问题 (The Problem)</h2><h3 id="现象"><a href="#现象" class="headerlink" title="现象"></a>现象</h3><p>运行程序时抛出异常： <code>Exception in thread &quot;AWT-EventQueue-0&quot; java.lang.NullPointerException: Cannot invoke &quot;java.net.URL.toString()&quot; because &quot;url&quot; is null</code></p>
+<h3 id="报错场景"><a href="#报错场景" class="headerlink" title="报错场景"></a>报错场景</h3><p>在 <code>paint</code> 方法中使用系统类（如 <code>Panel.class</code>）尝试获取本项目内的图片资源：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">package com.csy.draw;</span><br><span class="line"></span><br><span class="line">import javax.swing.*;</span><br><span class="line">import java.awt.*;</span><br><span class="line">import java.net.URL;</span><br><span class="line"></span><br><span class="line">public class MyPanel extends JPanel &#123;</span><br><span class="line">    @Override</span><br><span class="line">    public void paint(Graphics g) &#123;</span><br><span class="line">        super.paint(g);</span><br><span class="line">        // ❌ 报错位置：url 返回了 null</span><br><span class="line">        URL url = Panel.class.getResource(&quot;/img.png&quot;);</span><br><span class="line">        Image image = Toolkit.getDefaultToolkit().getImage(url);</span><br><span class="line">        g.drawImage(image, 0, 0, 140, 140, this);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h2 id="2-核心原因-The-Root-Cause"><a href="#2-核心原因-The-Root-Cause" class="headerlink" title="2. 核心原因 (The Root Cause)"></a>2. 核心原因 (The Root Cause)</h2><h3 id="A-逻辑链路断裂"><a href="#A-逻辑链路断裂" class="headerlink" title="A. 逻辑链路断裂"></a>A. 逻辑链路断裂</h3><p><code>getResource()</code> 方法如果找不到资源，不会报错，而是静默返回 <code>null</code>。当后续 <code>getImage(url)</code> 尝试操作这个 <code>null</code> 对象时，程序就会崩溃。</p>
+<h3 id="B-类加载器-ClassLoader-的“地盘意识”"><a href="#B-类加载器-ClassLoader-的“地盘意识”" class="headerlink" title="B. 类加载器 (ClassLoader) 的“地盘意识”"></a>B. 类加载器 (ClassLoader) 的“地盘意识”</h3><p>Java 的类加载采用<strong>双亲委派模型</strong>。不同的类由不同的“加载器管家”管理：</p>
+<ol>
+<li><strong>Bootstrap ClassLoader (引导类加载器)</strong>: 负责 JDK 核心库（如 <code>java.awt.Panel</code>）。它的搜索范围<strong>仅限 JDK 内部</strong>，不认识你的项目路径。</li>
+<li><strong>App ClassLoader (应用类加载器)</strong>: 负责加载你自己写的类（如 <code>MyPanel</code>）以及项目的 <code>out</code> 或 <code>target</code> 目录。</li>
+</ol>
+<p><strong>为什么用 <code>Panel.class</code> 会失败？</strong> 因为 <code>Panel</code> 是皇亲国戚（系统类），它找东西只会去“皇宫内院”（JDK 库）找。你让它去你家的“小仓库”（项目目录）找图片，它肯定找不到。</p>
+<h2 id="3-深入理解-class-语法"><a href="#3-深入理解-class-语法" class="headerlink" title="3. 深入理解 .class 语法"></a>3. 深入理解 <code>.class</code> 语法</h2><ul>
+<li><strong>本质</strong>: <code>Panel.class</code> 是获取该类在 JVM 内存中的“镜像对象”（身份证）。</li>
+<li><strong>功能</strong>: <code>getResource()</code> 是定义在 <code>java.lang.Class</code> 类中的方法。<strong>谁的对象发起调用，就优先从谁的加载器路径开始找。</strong></li>
+</ul>
+<h2 id="4-解决方案-The-Solutions"><a href="#4-解决方案-The-Solutions" class="headerlink" title="4. 解决方案 (The Solutions)"></a>4. 解决方案 (The Solutions)</h2><h3 id="方案一：使用“离资源最近”的类-代码修正"><a href="#方案一：使用“离资源最近”的类-代码修正" class="headerlink" title="方案一：使用“离资源最近”的类 (代码修正)"></a>方案一：使用“离资源最近”的类 (代码修正)</h3><p>永远使用你自己定义的类来获取资源，因为它们属于 <strong>App ClassLoader</strong>，能看到你的项目文件。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">// ✅ 推荐：使用当前自定义类</span><br><span class="line">URL url = MyPanel.class.getResource(&quot;/img.png&quot;); </span><br><span class="line"></span><br><span class="line">// ✅ 推荐：在非静态方法中使用 getClass()</span><br><span class="line">URL url = this.getClass().getResource(&quot;/img.png&quot;);</span><br></pre></td></tr></table></figure>
+<h3 id="方案二：检查-IDE-资源目录配置"><a href="#方案二：检查-IDE-资源目录配置" class="headerlink" title="方案二：检查 IDE 资源目录配置"></a>方案二：检查 IDE 资源目录配置</h3><p>如果代码写对了还是报错，请检查：</p>
+<ol>
+<li>确保图片放在了标记为 <strong>Resources Root</strong> 的文件夹下。</li>
+<li>检查 <code>out</code> 编译输出目录：确认 <code>out/production/项目名/</code> 目录下确实存在 <code>img.png</code>。</li>
+</ol>
+<h3 id="方案三：路径规则"><a href="#方案三：路径规则" class="headerlink" title="方案三：路径规则"></a>方案三：路径规则</h3><ul>
+<li><strong>加斜杠 <code>/</code></strong>: <code>getResource(&quot;/img.png&quot;)</code> 表示从 <strong>类路径根目录</strong> 开始找。</li>
+<li><strong>不加斜杠</strong>: <code>getResource(&quot;img.png&quot;)</code> 表示从 <strong>当前类所在的包</strong>（文件夹）下找。</li>
+</ul>
+<h2 id="5-性能优化建议-重要"><a href="#5-性能优化建议-重要" class="headerlink" title="5. 性能优化建议 (重要)"></a>5. 性能优化建议 (重要)</h2><p><strong>不要在 <code>paint()</code> 方法中加载资源！</strong> <code>paint()</code> 会在窗口缩放、遮挡恢复时被频繁触发。每次触发都重新读取磁盘图片会非常卡顿。</p>
+<p><strong>最佳实践：在构造器中预加载</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">public class MyPanel extends JPanel &#123;</span><br><span class="line">    private Image image;</span><br><span class="line"></span><br><span class="line">    public MyPanel() &#123;</span><br><span class="line">        // 在构造器中只加载一次，存入成员变量</span><br><span class="line">        URL url = MyPanel.class.getResource(&quot;/img.png&quot;);</span><br><span class="line">        if (url != null) &#123;</span><br><span class="line">            image = Toolkit.getDefaultToolkit().getImage(url);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    @Override</span><br><span class="line">    public void paint(Graphics g) &#123;</span><br><span class="line">        super.paint(g);</span><br><span class="line">        if (image != null) &#123;</span><br><span class="line">            g.drawImage(image, 0, 0, this);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h2 id="💡-总结心得"><a href="#💡-总结心得" class="headerlink" title="💡 总结心得"></a>💡 总结心得</h2><ol>
+<li><strong>谁的代码，谁领物资</strong>：加载项目资源，用项目类，别用系统类。</li>
+<li><strong>判空是美德</strong>：获取资源后先判断 <code>url != null</code>，可以避免程序崩溃并快速定位问题。</li>
+<li><strong>看编译输出</strong>：代码没写错却找不到文件，多半是 IDEA 没把资源同步到编译后的文件夹里。</li>
+</ol>
+</li>
+</ol>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="http://example.com/2026/04/01/Java-%E8%B5%84%E6%BA%90%E5%8A%A0%E8%BD%BD%E7%A9%BA%E6%8C%87%E9%92%88%E5%BC%82%E5%B8%B8/" data-id="cuid1hznzewFknYMPeEZxHBRU" data-title="Java 资源加载空指针异常" class="article-share-link"><span class="fa fa-share">Share</span></a>
+      
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Java/" rel="tag">Java</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%BC%82%E5%B8%B8%E5%A4%84%E7%90%86/" rel="tag">异常处理</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/" rel="tag">性能优化</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E7%B1%BB%E5%8A%A0%E8%BD%BD%E5%99%A8/" rel="tag">类加载器</a></li></ul>
+
+    </footer>
+  </div>
+  
+</article>
+
+
+
+  
     <article id="post-初探-JUnit-单元测试：Test注解背后的基本原理" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
   <div class="article-meta">
     <a href="/2026/03/31/%E5%88%9D%E6%8E%A2-JUnit-%E5%8D%95%E5%85%83%E6%B5%8B%E8%AF%95%EF%BC%9ATest%E6%B3%A8%E8%A7%A3%E8%83%8C%E5%90%8E%E7%9A%84%E5%9F%BA%E6%9C%AC%E5%8E%9F%E7%90%86/" class="article-date">
@@ -1282,103 +1359,6 @@ mjx-container[display="true"] + br {
 
 
   
-    <article id="post-英语阅读-2025-12-3-One" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
-  <div class="article-meta">
-    <a href="/2026/03/27/%E8%8B%B1%E8%AF%AD%E9%98%85%E8%AF%BB-2025-12-3-One/" class="article-date">
-  <time class="dt-published" datetime="2026-03-27T08:47:12.000Z" itemprop="datePublished">2026-03-27</time>
-</a>
-    
-  </div>
-  <div class="article-inner">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="p-name article-title" href="/2026/03/27/%E8%8B%B1%E8%AF%AD%E9%98%85%E8%AF%BB-2025-12-3-One/">英语阅读-2025-12-3-One</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="e-content article-entry" itemprop="articleBody">
-      
-        <h1 id="英语阅读精读报告：顶级餐厅的“素食”豪赌"><a href="#英语阅读精读报告：顶级餐厅的“素食”豪赌" class="headerlink" title="英语阅读精读报告：顶级餐厅的“素食”豪赌"></a>英语阅读精读报告：顶级餐厅的“素食”豪赌</h1><img src="/2026/03/27/%E8%8B%B1%E8%AF%AD%E9%98%85%E8%AF%BB-2025-12-3-One/read.png" class="" title="文章">
-<h2 id="📍-文章核心主旨-Main-Idea"><a href="#📍-文章核心主旨-Main-Idea" class="headerlink" title="📍 文章核心主旨 (Main Idea)"></a>📍 文章核心主旨 (Main Idea)</h2><p>本文报道了纽约知名高级餐厅 Eleven Madison Park 创造历史，成为<strong>全球首家荣获米其林三星的纯素食餐厅</strong>的故事。主厨 Daniel Humm 鉴于气候危机，冒着巨大风险将原本以肉食闻名的菜单改为植物性饮食。最终的殊荣不仅证实了这一大胆决定的正确性，也向世界证明了：<strong>顶级的奢华餐饮与环保可持续理念是可以完美结合的</strong>。</p>
-<h2 id="📖-段落大意梳理-Paragraph-Summary"><a href="#📖-段落大意梳理-Paragraph-Summary" class="headerlink" title="📖 段落大意梳理 (Paragraph Summary)"></a>📖 段落大意梳理 (Paragraph Summary)</h2><ul>
-<li><strong>第 1-2 段：创造历史，打破常规</strong><ul>
-<li>纽约的 Eleven Madison Park 成为首家摘得米其林三星的素食餐厅。值得一提的是，这家餐厅早在2011年就曾凭借奢华的肉类菜肴获得过此项最高荣誉。</li>
-</ul>
-</li>
-<li><strong>第 3-5 段：冒险转型与环保初衷</strong><ul>
-<li>主厨 Humm 决定移除菜单上的肉类。原因是他认为现有的食物系统是“不可持续的”，且为了应对“气候危机”，他不想再开传统的餐厅。他承认这极其冒险，但认为这是一场“值得的赌博”，希望能以此为整个餐饮界推开一扇通往新可能的大门。</li>
-</ul>
-</li>
-<li><strong>第 6-7 段：获得肯定与满怀感恩</strong><ul>
-<li>米其林指南将其评为“奢华餐饮的大胆愿景”，这证实了餐厅拥抱素食的决定是正确的。Humm 发表感言，感谢团队 25 年来的贡献以及顾客和合作伙伴的支持，正是这种信任让他们敢于“放手一搏”。</li>
-</ul>
-</li>
-<li><strong>第 8-9 段：殊荣的含金量与未来愿景</strong><ul>
-<li>米其林三星代表着主厨处于职业巅峰，菜肴被升华为“艺术形式”。这明确肯定了素食在烹饪界日益增长的地位。最后，Humm 呼吁奢侈品牌应当承担起社会责任，用更强的“创造力”去打造一个更美好、更美味的未来。</li>
-</ul>
-</li>
-</ul>
-<h2 id="📚-核心生词本-Vocabulary-Builder"><a href="#📚-核心生词本-Vocabulary-Builder" class="headerlink" title="📚 核心生词本 (Vocabulary Builder)"></a>📚 核心生词本 (Vocabulary Builder)</h2><h3 id="🌟-重点名词-Nouns"><a href="#🌟-重点名词-Nouns" class="headerlink" title="🌟 重点名词 (Nouns)"></a>🌟 重点名词 (Nouns)</h3><ul>
-<li><strong>establishment</strong> <code>/ɪˈstæblɪʃmənt/</code> n. 机构，企业，店铺 (指代高档餐厅)</li>
-<li><strong>gamble</strong> <code>/ˈɡæmbl/</code> n./v. 赌博，冒险</li>
-<li><strong>accomplishment</strong> <code>/əˈkɑːmplɪʃmənt/</code> n. 成就</li>
-<li><strong>vision</strong> <code>/ˈvɪʒn/</code> n. 愿景，远见</li>
-<li><strong>significance</strong> <code>/sɪɡˈnɪfɪkəns/</code> n. 重要性，意义</li>
-<li><strong>luxury</strong> <code>/ˈlʌkʃəri/</code> n./adj. 奢侈，奢华(的)</li>
-<li><strong>responsibility</strong> <code>/rɪˌspɑːnsəˈbɪləti/</code> n. 责任</li>
-</ul>
-<h3 id="🌟-重点动词-Verbs"><a href="#🌟-重点动词-Verbs" class="headerlink" title="🌟 重点动词 (Verbs)"></a>🌟 重点动词 (Verbs)</h3><ul>
-<li><strong>cite</strong> <code>/saɪt/</code> v. 引用，举出 (作为理由)</li>
-<li><strong>acknowledge</strong> <code>/əkˈnɑːlɪdʒ/</code> v. 承认，认可</li>
-<li><strong>validate</strong> <code>/ˈvælɪdeɪt/</code> v. 证实，证明…是对的/有价值的</li>
-<li><strong>embrace</strong> <code>/ɪmˈbreɪs/</code> v. 拥抱，欣然接受</li>
-<li><strong>elevate</strong> <code>/ˈelɪveɪt/</code> v. 提升，抬高 (至更高的境界)</li>
-</ul>
-<h3 id="🌟-重点形容词-Adjectives"><a href="#🌟-重点形容词-Adjectives" class="headerlink" title="🌟 重点形容词 (Adjectives)"></a>🌟 重点形容词 (Adjectives)</h3><ul>
-<li><strong>vegan</strong> <code>/ˈviːɡən/</code> adj. 严格素食的 (不含任何动物制品)</li>
-<li><strong>plant-based</strong> adj. 以植物为基础的，植物性的</li>
-<li><strong>unsustainable</strong> <code>/ˌʌnsəˈsteɪnəbl/</code> adj. 不可持续的 (<em>环保核心词</em>)</li>
-<li><strong>bold</strong> <code>/boʊld/</code> adj. 大胆的，无畏的</li>
-<li><strong>culinary</strong> <code>/ˈkʌlɪneri/</code> adj. 烹饪的，厨房的</li>
-</ul>
-<h2 id="🔗-高频句型与地道搭配-Key-Collocations-amp-Phrases"><a href="#🔗-高频句型与地道搭配-Key-Collocations-amp-Phrases" class="headerlink" title="🔗 高频句型与地道搭配 (Key Collocations &amp; Phrases)"></a>🔗 高频句型与地道搭配 (Key Collocations &amp; Phrases)</h2><ol>
-<li><strong>be famed for…</strong>：因…而闻名 (同 be famous/known for)</li>
-<li><strong>make the bold decision to do…</strong>：做出做某事的大胆决定</li>
-<li><strong>a risk worth taking</strong>：一个值得冒的风险 (<em>写作加分表达</em>)</li>
-<li><strong>in view of…</strong>：鉴于，考虑到… (<em>逻辑连接词</em>)</li>
-<li><strong>open doors for…</strong>：为…打开大门，提供机会</li>
-<li><strong>take the jump</strong>：冒险尝试，放手一搏</li>
-<li><strong>in a row</strong>：连续地 (如 for the 11th year in a row 连续第11年)</li>
-<li><strong>at the peak of one’s profession</strong>：处于某人职业生涯的巅峰</li>
-<li><strong>be destined to do…</strong>：注定要做某事</li>
-<li><strong>a nod to…</strong>：向…致意，对…的肯定/认可 (<em>新闻常用比喻</em>)</li>
-<li><strong>have a role to play</strong>：有作用要发挥，扮演着重要角色</li>
-<li><strong>The more…, the more…</strong>：越…，就越… (如 The more creative we are, the more beautiful our future will be.)</li>
-</ol>
-
-      
-    </div>
-    <footer class="article-footer">
-      <a data-url="http://example.com/2026/03/27/%E8%8B%B1%E8%AF%AD%E9%98%85%E8%AF%BB-2025-12-3-One/" data-id="cuidY6vnU9sG_dMXPuD4BtBjv" data-title="英语阅读-2025-12-3-One" class="article-share-link"><span class="fa fa-share">Share</span></a>
-      
-      
-      
-  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E8%8B%B1%E8%AF%AD/" rel="tag">英语</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E9%98%85%E8%AF%BB/" rel="tag">阅读</a></li></ul>
-
-    </footer>
-  </div>
-  
-</article>
-
-
-
-  
 
 
   <nav id="page-nav">
@@ -1414,7 +1394,7 @@ mjx-container[display="true"] + br {
   <div class="widget-wrap">
     <h3 class="widget-title">Tag Cloud</h3>
     <div class="widget tagcloud">
-      <a href="/tags/EDT-%E4%BA%8B%E4%BB%B6%E5%88%86%E5%8F%91%E7%BA%BF%E7%A8%8B/" style="font-size: 10px;">EDT(事件分发线程)</a> <a href="/tags/GUI/" style="font-size: 10px;">GUI</a> <a href="/tags/JVM/" style="font-size: 12.5px;">JVM</a> <a href="/tags/Java/" style="font-size: 17.5px;">Java</a> <a href="/tags/JavaSE/" style="font-size: 20px;">JavaSE</a> <a href="/tags/JavaWeb/" style="font-size: 10px;">JavaWeb</a> <a href="/tags/Junit/" style="font-size: 10px;">Junit</a> <a href="/tags/KeyListener/" style="font-size: 10px;">KeyListener</a> <a href="/tags/Swing-AWT/" style="font-size: 10px;">Swing/AWT</a> <a href="/tags/Tomcat/" style="font-size: 10px;">Tomcat</a> <a href="/tags/interrupt/" style="font-size: 10px;">interrupt</a> <a href="/tags/%E4%B8%AD%E6%96%AD/" style="font-size: 10px;">中断</a> <a href="/tags/%E4%BA%8B%E4%BB%B6%E5%A4%84%E7%90%86%E6%9C%BA%E5%88%B6/" style="font-size: 10px;">事件处理机制</a> <a href="/tags/%E5%86%85%E5%AD%98%E6%A8%A1%E5%9E%8B/" style="font-size: 10px;">内存模型</a> <a href="/tags/%E5%90%8E%E7%AB%AF%E5%9F%BA%E7%A1%80/" style="font-size: 10px;">后端基础</a> <a href="/tags/%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6-GC/" style="font-size: 10px;">垃圾回收(GC)</a> <a href="/tags/%E5%9F%BA%E6%9C%AC%E8%AF%AD%E6%B3%95/" style="font-size: 12.5px;">基本语法</a> <a href="/tags/%E5%A4%9A%E7%BA%BF%E7%A8%8B/" style="font-size: 15px;">多线程</a> <a href="/tags/%E5%A4%9A%E7%BA%BF%E7%A8%8B%E7%8A%B6%E6%80%81/" style="font-size: 10px;">多线程状态</a> <a href="/tags/%E5%A7%94%E6%89%98%E4%BA%8B%E4%BB%B6%E6%A8%A1%E5%9E%8B/" style="font-size: 10px;">委托事件模型</a> <a href="/tags/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B/" style="font-size: 10px;">并发编程</a> <a href="/tags/%E5%BA%95%E5%B1%82%E5%8E%9F%E7%90%86/" style="font-size: 10px;">底层原理</a> <a href="/tags/%E5%BC%82%E5%B8%B8%E5%A4%84%E7%90%86/" style="font-size: 10px;">异常处理</a> <a href="/tags/%E5%BE%85%E5%AE%8C%E5%96%84/" style="font-size: 10px;">待完善</a> <a href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/" style="font-size: 10px;">性能优化</a> <a href="/tags/%E6%8E%92%E5%BA%8F/" style="font-size: 10px;">排序</a> <a href="/tags/%E6%8E%A7%E5%88%B6%E5%8F%8D%E8%BD%AC-IoC/" style="font-size: 10px;">控制反转(IoC)</a> <a href="/tags/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F/" style="font-size: 12.5px;">操作系统</a> <a href="/tags/%E6%A0%B8%E5%BF%83%E8%BF%9B%E9%98%B6/" style="font-size: 10px;">核心进阶</a> <a href="/tags/%E7%AE%97%E6%B3%95/" style="font-size: 12.5px;">算法</a> <a href="/tags/%E7%B1%BB%E5%8A%A0%E8%BD%BD%E5%99%A8/" style="font-size: 10px;">类加载器</a> <a href="/tags/%E7%BB%98%E5%9B%BE/" style="font-size: 10px;">绘图</a> <a href="/tags/%E8%8B%B1%E8%AF%AD/" style="font-size: 20px;">英语</a> <a href="/tags/%E8%AE%A1%E5%88%92/" style="font-size: 10px;">计划</a> <a href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E4%BD%93%E7%B3%BB%E7%BB%93%E6%9E%84/" style="font-size: 10px;">计算机体系结构</a> <a href="/tags/%E8%AE%BA%E6%96%87%E8%A7%84%E5%88%92/" style="font-size: 10px;">论文规划</a> <a href="/tags/%E8%BD%AF%E4%BB%B6%E6%9E%B6%E6%9E%84/" style="font-size: 10px;">软件架构</a> <a href="/tags/%E8%BF%AD%E4%BB%A3/" style="font-size: 10px;">迭代</a> <a href="/tags/%E9%80%92%E5%BD%92/" style="font-size: 10px;">递归</a> <a href="/tags/%E9%98%85%E8%AF%BB/" style="font-size: 20px;">阅读</a>
+      <a href="/tags/EDT-%E4%BA%8B%E4%BB%B6%E5%88%86%E5%8F%91%E7%BA%BF%E7%A8%8B/" style="font-size: 10px;">EDT(事件分发线程)</a> <a href="/tags/GUI/" style="font-size: 10px;">GUI</a> <a href="/tags/JVM/" style="font-size: 12px;">JVM</a> <a href="/tags/Java/" style="font-size: 16px;">Java</a> <a href="/tags/JavaSE/" style="font-size: 18px;">JavaSE</a> <a href="/tags/JavaWeb/" style="font-size: 10px;">JavaWeb</a> <a href="/tags/Junit/" style="font-size: 10px;">Junit</a> <a href="/tags/KeyListener/" style="font-size: 10px;">KeyListener</a> <a href="/tags/Swing-AWT/" style="font-size: 10px;">Swing/AWT</a> <a href="/tags/Tomcat/" style="font-size: 10px;">Tomcat</a> <a href="/tags/interrupt/" style="font-size: 10px;">interrupt</a> <a href="/tags/%E4%B8%AD%E6%96%AD/" style="font-size: 10px;">中断</a> <a href="/tags/%E4%BA%8B%E4%BB%B6%E5%A4%84%E7%90%86%E6%9C%BA%E5%88%B6/" style="font-size: 10px;">事件处理机制</a> <a href="/tags/%E5%86%85%E5%AD%98%E6%A8%A1%E5%9E%8B/" style="font-size: 10px;">内存模型</a> <a href="/tags/%E5%90%8E%E7%AB%AF%E5%9F%BA%E7%A1%80/" style="font-size: 10px;">后端基础</a> <a href="/tags/%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6-GC/" style="font-size: 10px;">垃圾回收(GC)</a> <a href="/tags/%E5%9F%BA%E6%9C%AC%E8%AF%AD%E6%B3%95/" style="font-size: 12px;">基本语法</a> <a href="/tags/%E5%A4%9A%E7%BA%BF%E7%A8%8B/" style="font-size: 14px;">多线程</a> <a href="/tags/%E5%A4%9A%E7%BA%BF%E7%A8%8B%E7%8A%B6%E6%80%81/" style="font-size: 10px;">多线程状态</a> <a href="/tags/%E5%A7%94%E6%89%98%E4%BA%8B%E4%BB%B6%E6%A8%A1%E5%9E%8B/" style="font-size: 10px;">委托事件模型</a> <a href="/tags/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B/" style="font-size: 10px;">并发编程</a> <a href="/tags/%E5%BA%95%E5%B1%82%E5%8E%9F%E7%90%86/" style="font-size: 10px;">底层原理</a> <a href="/tags/%E5%BC%82%E5%B8%B8%E5%A4%84%E7%90%86/" style="font-size: 10px;">异常处理</a> <a href="/tags/%E5%BE%85%E5%AE%8C%E5%96%84/" style="font-size: 10px;">待完善</a> <a href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/" style="font-size: 10px;">性能优化</a> <a href="/tags/%E6%8E%92%E5%BA%8F/" style="font-size: 10px;">排序</a> <a href="/tags/%E6%8E%A7%E5%88%B6%E5%8F%8D%E8%BD%AC-IoC/" style="font-size: 10px;">控制反转(IoC)</a> <a href="/tags/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F/" style="font-size: 12px;">操作系统</a> <a href="/tags/%E6%A0%B8%E5%BF%83%E8%BF%9B%E9%98%B6/" style="font-size: 10px;">核心进阶</a> <a href="/tags/%E7%AE%97%E6%B3%95/" style="font-size: 12px;">算法</a> <a href="/tags/%E7%B1%BB%E5%8A%A0%E8%BD%BD%E5%99%A8/" style="font-size: 10px;">类加载器</a> <a href="/tags/%E7%BB%98%E5%9B%BE/" style="font-size: 10px;">绘图</a> <a href="/tags/%E8%8B%B1%E8%AF%AD/" style="font-size: 20px;">英语</a> <a href="/tags/%E8%AE%A1%E5%88%92/" style="font-size: 10px;">计划</a> <a href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E4%BD%93%E7%B3%BB%E7%BB%93%E6%9E%84/" style="font-size: 10px;">计算机体系结构</a> <a href="/tags/%E8%AE%BA%E6%96%87%E8%A7%84%E5%88%92/" style="font-size: 10px;">论文规划</a> <a href="/tags/%E8%BD%AF%E4%BB%B6%E6%9E%B6%E6%9E%84/" style="font-size: 10px;">软件架构</a> <a href="/tags/%E8%BF%AD%E4%BB%A3/" style="font-size: 10px;">迭代</a> <a href="/tags/%E9%80%92%E5%BD%92/" style="font-size: 10px;">递归</a> <a href="/tags/%E9%98%85%E8%AF%BB/" style="font-size: 20px;">阅读</a>
     </div>
   </div>
 
@@ -1436,6 +1416,10 @@ mjx-container[display="true"] + br {
       <ul>
         
           <li>
+            <a href="/2026/04/08/%E5%9D%9A%E6%AF%85-Grit-%E5%A4%A9%E8%B5%8B%E4%B8%8E%E5%8A%AA%E5%8A%9B%E7%9A%84%E8%BE%83%E9%87%8F/">坚毅 (Grit) - 天赋与努力的较量</a>
+          </li>
+        
+          <li>
             <a href="/2026/04/07/%E8%8B%B1%E8%AF%AD%E9%98%85%E8%AF%BB-2025-6-1-One/">英语阅读-2025-6-1-One</a>
           </li>
         
@@ -1449,10 +1433,6 @@ mjx-container[display="true"] + br {
         
           <li>
             <a href="/2026/04/06/Java-%E5%A4%9A%E7%BA%BF%E7%A8%8B%E7%9A%84%E5%9F%BA%E6%9C%AC%E4%BD%BF%E7%94%A8/">Java-多线程的基本使用</a>
-          </li>
-        
-          <li>
-            <a href="/2026/04/05/Java-%E5%A4%9A%E7%BA%BF%E7%A8%8B%E4%B8%8E-JVM-%E5%86%85%E5%AD%98%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E7%AC%94%E8%AE%B0/">Java 多线程与 JVM 内存模型基础笔记</a>
           </li>
         
       </ul>
