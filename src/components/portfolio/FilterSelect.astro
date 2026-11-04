@@ -1,0 +1,83 @@
+---
+interface Props { id: string; label: string; all: string; items: string[]; }
+const { id, label, all, items } = Astro.props;
+---
+<div class="filter-field" data-filter-select>
+  <label id={`${id}-label`} for={id}>{label}</label>
+  <select id={id}><option value="">{all}</option>{items.map(item => <option value={item}>{item}</option>)}</select>
+  <div class="filter-picker" hidden>
+    <button type="button" class="filter-trigger" role="combobox" aria-labelledby={`${id}-label ${id}-value`} aria-expanded="false" aria-haspopup="listbox" aria-controls={`${id}-options`}>
+      <span id={`${id}-value`}>{all}</span>
+      <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m6 8 4 4 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <ul class="filter-options" id={`${id}-options`} role="listbox" aria-labelledby={`${id}-label`} hidden></ul>
+  </div>
+</div>
+<script>
+  document.querySelectorAll<HTMLElement>('[data-filter-select]').forEach(field => {
+    const select=field.querySelector('select')!;
+    const picker=field.querySelector<HTMLElement>('.filter-picker')!;
+    const button=picker.querySelector('button')!;
+    const value=button.querySelector('span')!;
+    const list=picker.querySelector('ul')!;
+    let active=0;
+    let search=''; let searchAt=0;
+    const isOpen=()=>button.getAttribute('aria-expanded')==='true';
+    function close() {
+      list.hidden=true;button.setAttribute('aria-expanded','false');button.removeAttribute('aria-activedescendant');
+    }
+    function mark() {
+      [...list.children].forEach((item,index)=>item.classList.toggle('is-active',index===active));
+      const option=list.children[active] as HTMLElement|undefined;
+      if(option && isOpen()) {button.setAttribute('aria-activedescendant',option.id);option.scrollIntoView({block:'nearest'});}
+    }
+    function sync() {
+      value.textContent=select.selectedOptions[0]?.textContent || '';
+      list.replaceChildren();
+      [...select.options].forEach((option,index)=>{
+        const item=document.createElement('li');item.id=`${select.id}-option-${index}`;
+        item.setAttribute('role','option');item.setAttribute('aria-selected',String(option.selected));
+        const text=document.createElement('span');text.textContent=option.text;item.append(text);
+        const check=document.createElement('span');check.className='filter-check';check.textContent='✓';check.setAttribute('aria-hidden','true');item.append(check);
+        item.addEventListener('pointerdown',event=>event.preventDefault());
+        item.addEventListener('pointermove',()=>{active=index;mark();});
+        item.addEventListener('click',()=>choose(index));
+        list.append(item);
+      });
+      active=Math.max(0,select.selectedIndex);mark();
+    }
+    function choose(index:number) {
+      select.selectedIndex=index;close();select.dispatchEvent(new Event('change',{bubbles:true}));
+    }
+    function open() {
+      document.dispatchEvent(new CustomEvent('filter-open',{detail:select.id}));
+      sync();list.hidden=false;button.setAttribute('aria-expanded','true');mark();
+    }
+    button.addEventListener('click',()=>isOpen()?close():open());
+    button.addEventListener('keydown',event=>{
+      if(event.key==='Tab'){close();return;}
+      if(event.key==='Escape'){if(isOpen()){event.preventDefault();close();}return;}
+      if(['ArrowDown','ArrowUp','Home','End'].includes(event.key)) {
+        event.preventDefault();
+        if(!isOpen())open();
+        else if(event.key==='ArrowDown')active=Math.min(select.length-1,active+1);
+        else if(event.key==='ArrowUp')active=Math.max(0,active-1);
+        if(event.key==='Home')active=0;if(event.key==='End')active=select.length-1;mark();return;
+      }
+      if(event.key==='Enter'||event.key===' '){event.preventDefault();if(isOpen())choose(active);else open();return;}
+      if(event.key.length===1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        event.preventDefault();if(!isOpen())open();
+        const now=Date.now();search=now-searchAt>700?event.key:search+event.key;searchAt=now;
+        const index=[...select.options].findIndex(o=>o.text.toLocaleLowerCase().startsWith(search.toLocaleLowerCase()));
+        if(index>=0){active=index;mark();}
+      }
+    });
+    select.addEventListener('change',sync);
+    select.addEventListener('filter:sync',()=>{close();sync();});
+    field.addEventListener('focusout',event=>{if(!field.contains(event.relatedTarget as Node|null))close();});
+    document.addEventListener('pointerdown',event=>{if(!field.contains(event.target as Node))close();});
+    document.addEventListener('filter-open',event=>{if((event as CustomEvent).detail!==select.id)close();});
+    field.querySelector('label')!.addEventListener('click',()=>button.focus());
+    sync();select.hidden=true;picker.hidden=false;
+  });
+</script>
