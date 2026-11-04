@@ -1,0 +1,24 @@
+---
+interface Props { email: string; }
+const { email } = Astro.props;
+---
+<details class="email-contact">
+  <summary>邮件联系 <span aria-hidden="true">↗</span></summary>
+  <div class="email-contact-panel">
+    <label>联系邮箱<input type="text" value={email} readonly aria-label="联系邮箱，可选中复制" /></label>
+    <a href={`mailto:${email}`}>打开邮件应用 ↗</a>
+    <p>若未打开，请复制邮箱地址，在常用邮箱中撰写邮件。</p>
+  </div>
+</details>
+
+<style>
+  .email-contact { min-width: 0; }
+  summary { cursor: pointer; list-style: none; font-size: 14px; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 6px; }
+  summary::-webkit-details-marker { display: none; }
+  summary:hover { text-decoration-color: var(--text); }
+  summary:focus-visible { outline: 2px solid var(--text); outline-offset: 5px; }
+  .email-contact-panel { width: 250px; max-width: 100%; margin-top: 16px; padding: 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); font-size: 13px; }
+  label { display: block; }
+  input { display: block; width: 100%; min-width: 0; margin: 8px 0 12px; padding: 6px 0; border: 0; background: transparent; color: var(--text); font: inherit; user-select: all; }
+  .email-contact-panel p { margin: 12px 0 0; font-size: 12px; line-height: 1.7; color: var(--muted); }
+</style>
