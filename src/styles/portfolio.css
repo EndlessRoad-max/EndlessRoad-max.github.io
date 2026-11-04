@@ -412,7 +412,7 @@ button {
   inset: 0;
   border-radius: 8px;
 }
-.project-card:focus-within {
+.project-card h3 a:focus-visible::after {
   outline: 2px solid var(--text);
   outline-offset: 4px;
 }
@@ -452,6 +452,8 @@ button {
   gap: 14px;
 }
 .note-row {
+  position: relative;
+  isolation: isolate;
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 20px;
@@ -480,6 +482,22 @@ button {
 .note-row h3 a:hover {
   text-decoration: underline;
   text-underline-offset: 4px;
+}
+.note-row h3 a::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: 8px;
+}
+.note-row h3 a:focus-visible::after {
+  outline: 2px solid var(--text);
+  outline-offset: 4px;
+}
+.note-row .note-meta a,
+.note-row .note-tags a {
+  position: relative;
+  z-index: 2;
 }
 .note-row p {
   color: var(--muted);
