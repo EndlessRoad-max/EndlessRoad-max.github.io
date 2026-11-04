@@ -48,7 +48,7 @@ const stars = home ? Array.from({ length: 140 }, () => ({
       </div>
     </header>
     <main id="main" class:list={["site-main", { "site-main-wide": wide }]}><slot /></main>
-    <footer class="site-footer"><div><a class="footer-brand" href={url("/")}>{portfolio.siteName}</a><span>认真做事，也认真记录。</span></div><div><a href={url("/rss.xml")}>RSS 订阅</a><span>© {new Date().getFullYear()} {portfolio.name}</span></div></footer>
+    <footer class="site-footer"><div><a class="footer-brand" href={url("/")}>{portfolio.siteName}</a><span>一直在路上，想看看前面还有什么</span></div><div><a href={url("/rss.xml")}>RSS 订阅</a><span>© {new Date().getFullYear()} {portfolio.name}</span></div></footer>
     <script>
       import { applyThemeToDocument, getStoredTheme, setTheme } from "../utils/setting-utils";
       const header = document.querySelector<HTMLElement>(".site-header")!;
