@@ -911,6 +911,10 @@ button {
   border-radius: 3px;
   padding: 2px 5px;
 }
+.custom-md :not(pre) > code::before,
+.custom-md :not(pre) > code::after {
+  content: none;
+}
 .custom-md code {
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
 }

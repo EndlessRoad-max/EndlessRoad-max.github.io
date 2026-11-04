@@ -199,4 +199,3 @@ class Solution {
 
 - [LeetCode 98：验证二叉搜索树](https://leetcode.cn/problems/validate-binary-search-tree/)
 
-文中的 5 张图随笔记保存在同一目录，通过相对路径引用。
