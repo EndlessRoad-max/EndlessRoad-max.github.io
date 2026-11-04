@@ -9,7 +9,8 @@ const { email } = Astro.props;
     <div class="email-address-row">
       <span class="email-address">{email}</span>
       <button type="button" class="copy-email" data-email={email} aria-label="复制邮箱地址" title="复制邮箱地址">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg>
+        <svg class="copy-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg>
+        <svg class="check-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>
       </button>
     </div>
     <span class="copy-status" role="status" aria-live="polite"></span>
@@ -23,13 +24,20 @@ const { email } = Astro.props;
     const panel = contact.querySelector<HTMLElement>(".email-contact-panel")!;
     const button = contact.querySelector<HTMLButtonElement>(".copy-email")!;
     const status = contact.querySelector<HTMLElement>(".copy-status")!;
+    let resetTimer: ReturnType<typeof setTimeout> | undefined;
+    const resetCopy = () => {
+      clearTimeout(resetTimer);
+      button.classList.remove("is-copied");
+      button.setAttribute("aria-label", "复制邮箱地址");
+      status.textContent = "";
+    };
     const positionPanel = () => {
       if (!contact.open) return;
       panel.style.left = "0px";
       const rect = panel.getBoundingClientRect();
       panel.style.left = `${Math.max(16 - rect.left, Math.min(0, window.innerWidth - 16 - rect.right))}px`;
     };
-    contact.addEventListener("toggle", () => { status.textContent = ""; positionPanel(); });
+    contact.addEventListener("toggle", () => { resetCopy(); positionPanel(); });
     window.addEventListener("resize", positionPanel);
     document.addEventListener("click", event => {
       if (event.target instanceof Node && !contact.contains(event.target)) contact.open = false;
@@ -41,9 +49,13 @@ const { email } = Astro.props;
       }
     });
     button.addEventListener("click", async () => {
+      resetCopy();
       try {
         await navigator.clipboard.writeText(button.dataset.email!);
-        status.textContent = "已复制";
+        if (!contact.open) return;
+        button.classList.add("is-copied");
+        button.setAttribute("aria-label", "邮箱地址已复制");
+        resetTimer = setTimeout(resetCopy, 1500);
       } catch {
         status.textContent = "复制失败，请选中地址复制";
       }
@@ -63,6 +75,9 @@ const { email } = Astro.props;
   .copy-email { display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; margin-left: auto; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 5px; background: transparent; color: var(--muted); cursor: pointer; }
   .copy-email:hover { background: var(--tint); color: var(--text); }
   .copy-email:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
-  .copy-status { display: block; min-height: 18px; margin: -8px 0 8px; font-size: 12px; color: var(--muted); }
+  .check-icon, .is-copied .copy-icon { display: none; }
+  .is-copied .check-icon { display: block; }
+  .copy-status { display: block; margin: -8px 0 8px; font-size: 12px; color: var(--muted); }
+  .copy-status:empty { display: none; }
   .email-contact-panel p { margin: 12px 0 0; font-size: 12px; line-height: 1.7; color: var(--muted); }
 </style>
