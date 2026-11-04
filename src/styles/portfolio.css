@@ -315,6 +315,9 @@ button {
 .motto-en-line { width: calc(var(--ink-width) * 64px); min-width: 0; }
 .motto-en-line > svg { width: 100%; height: auto; overflow: visible; }
 .motto-translation { margin-top: 0; color: var(--muted); font-size: 14px; letter-spacing: .08em; }
+.motto-translation { display: flex; align-items: center; justify-content: center; }
+.motto-chinese-art { display: inline-flex; }
+.motto-chinese-art svg { width: 18px; height: 18px; flex: none; }
 .motto-light { display: inline-block; width: 10px; height: 10px; margin-left: 9px; color: #b98a30; }
 :root.dark .motto-light { color: #ebc36c; }
 @media (max-width: 639px) {
@@ -323,6 +326,7 @@ button {
   .motto-en-line { width: calc(var(--ink-width) * 46px); max-width: 100%; }
   .motto-en-line + .motto-en-line { margin-top: -16px; }
   .motto-translation { font-size: 12px; letter-spacing: .02em; margin-top: 5px; }
+  .motto-chinese-art svg { width: 16px; height: 16px; }
   .home-page .sphere-sky { height: 680px; }
   .home-page .sphere-horizon { top: 345px; }
   .home-page .star-field { mask-image: radial-gradient(ellipse 190px 115px at 50% 225px, #0002 50%, #000 100%); }

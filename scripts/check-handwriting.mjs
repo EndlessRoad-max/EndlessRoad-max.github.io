@@ -31,7 +31,7 @@ try {
  const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
  const home=new Home(page);await home.open();
  assert.equal(await home.motto.getAttribute('data-state'),'writing');
- const chinese=page.getByText('一直在路上，想看看前面还有什么。',{exact:true});
+ const chinese=page.getByLabel('中文题词',{exact:true});
  assert.equal(await chinese.evaluate(el=>getComputedStyle(el).opacity),'0','Chinese must stay hidden while English is written');
  const timing=await home.motto.evaluate(el=>Math.max(...el.getAnimations({subtree:true}).map(a=>Number(a.effect.getComputedTiming().endTime))));
  assert(Math.abs(timing-8000)<2,`duration ${timing}`);

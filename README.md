@@ -1,4 +1,4 @@
-# 拾页 · 个人展示与笔记
+# 逐光未尽 · 个人展示与笔记
 
 基于 [Fuwari](https://github.com/saicaca/fuwari) 的个人网站：展示首页、项目集、Markdown 笔记、中文全文搜索、明暗主题，静态部署到 GitHub Pages。
 
@@ -118,9 +118,9 @@ Remove-Item Env:SITE_URL, Env:BASE_PATH
 保留 Fuwari 的 MIT 许可证，来源及改动见 `UPSTREAM.md`。旧版多语言说明和未使用的组件供上游参考，本 README 是当前站点维护入口。
 ## 首页手写文案维护
 
-首页星空中的固定文案由 `HandwrittenMotto.astro` 渲染。英文 Great Vibes 花体先沿字迹书写，完成后中文小字轻轻上浮并淡入，完整播放约 8 秒；减少动态效果或禁用 JavaScript 时直接展示全文。
+首页星空中的固定文案由 `HandwrittenMotto.astro` 渲染。英文 Great Vibes 花体先沿字迹书写，完成后中文手写楷体小字轻轻上浮并淡入，完整播放约 8 秒；减少动态效果或禁用 JavaScript 时直接展示全文。
 
-- 英文文案与矢量字迹是一组资源：修改英文句子时，同时更新组件语义文本和 `scripts/build-motto-lettering.py` 中的句子，再生成 `src/assets/handwriting/great-vibes.json`。中文直接修改组件中的翻译文本。
+- 英文文案与矢量字迹是一组资源：修改英文句子时，同时更新组件语义文本和 `scripts/build-motto-lettering.py` 中的句子，再生成 `src/assets/handwriting/great-vibes.json`。修改中文时同步更新组件翻译文本及 `chinese-art.json` 中所需字形；中文素材许可证在 `docs/licenses/makemeahanzi/`。
 - 生成工具只在素材维护时需要 Pillow、NumPy 和 fontTools，命令为 `python scripts/build-motto-lettering.py path/to/GreatVibes-Regular.ttf`；正常构建与页面访问不需要 Python 或原始字体文件。
 - 字形采用 Great Vibes 的填充轮廓，遮罩沿提取的字迹中心线显现；来源及文件校验值见素材目录的 `SOURCE.md`。字体遵循 SIL Open Font License，完整声明保存在 `docs/licenses/great-vibes/OFL.txt`。
 - 浏览器只使用随页面发布的 SVG，无远程字体、运行时接口或新增前端依赖。静态和动画结束状态直接显示完整字形轮廓。

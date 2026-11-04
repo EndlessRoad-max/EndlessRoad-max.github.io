@@ -1,7 +1,7 @@
 /** 个人信息统一入口。空链接不会显示；示例内容不代表真实经历。 */
 export const portfolio = {
   name: "陈书研",
-  siteName: "拾页",
+  siteName: "逐光未尽",
   tagline: "全栈开发 · AI Agent 学习与实践",
   introduction:
     "你好，我是陈书研，上海理工大学计算机技术专业研二在读，专注于全栈开发，同时学习 AI Agent 的原理与工程实现。",
