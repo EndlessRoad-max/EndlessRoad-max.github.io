@@ -6,6 +6,14 @@ interface Props { title?: string; description?: string; home?: boolean; wide?: b
 const { title, description = portfolio.introduction, home = false, wide = false } = Astro.props;
 const links = [["首页", "/"], ["项目", "/projects/"], ["笔记", "/notes/"], ["关于", "/about/"]];
 const path = Astro.url.pathname;
+const stars = home ? Array.from({ length: 140 }, () => ({
+  x: (Math.random() * 100).toFixed(2),
+  size: (1.4 + Math.random() * 1.2).toFixed(2),
+  opacity: (0.7 + Math.random() * 0.3).toFixed(2),
+  duration: (24 + Math.random() * 36).toFixed(2),
+  delay: (-Math.random() * 60).toFixed(2),
+  rest: (Math.random() * 100).toFixed(2),
+})) : [];
 ---
 <!doctype html>
 <html lang="zh-CN">
@@ -27,7 +35,7 @@ const path = Astro.url.pathname;
     </script>
   </head>
   <body class:list={{ "home-page": home }}>
-    {home && <div class="sphere-sky" aria-hidden="true"><div class="star-field"></div><div class="sphere-horizon"></div></div>}
+    {home && <div class="sphere-sky" aria-hidden="true"><div class="star-field">{stars.map(star => <span class="star-particle" style={`--x:${star.x}%;--size:${star.size}px;--alpha:${star.opacity};--duration:${star.duration}s;--delay:${star.delay}s;--rest:${star.rest}%`}></span>)}</div><div class="sphere-horizon"></div></div>}
     <a class="skip-link" href="#main">跳到正文</a>
     <header class="site-header">
       <div class="header-inner">
@@ -43,6 +51,11 @@ const path = Astro.url.pathname;
     <footer class="site-footer"><div><a class="footer-brand" href={url("/")}>{portfolio.siteName}</a><span>认真做事，也认真记录。</span></div><div><a href={url("/rss.xml")}>RSS 订阅</a><span>© {new Date().getFullYear()} {portfolio.name}</span></div></footer>
     <script>
       import { applyThemeToDocument, getStoredTheme, setTheme } from "../utils/setting-utils";
+      const header = document.querySelector<HTMLElement>(".site-header")!;
+      const updateHeader = () => header.classList.toggle("is-scrolled", window.scrollY > 8);
+      updateHeader();
+      window.addEventListener("scroll", updateHeader, { passive: true });
+      window.addEventListener("pageshow", updateHeader);
       const button = document.querySelector<HTMLButtonElement>("#theme-toggle")!;
       function label() { button.setAttribute("aria-label", document.documentElement.classList.contains("dark") ? "切换到浅色主题" : "切换到深色主题"); }
       label();
