@@ -19,7 +19,7 @@ class Home {
   }
 }
 try {
- await Promise.all([375,768,1440].map(async width=>{
+ await Promise.all([375,640,768,1440].map(async width=>{
   const context=await browser.newContext({viewport:{width,height:1000},reducedMotion:'reduce'});
   const page=await context.newPage();const home=new Home(page);await home.open();await home.complete();await home.layout();
   await page.screenshot({path:`test-results/motto-${width}.png`});
@@ -58,5 +58,5 @@ try {
  const staticPage=await nojs.newPage();const staticHome=new Home(staticPage);await staticHome.open();await staticHome.layout();
  assert.equal(await staticHome.motto.getAttribute('data-state'),null);
  await staticPage.screenshot({path:'test-results/motto-nojs.png'});await nojs.close();
- console.log('Handwriting passed: 3 widths, themes, 8s timeline, single playback, reload, return, persisted restore, reduced motion, no JS, keyboard.');
+ console.log('Handwriting passed: 4 widths, themes, 8s timeline, single playback, reload, return, persisted restore, reduced motion, no JS, keyboard.');
 } finally {await browser.close();}

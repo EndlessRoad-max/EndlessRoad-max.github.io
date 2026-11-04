@@ -309,7 +309,7 @@ button {
   align-items: center;
   justify-content: center;
 }
-.motto-character { width: 36px; height: 36px; flex: none; overflow: visible; }
+.motto-character { width: clamp(26px, 4.5vw, 36px); height: clamp(26px, 4.5vw, 36px); flex: none; overflow: visible; }
 .motto-pen { stroke-dasharray: 1; stroke-dashoffset: 0; }
 .motto-english { margin-top: 12px; gap: 8px; color: var(--muted); }
 .motto-en-line { gap: 12px; }
