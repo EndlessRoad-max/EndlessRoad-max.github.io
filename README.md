@@ -116,3 +116,11 @@ Remove-Item Env:SITE_URL, Env:BASE_PATH
 浏览器验收脚本为 `scripts/browser-check.mjs` 和 `scripts/check-fixtures.mjs`，需要可用的 Playwright/Chromium。可通过 `PLAYWRIGHT_MODULE` 指定已有 Playwright 的 `index.mjs`，`PLAYWRIGHT_BROWSERS_PATH` 指定浏览器目录；未指定模块时使用当前环境安装的 `playwright`。前者检查运行中的预览站点（默认 `http://127.0.0.1:4321/`，可用 `TEST_URL` 覆盖）；后者临时创建边界测试内容，测试子路径与分页，并在结束后清理测试内容、恢复正常构建。截图与 trace 保存在忽略提交的 `test-results/`。
 
 保留 Fuwari 的 MIT 许可证，来源及改动见 `UPSTREAM.md`。旧版多语言说明和未使用的组件供上游参考，本 README 是当前站点维护入口。
+## 首页手写文案维护
+
+首页星空中的固定文案由 `HandwrittenMotto.astro` 渲染。中文逐笔书写，英文随后连写，完整播放约 8 秒；减少动态效果或禁用 JavaScript 时直接展示全文。
+
+- 文案与字迹路径是一组资源：修改句子时，同时更新组件中的语义文本、中文分行和 `src/assets/handwriting/` 中的中文笔画与英文路径，不能只改文字。
+- 中文仅包含当前句子所需的字形子集。来源版本见该目录的 `SOURCE.md`；上游版权及 Arphic Public License 保存在 `docs/licenses/makemeahanzi/`，修改或再分发素材时一并保留。
+- 英文是本站制作的笔迹中心线路径。逐笔遮罩和连写效果均在本地完成，无外部字体或运行时数据请求。
+- 浏览器验收：启动本地预览后运行 `node scripts/check-handwriting.mjs`。可通过 `CHECK_URL` 指定地址，通过 `PLAYWRIGHT_MODULE` 指定本机 Playwright 模块。

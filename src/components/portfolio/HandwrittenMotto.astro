@@ -1,0 +1,82 @@
+---
+import chinese from '../../assets/handwriting/chinese.json';
+import { englishLines } from '../../assets/handwriting/english';
+const lines = ['一直在路上，', '想看看前面还有什么。'];
+const glyphs = chinese as Record<string, {strokes: string[]; medians: number[][][]}>;
+let strokeOrder = 0;
+---
+<section class="handwritten-motto" aria-label="一直在路上，想看看前面还有什么。 Still curious. Still moving forward.">
+  <p class="motto-accessible">一直在路上，想看看前面还有什么。<span lang="en">Still curious. Still moving forward.</span></p>
+  <div class="motto-chinese" aria-hidden="true">
+    {lines.map((line, lineIndex) => <span class="motto-cn-line">
+      {[...line].map((character, charIndex) => {
+        const glyph = glyphs[character];
+        return <svg class="motto-character" viewBox="0 0 1024 1024" focusable="false">
+          {glyph ? <g transform="scale(1,-1) translate(0,-900)">
+            {glyph.strokes.map((d, index) => {
+              const id = `motto-${lineIndex}-${charIndex}-${index}`;
+              const median = glyph.medians[index];
+              return <>
+                <defs><mask id={id} maskUnits="userSpaceOnUse" x="-200" y="-200" width="1500" height="1500">
+                  <path class="motto-pen" data-script="cn" data-order={strokeOrder++} d={median.map(([x,y],i) => `${i?'L':'M'}${x} ${y}`).join(' ')} pathLength="1" fill="none" stroke="white" stroke-width="190" stroke-linecap="round" stroke-linejoin="round" />
+                </mask></defs>
+                <path d={d} fill="currentColor" mask={`url(#${id})`} />
+              </>;
+            })}
+          </g> : <path class="motto-pen" data-script="cn" data-pause={character==='，'?'120':undefined} data-order={strokeOrder++} d={character==='，'?'M390 740 Q450 800 350 880':'M430 760 A55 55 0 1 1 429 760'} pathLength="1" stroke="currentColor" stroke-width="46" stroke-linecap="round" fill="none" />}
+        </svg>;
+      })}
+    </span>)}
+  </div>
+  <div class="motto-english" aria-hidden="true">
+    {englishLines.map((line, index) => <span class="motto-en-line">
+      <svg viewBox={`-2 -2 ${line.width+4} 43`} style={`width:${(line.width+4)*.82}px`} focusable="false">
+        <g fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round">
+          {line.strokes.map(p => <path class="motto-pen" data-script="en" d={p.d} transform={`translate(${p.x},0)`} pathLength="1" />)}
+        </g>
+      </svg>
+      {index===1 && <svg class="motto-light" viewBox="0 0 20 20" focusable="false"><path d="M10 0 Q11 9 20 10 Q11 11 10 20 Q9 11 0 10 Q9 9 10 0" fill="currentColor" /></svg>}
+    </span>)}
+  </div>
+</section>
+
+<script>
+  const motto = document.querySelector<HTMLElement>('.handwritten-motto');
+  if (motto) {
+    const motion = matchMedia('(prefers-reduced-motion: reduce)');
+    let animations: Animation[] = [];
+    let generation = 0;
+    const finish = () => {
+      generation++;
+      animations.forEach(animation => animation.cancel());
+      animations = [];
+      motto.dataset.state = 'complete';
+    };
+    const play = () => {
+      finish();
+      if (motion.matches || window.scrollY > 8) return;
+      const current = generation;
+      try {
+        let delay = 200;
+        for (const [script, total] of [['cn', 5500], ['en', 1900]] as const) {
+          const paths = [...motto.querySelectorAll<SVGPathElement>(`[data-script="${script}"]`)];
+          const lengths = paths.map(p => Math.max(20, p.getTotalLength()));
+          const sum = lengths.reduce((a,b) => a+b,0);
+          paths.forEach((path, i) => {
+            const duration = (total - (script==='cn'?120:0)) * lengths[i] / sum;
+            animations.push(path.animate([{strokeDashoffset:1},{strokeDashoffset:0}], {duration, delay, fill:'both', easing:'linear'}));
+            delay += duration + Number(path.dataset.pause || 0);
+          });
+          if (script === 'cn') delay += 150;
+        }
+        const star = motto.querySelector('.motto-light')!;
+        animations.push(star.animate([{opacity:0},{opacity:1}],{duration:250,delay,fill:'both'}));
+        motto.dataset.state = 'writing';
+        Promise.all(animations.map(a => a.finished)).then(() => {if(current===generation) finish();}).catch(() => {});
+      } catch { finish(); }
+    };
+    motion.addEventListener('change', () => {if(motion.matches) finish();});
+    window.addEventListener('pageshow', event => {if(event.persisted) play();});
+    play();
+  }
+</script>

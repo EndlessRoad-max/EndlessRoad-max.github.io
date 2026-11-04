@@ -2,6 +2,7 @@
 import SiteLayout from "../layouts/SiteLayout.astro";
 import ProjectCard from "../components/portfolio/ProjectCard.astro";
 import NoteRow from "../components/portfolio/NoteRow.astro";
+import HandwrittenMotto from "../components/portfolio/HandwrittenMotto.astro";
 import { portfolio } from "../portfolio.config";
 import { publishedNotes, publishedProjects } from "../utils/portfolio";
 import { url } from "../utils/url-utils";
@@ -10,6 +11,7 @@ const projects = (await publishedProjects()).filter(p => p.data.featured).slice(
 const notes = (await publishedNotes()).slice(0, 6);
 ---
 <SiteLayout home>
+  <HandwrittenMotto />
   <section class="hero" aria-label="个人介绍">
     <p class="hello">你好，我是</p>
     <h1>{portfolio.name}</h1>
