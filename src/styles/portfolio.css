@@ -1232,13 +1232,13 @@ button {
   }
 }
 
-/* Dark homepage: static lunar relief, moving sky, quiet reading surface. */
+/* Shared lunar composition; theme changes paint, never geometry. */
 .lunar-surface, .lunar-shade { display: none; }
 .sky-paused .star-particle { animation-play-state: paused; }
-.dark .home-page .sphere-sky { height: 690px; isolation: isolate; }
-.dark .home-page .sphere-horizon { display: none; }
-.dark .home-page .star-field { z-index: 0; }
-.dark .home-page .lunar-surface {
+.home-page .sphere-sky { height: 690px; isolation: isolate; }
+.home-page .sphere-horizon { display: none; }
+.home-page .star-field { z-index: 0; }
+.home-page .lunar-surface {
   --moon-width: max(100vw, 1100px);
   display: block;
   position: absolute;
@@ -1252,25 +1252,66 @@ button {
   clip-path: polygon(0% 41.4%, 5% 35.9%, 10% 31%, 15% 26.8%, 20% 23.3%, 25% 20.5%, 30% 18.3%, 35% 16.7%, 40% 15.7%, 45% 15.1%, 50% 15%, 55% 15.1%, 60% 15.7%, 65% 16.7%, 70% 18.3%, 75% 20.5%, 80% 23.3%, 85% 26.8%, 90% 31%, 95% 35.9%, 100% 41.4%, 100% 100%, 0 100%);
 }
 .lunar-surface img { display: block; width: 100%; height: auto; }
-.dark .home-page .lunar-shade {
+.home-page .lunar-shade {
   display: block;
   position: absolute;
   z-index: 2;
   inset: 0;
-  background: radial-gradient(ellipse 300px 130px at 50% 455px, #101010ad, transparent 100%), linear-gradient(to bottom, transparent 320px, #10101030 390px, #101010b3 520px, #101010 650px);
+  --night-shade: radial-gradient(ellipse 300px 130px at 50% 455px, #101010ad, transparent 100%), linear-gradient(to bottom, transparent 320px, #10101030 390px, #101010b3 520px, #101010 650px);
 }
-.dark .home-page .hero { min-height: 400px; padding: 95px 0 65px; }
+.home-page .hero { min-height: 400px; padding: 95px 0 65px; }
 .dark .home-page .hero h1 { color: #fafafa; text-shadow: 0 2px 20px #10101080; }
 .dark .home-page .hello, .dark .home-page .hero-subtitle { color: #c4c4c4; }
-.dark .home-page .intro-section { max-width: 740px; margin: 16px auto 90px; color: #b5b5b5; }
+.home-page .intro-section { max-width: 740px; margin: 16px auto 90px; color: #b5b5b5; }
 @media (max-width: 639px) {
-  .dark .home-page .sphere-sky { height: 690px; }
-  .dark .home-page .lunar-surface { --moon-width: 1050px; top: 240px; }
-  .dark .home-page .lunar-shade { background: radial-gradient(ellipse 180px 100px at 50% 470px, #10101099, transparent), linear-gradient(to bottom, transparent 350px, #10101055 430px, #101010d9 560px, #101010 650px); }
-  .dark .home-page .hero { min-height: 320px; padding: 68px 0 52px; }
-  .dark .home-page .intro-section { margin: 16px auto 65px; }
+  .home-page .sphere-sky { height: 690px; }
+  .home-page .lunar-surface { --moon-width: 1050px; top: 240px; }
+  .home-page .lunar-shade { --night-shade: radial-gradient(ellipse 180px 100px at 50% 470px, #10101099, transparent), linear-gradient(to bottom, transparent 350px, #10101055 430px, #101010d9 560px, #101010 650px); }
+  .home-page .hero { min-height: 320px; padding: 68px 0 52px; }
+  .home-page .intro-section { margin: 16px auto 65px; }
   .dark .home-page .star-particle:nth-child(n + 49) { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .star-particle { animation: none; }
 }
+
+/* Daylight uses the same lunar pixels, with a silver tonal treatment. */
+.lunar-surface img { opacity: 0; }
+.lunar-surface img.is-ready { opacity: 1; }
+:root:not(.dark) .home-page {
+  --text: #1b1d20;
+  --muted: #60656d;
+}
+:root:not(.dark) .home-page .sphere-sky { background: linear-gradient(#f4f6f8 0 320px, #fff 650px); }
+:root:not(.dark) .home-page .star-field { display: none; }
+:root:not(.dark) .home-page .star-particle { animation: none; }
+:root:not(.dark) .home-page .lunar-surface { background: #eeeeef; }
+:root:not(.dark) .home-page .lunar-surface img { filter: brightness(1.25) contrast(.65); }
+:root:not(.dark) .home-page .lunar-surface img.is-ready { opacity: .55; }
+.home-page .lunar-shade {
+  --day-shade: linear-gradient(to bottom, transparent 320px, #ffffff40 390px, #ffffffcc 520px, #fff 650px);
+}
+:root:not(.dark) .home-page .hello,
+:root:not(.dark) .home-page .hero-subtitle { color: #33373c; }
+:root:not(.dark) .home-page .intro-section { color: var(--muted); }
+:root:not(.dark) .home-page .secondary { border-color: #92969b; background: #fff; }
+:root:not(.dark) .home-page .secondary:hover { background: #f4f6f8; border-color: #60656d; }
+:root:not(.dark) .home-page .primary:hover { opacity: 1; background: #36393e; }
+:root:not(.dark) .home-page .button:focus-visible { outline: 2px solid #60656d; outline-offset: 4px; }
+.theme-transitions .home-page,
+.theme-transitions .home-page .lunar-surface,
+.theme-transitions .home-page .lunar-surface img,
+.theme-transitions .home-page .hero h1,
+.theme-transitions .home-page .hero-subtitle,
+.theme-transitions .home-page .hello,
+.theme-transitions .home-page .button { transition: color .2s ease, background-color .2s ease, filter .2s ease, opacity .2s ease; }
+@media (max-width: 639px) {
+  .home-page .lunar-shade { --day-shade: linear-gradient(to bottom, transparent 350px, #ffffff55 430px, #ffffffdd 560px, #fff 650px); }
+}
+
+.home-page .lunar-shade::before, .home-page .lunar-shade::after { content: ""; position: absolute; inset: 0; }
+.home-page .lunar-shade::before { background: var(--night-shade); opacity: 0; }
+.home-page .lunar-shade::after { background: var(--day-shade); opacity: 1; }
+.dark .home-page .lunar-shade::before { opacity: 1; }
+.dark .home-page .lunar-shade::after { opacity: 0; }
+.theme-transitions .lunar-shade::before, .theme-transitions .lunar-shade::after { transition: opacity .2s ease; }

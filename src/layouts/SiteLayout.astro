@@ -52,6 +52,13 @@ const stars = home ? Array.from({ length: 140 }, () => ({
     <script>
       import { applyThemeToDocument, getStoredTheme, setTheme } from "../utils/setting-utils";
       const sky = document.querySelector<HTMLElement>(".sphere-sky");
+      const moon = sky?.querySelector<HTMLImageElement>(".lunar-surface img");
+      if (moon) {
+        const revealMoon = () => moon.decode().then(() => moon.classList.add("is-ready")).catch(() => moon.classList.remove("is-ready"));
+        moon.addEventListener("load", revealMoon);
+        moon.addEventListener("error", () => moon.classList.remove("is-ready"));
+        if (moon.complete) revealMoon();
+      }
       if (sky && "IntersectionObserver" in window) {
         const observer = new IntersectionObserver(([entry]) => {
           sky.classList.toggle("sky-paused", !entry.isIntersecting);
@@ -67,11 +74,13 @@ const stars = home ? Array.from({ length: 140 }, () => ({
       function label() { button.setAttribute("aria-label", document.documentElement.classList.contains("dark") ? "切换到浅色主题" : "切换到深色主题"); }
       label();
       button.addEventListener("click", () => {
+        document.documentElement.classList.add("theme-transitions");
         const next = document.documentElement.classList.contains("dark") ? "light" : "dark";
         try { setTheme(next); } catch { applyThemeToDocument(next); }
         label();
       });
       matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+        document.documentElement.classList.add("theme-transitions");
         try { if (getStoredTheme() === "auto") applyThemeToDocument("auto"); } catch { applyThemeToDocument("auto"); }
         label();
       });
