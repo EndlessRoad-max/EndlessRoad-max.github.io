@@ -31,11 +31,15 @@ try {
  const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
  const home=new Home(page);await home.open();
  assert.equal(await home.motto.getAttribute('data-state'),'writing');
+ const chinese=page.getByText('一直在路上，想看看前面还有什么。',{exact:true});
+ assert.equal(await chinese.evaluate(el=>getComputedStyle(el).opacity),'0','Chinese must stay hidden while English is written');
  const timing=await home.motto.evaluate(el=>Math.max(...el.getAnimations({subtree:true}).map(a=>Number(a.effect.getComputedTiming().endTime))));
  assert(Math.abs(timing-8000)<2,`duration ${timing}`);
  await page.waitForFunction(()=>{const el=document.querySelector('[data-state]');return el?.getAnimations({subtree:true}).some(a=>Number(a.currentTime)>2200);});
+ assert.equal(await home.motto.evaluate(el=>{const paths=el.querySelectorAll('[data-script="en"]');return getComputedStyle(paths[paths.length-1]).opacity;}),'0','Final punctuation must not appear early');
  await page.screenshot({path:'test-results/motto-writing.png'});
  await home.complete();await home.layout();
+ assert.equal(await chinese.evaluate(el=>getComputedStyle(el).opacity),'1','Chinese must appear after English');
  await page.evaluate(()=>document.documentElement.classList.add('dark'));
  await page.setViewportSize({width:768,height:1000});
  assert.equal(await home.motto.getAttribute('data-state'),'complete');

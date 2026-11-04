@@ -118,9 +118,10 @@ Remove-Item Env:SITE_URL, Env:BASE_PATH
 保留 Fuwari 的 MIT 许可证，来源及改动见 `UPSTREAM.md`。旧版多语言说明和未使用的组件供上游参考，本 README 是当前站点维护入口。
 ## 首页手写文案维护
 
-首页星空中的固定文案由 `HandwrittenMotto.astro` 渲染。中文逐笔书写，英文随后连写，完整播放约 8 秒；减少动态效果或禁用 JavaScript 时直接展示全文。
+首页星空中的固定文案由 `HandwrittenMotto.astro` 渲染。英文 Great Vibes 花体先沿字迹书写，完成后中文小字轻轻上浮并淡入，完整播放约 8 秒；减少动态效果或禁用 JavaScript 时直接展示全文。
 
-- 文案与字迹路径是一组资源：修改句子时，同时更新组件中的语义文本、中文分行和 `src/assets/handwriting/` 中的中文笔画与英文路径，不能只改文字。
-- 中文仅包含当前句子所需的字形子集。来源版本见该目录的 `SOURCE.md`；上游版权及 Arphic Public License 保存在 `docs/licenses/makemeahanzi/`，修改或再分发素材时一并保留。
-- 英文是本站制作的笔迹中心线路径。逐笔遮罩和连写效果均在本地完成，无外部字体或运行时数据请求。
+- 英文文案与矢量字迹是一组资源：修改英文句子时，同时更新组件语义文本和 `scripts/build-motto-lettering.py` 中的句子，再生成 `src/assets/handwriting/great-vibes.json`。中文直接修改组件中的翻译文本。
+- 生成工具只在素材维护时需要 Pillow、NumPy 和 fontTools，命令为 `python scripts/build-motto-lettering.py path/to/GreatVibes-Regular.ttf`；正常构建与页面访问不需要 Python 或原始字体文件。
+- 字形采用 Great Vibes 的填充轮廓，遮罩沿提取的字迹中心线显现；来源及文件校验值见素材目录的 `SOURCE.md`。字体遵循 SIL Open Font License，完整声明保存在 `docs/licenses/great-vibes/OFL.txt`。
+- 浏览器只使用随页面发布的 SVG，无远程字体、运行时接口或新增前端依赖。静态和动画结束状态直接显示完整字形轮廓。
 - 浏览器验收：启动本地预览后运行 `node scripts/check-handwriting.mjs`。可通过 `CHECK_URL` 指定地址，通过 `PLAYWRIGHT_MODULE` 指定本机 Playwright 模块。

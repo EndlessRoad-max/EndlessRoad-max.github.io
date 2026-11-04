@@ -304,25 +304,25 @@ button {
   clip-path: inset(50%);
   white-space: nowrap;
 }
-.motto-chinese, .motto-cn-line, .motto-english, .motto-en-line {
+.motto-english, .motto-en-line {
   display: flex;
   align-items: center;
   justify-content: center;
 }
-.motto-character { width: clamp(26px, 4.5vw, 36px); height: clamp(26px, 4.5vw, 36px); flex: none; overflow: visible; }
 .motto-pen { stroke-dasharray: 1; stroke-dashoffset: 0; }
-.motto-english { margin-top: 12px; gap: 8px; color: var(--muted); }
-.motto-en-line { gap: 12px; }
-.motto-en-line > svg { height: 35px; overflow: visible; flex: none; }
-.motto-en-line > .motto-light { width: 12px; height: 12px; color: #b98a30; }
+.handwritten-motto:not([data-state="writing"]) .motto-ink { mask: none; }
+.motto-english { gap: 6px; color: var(--text); }
+.motto-en-line { width: calc(var(--ink-width) * 64px); min-width: 0; }
+.motto-en-line > svg { width: 100%; height: auto; overflow: visible; }
+.motto-translation { margin-top: 0; color: var(--muted); font-size: 14px; letter-spacing: .08em; }
+.motto-light { display: inline-block; width: 10px; height: 10px; margin-left: 9px; color: #b98a30; }
 :root.dark .motto-light { color: #ebc36c; }
 @media (max-width: 639px) {
   .handwritten-motto { min-height: 235px; padding: 28px 0 32px; }
-  .motto-chinese, .motto-english { flex-direction: column; }
-  .motto-chinese { gap: 8px; }
-  .motto-character { width: 26px; height: 26px; }
-  .motto-english { gap: 0; margin-top: 10px; }
-  .motto-en-line > svg:not(.motto-light) { max-width: 220px; height: 29px; }
+  .motto-english { flex-direction: column; gap: 0; }
+  .motto-en-line { width: calc(var(--ink-width) * 46px); max-width: 100%; }
+  .motto-en-line + .motto-en-line { margin-top: -16px; }
+  .motto-translation { font-size: 12px; letter-spacing: .02em; margin-top: 5px; }
   .home-page .sphere-sky { height: 680px; }
   .home-page .sphere-horizon { top: 345px; }
   .home-page .star-field { mask-image: radial-gradient(ellipse 190px 115px at 50% 225px, #0002 50%, #000 100%); }
