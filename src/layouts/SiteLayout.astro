@@ -8,9 +8,9 @@ const links = [["首页", "/"], ["项目", "/projects/"], ["笔记", "/notes/"],
 const path = Astro.url.pathname;
 const stars = home ? Array.from({ length: 140 }, () => ({
   x: (Math.random() * 100).toFixed(2),
-  size: (1.4 + Math.random() * 1.2).toFixed(2),
-  opacity: (0.7 + Math.random() * 0.3).toFixed(2),
-  duration: (24 + Math.random() * 36).toFixed(2),
+  size: (0.6 + Math.random() ** 3 * 1.6).toFixed(2),
+  opacity: (0.18 + Math.random() ** 2 * 0.65).toFixed(2),
+  duration: (55 + Math.random() * 60).toFixed(2),
   delay: (-Math.random() * 60).toFixed(2),
   rest: (Math.random() * 100).toFixed(2),
 })) : [];
@@ -35,7 +35,7 @@ const stars = home ? Array.from({ length: 140 }, () => ({
     </script>
   </head>
   <body class:list={{ "home-page": home }}>
-    {home && <div class="sphere-sky" aria-hidden="true"><div class="star-field">{stars.map(star => <span class="star-particle" style={`--x:${star.x}%;--size:${star.size}px;--alpha:${star.opacity};--duration:${star.duration}s;--delay:${star.delay}s;--rest:${star.rest}%`}></span>)}</div><div class="sphere-horizon"></div></div>}
+    {home && <div class="sphere-sky" aria-hidden="true"><div class="star-field">{stars.map(star => <span class="star-particle" style={`--x:${star.x}%;--size:${star.size}px;--alpha:${star.opacity};--duration:${star.duration}s;--delay:${star.delay}s;--rest:${star.rest}%`}></span>)}</div><div class="sphere-horizon"></div><div class="lunar-surface"><picture><source media="(max-width: 639px)" srcset={url("/images/lunar-horizon-mobile.webp")} /><img src={url("/images/lunar-horizon.webp")} width="1536" height="1024" alt="" decoding="async" fetchpriority="high" /></picture></div><div class="lunar-shade"></div></div>}
     <a class="skip-link" href="#main">跳到正文</a>
     <header class="site-header">
       <div class="header-inner">
@@ -51,6 +51,13 @@ const stars = home ? Array.from({ length: 140 }, () => ({
     <footer class="site-footer"><div><a class="footer-brand" href={url("/")}>{portfolio.siteName}</a><span>一直在路上，想看看前面还有什么</span></div><div><a href={url("/rss.xml")}>RSS 订阅</a><span>© {new Date().getFullYear()} {portfolio.name}</span></div></footer>
     <script>
       import { applyThemeToDocument, getStoredTheme, setTheme } from "../utils/setting-utils";
+      const sky = document.querySelector<HTMLElement>(".sphere-sky");
+      if (sky && "IntersectionObserver" in window) {
+        const observer = new IntersectionObserver(([entry]) => {
+          sky.classList.toggle("sky-paused", !entry.isIntersecting);
+        });
+        observer.observe(sky);
+      }
       const header = document.querySelector<HTMLElement>(".site-header")!;
       const updateHeader = () => header.classList.toggle("is-scrolled", window.scrollY > 8);
       updateHeader();
