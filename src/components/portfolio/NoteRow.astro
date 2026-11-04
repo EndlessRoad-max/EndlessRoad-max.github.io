@@ -1,0 +1,9 @@
+---
+import type { CollectionEntry } from "astro:content";
+import { url } from "../../utils/url-utils";
+import { dateLabel } from "../../utils/portfolio";
+interface Props { post: CollectionEntry<"posts">; }
+const { post } = Astro.props;
+const date = post.data.updated ?? post.data.published;
+---
+<article class="note-row"><div class="note-meta"><a href={url(`/notes/?category=${encodeURIComponent(post.data.category || "未分类")}`)}>{post.data.category || "未分类"}</a><time datetime={date.toISOString()}>{dateLabel(date)}</time></div><h3><a href={url(`/posts/${post.slug}/`)}>{post.data.title}</a></h3><p>{post.data.description}</p><div class="note-tags">{post.data.tags.map(tag => <a href={url(`/notes/?tag=${encodeURIComponent(tag)}`)}>#{tag}</a>)}</div></article>

@@ -1,0 +1,20 @@
+---
+import SiteLayout from "../../layouts/SiteLayout.astro";
+import ProjectCard from "../../components/portfolio/ProjectCard.astro";
+import { publishedProjects } from "../../utils/portfolio";
+const projects = await publishedProjects();
+const tags = [...new Set(projects.flatMap(p => p.data.tags))].sort();
+---
+<SiteLayout title="项目"><header class="page-heading"><p class="page-kicker">想法的落点</p><h1>项目集<span class="heading-dot">.</span></h1><p>记录从问题出发，到作品落地的过程。</p></header><div class="filter-bar" role="group" aria-label="按技术筛选项目"><button class="chip" data-project-tag="" aria-pressed="true">全部</button>{tags.map(tag => <button class="chip" data-project-tag={tag} aria-pressed="false">{tag}</button>)}</div><p id="project-count" class="result-count" aria-live="polite">共 {projects.length} 个项目</p><div class="project-grid">{projects.map(project => <ProjectCard project={project} />)}</div>{!projects.length && <p class="empty-state">作品正在整理中。</p>}
+<script>
+  const buttons = document.querySelectorAll<HTMLButtonElement>("[data-project-tag]");
+  buttons.forEach(button => button.addEventListener("click", () => {
+    buttons.forEach(item => item.setAttribute("aria-pressed", String(item === button)));
+    let count = 0;
+    document.querySelectorAll<HTMLElement>(".project-card").forEach(card => {
+      card.hidden = !!button.dataset.projectTag && !JSON.parse(card.dataset.tags || "[]").includes(button.dataset.projectTag);
+      if (!card.hidden) count++;
+    });
+    document.querySelector("#project-count")!.textContent = `共 ${count} 个项目`;
+  }));
+</script></SiteLayout>

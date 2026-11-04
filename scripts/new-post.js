@@ -1,59 +1,24 @@
-/* This is a script to create a new post markdown file with front-matter */
-
-import fs from "fs"
-import path from "path"
-
-function getDate() {
-  const today = new Date()
-  const year = today.getFullYear()
-  const month = String(today.getMonth() + 1).padStart(2, "0")
-  const day = String(today.getDate()).padStart(2, "0")
-
-  return `${year}-${month}-${day}`
+import fs from "node:fs";
+import path from "node:path";
+const slug = process.argv[2];
+if (!slug || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
+  console.error("用法：pnpm new-post my-note（英文小写、数字和连字符）");
+  process.exit(1);
 }
-
-const args = process.argv.slice(2)
-
-if (args.length === 0) {
-  console.error(`Error: No filename argument provided
-Usage: npm run new-post -- <filename>`)
-  process.exit(1) // Terminate the script and return error code 1
+const date = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Shanghai",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+}).format(new Date());
+const file = path.join("src/content/posts", `${slug}.md`);
+const content = `---\ntitle: "新笔记"\npublished: ${date}\ndescription: "填写一两句摘要"\ncategory: "日常记录"\ntags: []\ndraft: true\n---\n\n## 从这里开始\n\n写下你的记录。发布前将 draft 改为 false。\n`;
+try {
+  fs.writeFileSync(file, content, { flag: "wx" });
+  console.log(`已创建 ${file}，默认草稿。`);
+} catch (error) {
+  console.error(
+    error.code === "EEXIST" ? "同名笔记已存在，没有覆盖。" : error.message,
+  );
+  process.exit(1);
 }
-
-let fileName = args[0]
-
-// Add .md extension if not present
-const fileExtensionRegex = /\.(md|mdx)$/i
-if (!fileExtensionRegex.test(fileName)) {
-  fileName += ".md"
-}
-
-const targetDir = "./src/content/posts/"
-const fullPath = path.join(targetDir, fileName)
-
-if (fs.existsSync(fullPath)) {
-  console.error(`Error: File ${fullPath} already exists `)
-  process.exit(1)
-}
-
-// recursive mode creates multi-level directories
-const dirPath = path.dirname(fullPath)
-if (!fs.existsSync(dirPath)) {
-    fs.mkdirSync(dirPath, { recursive: true })
-}
-
-const content = `---
-title: ${args[0]}
-published: ${getDate()}
-description: ''
-image: ''
-tags: []
-category: ''
-draft: false 
-lang: ''
----
-`
-
-fs.writeFileSync(path.join(targetDir, fileName), content)
-
-console.log(`Post ${fullPath} created`)

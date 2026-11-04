@@ -3,7 +3,6 @@ import svelte from "@astrojs/svelte";
 import tailwind from "@astrojs/tailwind";
 import { pluginCollapsibleSections } from "@expressive-code/plugin-collapsible-sections";
 import { pluginLineNumbers } from "@expressive-code/plugin-line-numbers";
-import swup from "@swup/astro";
 import expressiveCode from "astro-expressive-code";
 import icon from "astro-icon";
 import { defineConfig } from "astro/config";
@@ -25,27 +24,16 @@ import { remarkReadingTime } from "./src/plugins/remark-reading-time.mjs";
 import { pluginCustomCopyButton } from "./src/plugins/expressive-code/custom-copy-button.js";
 
 // https://astro.build/config
+const [owner, repository] = (process.env.GITHUB_REPOSITORY || "").split("/");
+const site = process.env.SITE_URL || (owner ? `https://${owner}.github.io` : "https://endlessroad-max.github.io");
+const base = process.env.BASE_PATH || (repository && repository.toLowerCase() !== `${owner}.github.io`.toLowerCase() ? `/${repository}/` : "/");
 export default defineConfig({
-	site: "https://fuwari.vercel.app/",
-	base: "/",
+	site,
+	base,
 	trailingSlash: "always",
 	integrations: [
 		tailwind({
 			nesting: true,
-		}),
-		swup({
-			theme: false,
-			animationClass: "transition-swup-", // see https://swup.js.org/options/#animationselector
-			// the default value `transition-` cause transition delay
-			// when the Tailwind class `transition-all` is used
-			containers: ["main", "#toc"],
-			smoothScrolling: true,
-			cache: true,
-			preload: true,
-			accessibility: true,
-			updateHead: true,
-			updateBodyClass: false,
-			globalInstance: true,
 		}),
 		icon({
 			include: {

@@ -1,0 +1,52 @@
+---
+import SiteLayout from "../../layouts/SiteLayout.astro";
+import NoteRow from "../../components/portfolio/NoteRow.astro";
+import { publishedNotes } from "../../utils/portfolio";
+import { url } from "../../utils/url-utils";
+const notes = await publishedNotes();
+const categories = [...new Set(notes.map(p => p.data.category || "未分类"))].sort();
+const tags = [...new Set(notes.flatMap(p => p.data.tags))].sort();
+---
+<SiteLayout title="笔记"><header class="page-heading"><p class="page-kicker">写下来，才有迹可循</p><h1>笔记本<span class="heading-dot">.</span></h1><p>学习、实践，以及还没有想明白的问题。</p></header>
+<div class="notes-layout"><aside class="notes-filters"><div class="filter-field"><label for="category">按分类阅读</label><select id="category"><option value="">全部分类</option>{categories.map(c => <option value={c}>{c}</option>)}</select></div><div class="filter-field"><label for="tag">按标签发现</label><select id="tag"><option value="">全部标签</option>{tags.map(t => <option value={t}>{t}</option>)}</select></div><a class="text-link" href={url("/search/")}>搜索笔记正文 ↗</a></aside><div><p id="notes-count" class="result-count" aria-live="polite">共 {notes.length} 篇笔记</p><div id="note-list">{notes.map(post => <div data-note data-category={post.data.category || "未分类"} data-tags={JSON.stringify(post.data.tags)}><NoteRow post={post} /></div>)}</div><p id="notes-empty" class="empty-state" hidden={notes.length > 0}>还没有符合条件的笔记，试试其他分类或标签。</p><nav class="pagination" aria-label="笔记分页"><button id="prev-page">上一页</button><span id="page-label" aria-live="polite"></span><button id="next-page">下一页</button></nav><noscript><p>当前展示全部笔记。启用 JavaScript 可使用筛选和分页。</p></noscript></div></div>
+<script>
+  const category = document.querySelector<HTMLSelectElement>("#category")!;
+  const tag = document.querySelector<HTMLSelectElement>("#tag")!;
+  const rows = [...document.querySelectorAll<HTMLElement>("[data-note]")];
+  const prev = document.querySelector<HTMLButtonElement>("#prev-page")!;
+  const next = document.querySelector<HTMLButtonElement>("#next-page")!;
+  let current = 1;
+  function readURL() {
+    const params = new URLSearchParams(location.search);
+    for (const [select, name] of [[category, "category"], [tag, "tag"]] as const) {
+      const value = params.get(name) || "";
+      if (value && ![...select.options].some(o => o.value === value)) select.add(new Option(value, value));
+      select.value = value;
+    }
+    current = Math.max(1, Number.parseInt(params.get("page") || "1", 10) || 1);
+  }
+  function render(write = false) {
+    const matching = rows.filter(row => (!category.value || row.dataset.category === category.value) && (!tag.value || JSON.parse(row.dataset.tags || "[]").includes(tag.value)));
+    const pages = Math.max(1, Math.ceil(matching.length / 10));
+    current = Math.min(current, pages);
+    rows.forEach(row => { row.hidden = true; });
+    matching.slice((current - 1) * 10, current * 10).forEach(row => { row.hidden = false; });
+    document.querySelector("#notes-count")!.textContent = `共 ${matching.length} 篇笔记`;
+    document.querySelector<HTMLElement>("#notes-empty")!.hidden = matching.length !== 0;
+    document.querySelector("#page-label")!.textContent = `${current} / ${pages}`;
+    prev.disabled = current <= 1;
+    next.disabled = current >= pages;
+    if (write) {
+      const params = new URLSearchParams();
+      if (category.value) params.set("category", category.value);
+      if (tag.value) params.set("tag", tag.value);
+      if (current > 1) params.set("page", String(current));
+      history.pushState(null, "", location.pathname + (params.size ? `?${params}` : ""));
+    }
+  }
+  [category, tag].forEach(select => select.addEventListener("change", () => { current = 1; render(true); }));
+  prev.addEventListener("click", () => { current--; render(true); });
+  next.addEventListener("click", () => { current++; render(true); });
+  window.addEventListener("popstate", () => { readURL(); render(); });
+  readURL(); render();
+</script></SiteLayout>

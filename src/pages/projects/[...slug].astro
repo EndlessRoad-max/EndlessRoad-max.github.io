@@ -1,0 +1,12 @@
+---
+import type { CollectionEntry } from "astro:content";
+import ArticleLayout from "../../layouts/ArticleLayout.astro";
+import { publishedProjects } from "../../utils/portfolio";
+export async function getStaticPaths() {
+  return (await publishedProjects()).map(project => ({ params: { slug: project.slug }, props: { project } }));
+}
+interface Props { project: CollectionEntry<"projects">; }
+const { project } = Astro.props;
+const { Content, headings } = await project.render();
+---
+<ArticleLayout title={project.data.title} description={project.data.description} headings={headings} kind="项目" image={project.data.image}><div slot="meta"><div class="tags"><span>{project.data.status}</span>{project.data.tags.map(tag => <span>{tag}</span>)}</div>{(project.data.source || project.data.demo) && <div class="actions" data-pagefind-ignore>{project.data.source && <a class="button primary" href={project.data.source} target="_blank" rel="noreferrer">查看源码</a>}{project.data.demo && <a class="button secondary" href={project.data.demo} target="_blank" rel="noreferrer">在线演示</a>}</div>}</div><Content /></ArticleLayout>

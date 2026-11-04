@@ -1,0 +1,60 @@
+---
+import "../styles/portfolio.css";
+import { portfolio } from "../portfolio.config";
+import { url } from "../utils/url-utils";
+interface Props { title?: string; description?: string; home?: boolean; wide?: boolean; }
+const { title, description = portfolio.introduction, home = false, wide = false } = Astro.props;
+const links = [["首页", "/"], ["项目", "/projects/"], ["笔记", "/notes/"], ["关于", "/about/"]];
+const path = Astro.url.pathname;
+---
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#171717" />
+    <title>{title ? `${title} · ${portfolio.siteName}` : `${portfolio.siteName} · 项目与笔记`}</title>
+    <link rel="icon" type="image/svg+xml" href={url("/images/avatar.svg")} />
+    <link rel="canonical" href={new URL(Astro.url.pathname, Astro.site)} />
+    <link rel="alternate" type="application/rss+xml" title="笔记订阅" href={url("/rss.xml")} />
+    <script is:inline>
+      try {
+        const theme = localStorage.getItem("theme") || "auto";
+        document.documentElement.classList.toggle("dark", theme === "dark" || (theme === "auto" && matchMedia("(prefers-color-scheme: dark)").matches));
+      } catch { document.documentElement.classList.toggle("dark", matchMedia("(prefers-color-scheme: dark)").matches); }
+      document.documentElement.dataset.theme = "github-dark";
+    </script>
+  </head>
+  <body class:list={{ "home-page": home }}>
+    {home && <div class="sphere-sky" aria-hidden="true"><div class="star-field"></div><div class="sphere-horizon"></div></div>}
+    <a class="skip-link" href="#main">跳到正文</a>
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="brand" href={url("/")} aria-label={`${portfolio.siteName} 首页`}><svg class="brand-symbol" aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="8"/><ellipse cx="12" cy="12" rx="3.5" ry="8" transform="rotate(-35 12 12)"/><path d="M4 12h16"/></svg>{portfolio.siteName}</a>
+        <nav aria-label="主导航">{links.map(([label, href]) => <a href={url(href)} aria-current={(href === "/" ? path === url(href) : path.startsWith(url(href)) || (href === "/notes/" && path.startsWith(url("/posts/")))) ? "page" : undefined}>{label}</a>)}</nav>
+        <div class="header-tools">
+          <a class="search-link" href={url("/search/")} aria-label="搜索笔记和项目"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 5 5"/></svg><span>搜索</span></a>
+          <button id="theme-toggle" class="icon-button" aria-label="切换明暗主题" title="切换明暗主题"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M20.5 14A8.5 8.5 0 0 1 10 3.5 8.5 8.5 0 1 0 20.5 14Z"/></svg></button>
+        </div>
+      </div>
+    </header>
+    <main id="main" class:list={["site-main", { "site-main-wide": wide }]}><slot /></main>
+    <footer class="site-footer"><div><a class="footer-brand" href={url("/")}>{portfolio.siteName}</a><span>认真做事，也认真记录。</span></div><div><a href={url("/rss.xml")}>RSS 订阅</a><span>© {new Date().getFullYear()} {portfolio.name}</span></div></footer>
+    <script>
+      import { applyThemeToDocument, getStoredTheme, setTheme } from "../utils/setting-utils";
+      const button = document.querySelector<HTMLButtonElement>("#theme-toggle")!;
+      function label() { button.setAttribute("aria-label", document.documentElement.classList.contains("dark") ? "切换到浅色主题" : "切换到深色主题"); }
+      label();
+      button.addEventListener("click", () => {
+        const next = document.documentElement.classList.contains("dark") ? "light" : "dark";
+        try { setTheme(next); } catch { applyThemeToDocument(next); }
+        label();
+      });
+      matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+        try { if (getStoredTheme() === "auto") applyThemeToDocument("auto"); } catch { applyThemeToDocument("auto"); }
+        label();
+      });
+    </script>
+  </body>
+</html>

@@ -25,4 +25,18 @@ const specCollection = defineCollection({
 export const collections = {
 	posts: postsCollection,
 	spec: specCollection,
+	projects: defineCollection({
+		schema: z.object({
+			title: z.string(),
+			description: z.string(),
+			tags: z.array(z.string()).default([]),
+			status: z.string().default("进行中"),
+			image: z.string().default(""),
+			source: z.string().url().optional(),
+			demo: z.string().url().optional(),
+			featured: z.boolean().default(false),
+			order: z.number().default(100),
+			draft: z.boolean().default(false),
+		}),
+	}),
 };

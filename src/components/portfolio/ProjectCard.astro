@@ -1,0 +1,15 @@
+---
+import type { CollectionEntry } from "astro:content";
+import { url } from "../../utils/url-utils";
+interface Props { project: CollectionEntry<"projects">; }
+const { project } = Astro.props;
+---
+<article class="project-card" data-tags={JSON.stringify(project.data.tags)}>
+  <div class="project-copy">
+    <span class="status">{project.data.status}</span>
+    <h3><a href={url(`/projects/${project.slug}/`)}>{project.data.title}</a></h3>
+    <p>{project.data.description}</p>
+    <div class="tags">{project.data.tags.map(tag => <span>{tag}</span>)}</div>
+  </div>
+  <span class="card-arrow" aria-hidden="true">›</span>
+</article>

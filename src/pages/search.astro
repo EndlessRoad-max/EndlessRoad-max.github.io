@@ -1,0 +1,12 @@
+---
+import SiteLayout from "../layouts/SiteLayout.astro";
+import { url } from "../utils/url-utils";
+---
+<SiteLayout title="搜索"><div class="search-page"><header class="page-heading"><p class="page-kicker">找到下一条线索</p><h1>搜索这个空间<span class="heading-dot">.</span></h1><p>查找笔记与项目中的标题、关键词和正文。</p></header><div id="search" class="search-box"></div><p id="search-status" role="status" class="result-count">正在准备搜索…</p><noscript>请启用 JavaScript 使用全文搜索，也可以从笔记页按分类浏览。</noscript></div><link rel="stylesheet" href={url("/pagefind/pagefind-ui.css")} /><script is:inline src={url("/pagefind/pagefind-ui.js")}></script><script is:inline define:vars={{ base: url("/"), bundle: url("/pagefind/") }}>
+try {
+  new PagefindUI({ element: "#search", bundlePath: bundle, baseUrl: base, showSubResults: true, showImages: false, translations: { placeholder: "搜索笔记或项目…", zero_results: "没有找到 [SEARCH_TERM]，试试其他关键词。", many_results: "找到 [COUNT] 条结果", one_result: "找到 1 条结果", searching: "正在搜索…", load_more: "加载更多", search_label: "站内全文搜索", clear_search: "清空" } });
+  document.getElementById("search-status").textContent = "支持中文关键词，搜索范围为已发布的项目与笔记。";
+} catch {
+  document.getElementById("search-status").textContent = "搜索索引尚未加载。请刷新重试；本地使用 pnpm build 和 pnpm preview 体验完整搜索。";
+}
+</script></SiteLayout>

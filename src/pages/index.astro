@@ -1,0 +1,59 @@
+---
+import SiteLayout from "../layouts/SiteLayout.astro";
+import ProjectCard from "../components/portfolio/ProjectCard.astro";
+import NoteRow from "../components/portfolio/NoteRow.astro";
+import { portfolio } from "../portfolio.config";
+import { publishedNotes, publishedProjects } from "../utils/portfolio";
+import { url } from "../utils/url-utils";
+
+const projects = (await publishedProjects()).filter(p => p.data.featured).slice(0, 4);
+const notes = (await publishedNotes()).slice(0, 6);
+---
+<SiteLayout home>
+  <section class="hero" aria-label="个人介绍">
+    <p class="hello">你好，我是</p>
+    <h1>{portfolio.name}</h1>
+    <p class="hero-subtitle">{portfolio.tagline}</p>
+    <div class="actions">
+      <a class="button primary" href={url("/notes/")}>进入笔记</a>
+      <a class="button secondary" href={url("/projects/")}>查看项目</a>
+    </div>
+  </section>
+
+  <section class="intro-section" aria-label="关于这个空间">
+    <p>{portfolio.introduction}</p>
+    <p>{portfolio.about}</p>
+    <a class="text-link" href={url("/about/")}>更多关于我 <span aria-hidden="true">↗</span></a>
+  </section>
+
+  <section class="home-section">
+    <div class="section-heading">
+      <h2>最近的笔记</h2>
+      <a class="text-link" href={url("/notes/")}>全部笔记</a>
+    </div>
+    <div class="notes-paper">
+      {notes.map(post => <NoteRow post={post} />)}
+      {!notes.length && <p class="empty-state">第一篇笔记正在路上。</p>}
+    </div>
+  </section>
+
+  <section class="home-section">
+    <div class="section-heading">
+      <h2>精选项目</h2>
+      <a class="text-link" href={url("/projects/")}>全部项目</a>
+    </div>
+    <div class="project-grid">
+      {projects.map(project => <ProjectCard project={project} />)}
+    </div>
+    {!projects.length && <p class="empty-state">作品正在整理中，欢迎先看看笔记。</p>}
+  </section>
+
+  <section class="connect-section">
+    <h2>保持联系</h2>
+    <div class="connect-links">
+      {portfolio.github && <a href={portfolio.github} target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a>}
+      {portfolio.email && <a href={`mailto:${portfolio.email}`}>邮件联系 <span aria-hidden="true">↗</span></a>}
+      <a href={url("/rss.xml")}>RSS 订阅 <span aria-hidden="true">↗</span></a>
+    </div>
+  </section>
+</SiteLayout>

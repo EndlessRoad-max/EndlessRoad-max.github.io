@@ -1,11 +1,16 @@
 {
-  "name": "fuwari",
+  "name": "shiyi-personal-space",
   "type": "module",
   "version": "0.0.1",
+  "engines": {
+    "node": ">=24 <25"
+  },
   "scripts": {
     "dev": "astro dev",
     "start": "astro dev",
     "check": "astro check",
+    "check:build": "node scripts/check-build.mjs",
+    "check:browser": "node scripts/browser-check.mjs",
     "build": "astro build && pagefind --site dist",
     "preview": "astro preview",
     "astro": "astro",
