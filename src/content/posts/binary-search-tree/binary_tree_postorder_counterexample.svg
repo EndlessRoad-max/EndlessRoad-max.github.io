@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="710" viewBox="0 0 1100 710"><title>为什么后序递归要同时返回最小值与最大值</title><rect width="1100" height="710" rx="20" fill="#f8fafc"/><g font-family="Microsoft YaHei, sans-serif">
+<text x="550" y="43" font-size="26" fill="#20344a" font-weight="700" text-anchor="middle">为什么要同时返回最小值和最大值？</text>
+<text x="550" y="76" font-size="17" fill="#b5473c" font-weight="400" text-anchor="middle">反例：节点 7 位于根节点 5 的左子树中，违反 7 &lt; 5 的要求</text>
+<rect x="24" y="100" width="514" height="505" rx="16" fill="white" stroke="#dce5ef"/>
+<text x="281" y="135" font-size="19" fill="#b5473c" font-weight="700" text-anchor="middle">只按左右位置返回一个最值：丢失信息</text>
+<path d="M 279 205 L 164 320" stroke="#a4b2c1" stroke-width="2"/>
+<path d="M 279 205 L 419 320" stroke="#a4b2c1" stroke-width="2"/>
+<path d="M 164 320 L 94 440" stroke="#a4b2c1" stroke-width="2"/>
+<path d="M 164 320 L 269 440" stroke="#a4b2c1" stroke-width="2"/>
+<path d="M 269 440 L 204 550" stroke="#a4b2c1" stroke-width="2"/>
+<circle cx="279" cy="205" r="26" fill="#ffdaa0" stroke="#e9b567" stroke-width="2"/>
+<text x="279" y="213" font-size="23" fill="#694719" font-weight="600" text-anchor="middle">5</text>
+<circle cx="164" cy="320" r="26" fill="#ffdaa0" stroke="#e9b567" stroke-width="2"/>
+<text x="164" y="328" font-size="23" fill="#694719" font-weight="600" text-anchor="middle">2</text>
+<circle cx="419" cy="320" r="26" fill="#ffdaa0" stroke="#e9b567" stroke-width="2"/>
+<text x="419" y="328" font-size="23" fill="#694719" font-weight="600" text-anchor="middle">6</text>
+<circle cx="94" cy="440" r="26" fill="#ffdaa0" stroke="#e9b567" stroke-width="2"/>
+<text x="94" y="448" font-size="23" fill="#694719" font-weight="600" text-anchor="middle">1</text>
+<circle cx="269" cy="440" r="26" fill="#fee2df" stroke="#d7685c" stroke-width="2"/>
+<text x="269" y="448" font-size="23" fill="#694719" font-weight="600" text-anchor="middle">7</text>
+<circle cx="204" cy="550" r="26" fill="#ffdaa0" stroke="#e9b567" stroke-width="2"/>
+<text x="204" y="558" font-size="23" fill="#694719" font-weight="600" text-anchor="middle">3</text>
+<rect x="106" y="256" width="116" height="29" rx="8" fill="#edf3fa"/>
+<text x="164" y="276" font-size="16" fill="#b5473c" font-weight="600" text-anchor="middle">只返回 3</text>
+<rect x="230" y="376" width="116" height="29" rx="8" fill="#edf3fa"/>
+<text x="288" y="396" font-size="16" fill="#b5473c" font-weight="600" text-anchor="middle">只返回 min=3</text>
+<rect x="31" y="376" width="116" height="29" rx="8" fill="#edf3fa"/>
+<text x="89" y="396" font-size="16" fill="#b5473c" font-weight="600" text-anchor="middle">max=1</text>
+<rect x="361" y="256" width="116" height="29" rx="8" fill="#edf3fa"/>
+<text x="419" y="276" font-size="16" fill="#b5473c" font-weight="600" text-anchor="middle">min=6</text>
+<text x="354" y="485" font-size="15" fill="#b5473c" font-weight="600" text-anchor="middle">7 的最大值被丢弃</text>
+<text x="352" y="513" font-size="14" fill="#b5473c" font-weight="400" text-anchor="middle">2 无法得知真正的最大值</text>
+<text x="279" y="175" font-size="15" fill="#b5473c" font-weight="600" text-anchor="middle">错误地用 3 &lt; 5 &lt; 6 判为有效</text>
+<rect x="562" y="100" width="514" height="505" rx="16" fill="white" stroke="#dce5ef"/>
+<text x="819" y="135" font-size="19" fill="#2563a6" font-weight="700" text-anchor="middle">返回 [min, max]：保留完整信息</text>
+<path d="M 817 205 L 702 320" stroke="#a4b2c1" stroke-width="2"/>
+<path d="M 817 205 L 957 320" stroke="#a4b2c1" stroke-width="2"/>
+<path d="M 702 320 L 632 440" stroke="#a4b2c1" stroke-width="2"/>
+<path d="M 702 320 L 807 440" stroke="#a4b2c1" stroke-width="2"/>
+<path d="M 807 440 L 742 550" stroke="#a4b2c1" stroke-width="2"/>
+<circle cx="817" cy="205" r="26" fill="#ffdaa0" stroke="#e9b567" stroke-width="2"/>
+<text x="817" y="213" font-size="23" fill="#694719" font-weight="600" text-anchor="middle">5</text>
+<circle cx="702" cy="320" r="26" fill="#ffdaa0" stroke="#e9b567" stroke-width="2"/>
+<text x="702" y="328" font-size="23" fill="#694719" font-weight="600" text-anchor="middle">2</text>
+<circle cx="957" cy="320" r="26" fill="#ffdaa0" stroke="#e9b567" stroke-width="2"/>
+<text x="957" y="328" font-size="23" fill="#694719" font-weight="600" text-anchor="middle">6</text>
+<circle cx="632" cy="440" r="26" fill="#ffdaa0" stroke="#e9b567" stroke-width="2"/>
+<text x="632" y="448" font-size="23" fill="#694719" font-weight="600" text-anchor="middle">1</text>
+<circle cx="807" cy="440" r="26" fill="#fee2df" stroke="#d7685c" stroke-width="2"/>
+<text x="807" y="448" font-size="23" fill="#694719" font-weight="600" text-anchor="middle">7</text>
+<circle cx="742" cy="550" r="26" fill="#ffdaa0" stroke="#e9b567" stroke-width="2"/>
+<text x="742" y="558" font-size="23" fill="#694719" font-weight="600" text-anchor="middle">3</text>
+<rect x="644" y="256" width="116" height="29" rx="8" fill="#edf3fa"/>
+<text x="702" y="276" font-size="16" fill="#2563a6" font-weight="600" text-anchor="middle">[1, 7]</text>
+<rect x="768" y="376" width="116" height="29" rx="8" fill="#edf3fa"/>
+<text x="826" y="396" font-size="16" fill="#2563a6" font-weight="600" text-anchor="middle">[3, 7]</text>
+<rect x="569" y="376" width="116" height="29" rx="8" fill="#edf3fa"/>
+<text x="627" y="396" font-size="16" fill="#2563a6" font-weight="600" text-anchor="middle">[1, 1]</text>
+<rect x="899" y="256" width="116" height="29" rx="8" fill="#edf3fa"/>
+<text x="957" y="276" font-size="16" fill="#2563a6" font-weight="600" text-anchor="middle">[6, 6]</text>
+<text x="907" y="485" font-size="14" fill="#2563a6" font-weight="400" text-anchor="middle">检查节点 2：1 &lt; 2 &lt; 3</text>
+<text x="907" y="513" font-size="15" fill="#2563a6" font-weight="600" text-anchor="middle">向上仍保留最大值 7</text>
+<text x="817" y="175" font-size="15" fill="#b5473c" font-weight="600" text-anchor="middle">检查 7 &lt; 5 &lt; 6 不成立 → 无效</text>
+<text x="550" y="641" font-size="18" fill="#20344a" font-weight="600" text-anchor="middle">节点 7 是节点 2 的右孩子，但它同时位于祖先节点 5 的左子树中。</text>
+<text x="550" y="676" font-size="17" fill="#475569" font-weight="400" text-anchor="middle">当前父节点只用一个边界来检查；更高层祖先还可能需要另一个边界。</text>
+</g></svg>

@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="660" viewBox="0 0 800 660" role="img" aria-labelledby="title desc">
+<title id="title">前序验证：自顶向下传递合法范围</title>
+<desc id="desc">根5范围负无穷到正无穷；左孩子2范围负无穷到5，右孩子6范围5到正无穷；2的左孩子1范围负无穷到2，右孩子4范围2到5；4的左孩子3范围2到4。所有范围均为开区间。</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 1 1 L 9 5 L 1 9" fill="none" stroke="#8d9daf" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<rect width="800" height="660" rx="20" fill="#f8fafc"/>
+<g font-family="Microsoft YaHei, PingFang SC, sans-serif" text-anchor="middle">
+<text x="400" y="42" font-size="24" font-weight="700" fill="#20344a">前序验证：自顶向下传递合法范围</text>
+<text x="400" y="73" font-size="15" fill="#64748b">先检查当前节点，再把收紧后的范围传给左右子树</text>
+
+<path d="M 375.48 173.56 L 272.58 259.87" stroke="#8d9daf" stroke-width="2.2" fill="none" marker-end="url(#arrow)"/>
+<path d="M 426.41 171.07 L 560.29 262.67" stroke="#8d9daf" stroke-width="2.2" fill="none" marker-end="url(#arrow)"/>
+<path d="M 222.82 306.07 L 144.95 387.05" stroke="#8d9daf" stroke-width="2.2" fill="none" marker-end="url(#arrow)"/>
+<path d="M 267.18 306.07 L 345.05 387.05" stroke="#8d9daf" stroke-width="2.2" fill="none" marker-end="url(#arrow)"/>
+<path d="M 349.89 437.89 L 287.62 514.99" stroke="#8d9daf" stroke-width="2.2" fill="none" marker-end="url(#arrow)"/>
+<rect x="333" y="79" width="134" height="30" rx="9" fill="#eaf2fc"/>
+<text x="400" y="100" font-size="18" fill="#2563a6">(−∞, +∞)</text>
+<circle cx="400" cy="153" r="29" fill="#ffdaa0" stroke="#e9b567" stroke-width="2"/>
+<text x="400" y="161" font-size="25" font-weight="600" fill="#694719">5</text>
+<rect x="178" y="209" width="134" height="30" rx="9" fill="#eaf2fc"/>
+<text x="245" y="230" font-size="18" fill="#2563a6">(−∞, 5)</text>
+<circle cx="245" cy="283" r="29" fill="#ffdaa0" stroke="#e9b567" stroke-width="2"/>
+<text x="245" y="291" font-size="25" font-weight="600" fill="#694719">2</text>
+<rect x="523" y="209" width="134" height="30" rx="9" fill="#eaf2fc"/>
+<text x="590" y="230" font-size="18" fill="#2563a6">(5, +∞)</text>
+<circle cx="590" cy="283" r="29" fill="#ffdaa0" stroke="#e9b567" stroke-width="2"/>
+<text x="590" y="291" font-size="25" font-weight="600" fill="#694719">6</text>
+<rect x="53" y="339" width="134" height="30" rx="9" fill="#eaf2fc"/>
+<text x="120" y="360" font-size="18" fill="#2563a6">(−∞, 2)</text>
+<circle cx="120" cy="413" r="29" fill="#ffdaa0" stroke="#e9b567" stroke-width="2"/>
+<text x="120" y="421" font-size="25" font-weight="600" fill="#694719">1</text>
+<rect x="303" y="339" width="134" height="30" rx="9" fill="#eaf2fc"/>
+<text x="370" y="360" font-size="18" fill="#2563a6">(2, 5)</text>
+<circle cx="370" cy="413" r="29" fill="#ffdaa0" stroke="#e9b567" stroke-width="2"/>
+<text x="370" y="421" font-size="25" font-weight="600" fill="#694719">4</text>
+<rect x="198" y="469" width="134" height="30" rx="9" fill="#eaf2fc"/>
+<text x="265" y="490" font-size="18" fill="#2563a6">(2, 4)</text>
+<circle cx="265" cy="543" r="29" fill="#ffdaa0" stroke="#e9b567" stroke-width="2"/>
+<text x="265" y="551" font-size="25" font-weight="600" fill="#694719">3</text>
+<rect x="463" y="385" width="285" height="158" rx="14" fill="#eef4fa"/>
+<text x="605" y="416" font-size="16" font-weight="700" fill="#254e79">以节点 4 为例</text>
+<text x="605" y="447" font-size="15" fill="#475569">下界 2：来自祖先节点 2</text>
+<text x="605" y="475" font-size="15" fill="#475569">上界 5：继承自祖先节点 5</text>
+<text x="605" y="514" font-size="15" fill="#254e79">进入左子树：范围收紧为 (2, 4)</text>
+<path d="M 55 592 H 745" stroke="#e0e7ef"/>
+<text x="400" y="625" font-size="16" fill="#475569">每个节点都必须满足：下界 &lt; 节点值 &lt; 上界（开区间）</text>
+</g></svg>

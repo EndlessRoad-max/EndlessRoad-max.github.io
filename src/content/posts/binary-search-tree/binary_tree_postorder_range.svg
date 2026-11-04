@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="730" viewBox="0 0 880 730" role="img" aria-labelledby="title desc">
+<title id="title">后序验证：自底向上返回子树最值</title>
+<desc id="desc">树根5，左孩子2，右孩子6。2的孩子为1和4，4的左孩子为3，右子树为空。1返回[1,1]，3返回[3,3]，4返回[3,4]，2返回[1,4]，6返回[6,6]，5返回[1,6]。空子树返回min为正无穷、max为负无穷。蓝色箭头表示递归结果向父节点返回。</desc>
+<defs><marker id="up" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 1 1 L 8 5 L 1 9" fill="none" stroke="#4783bb" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<rect width="880" height="730" rx="20" fill="#f8fafc"/>
+<g font-family="Microsoft YaHei, PingFang SC, sans-serif" text-anchor="middle">
+<text x="440" y="42" font-size="24" font-weight="700" fill="#20344a">后序验证：自底向上返回子树最值</text>
+<text x="440" y="73" font-size="15" fill="#64748b">先处理左、右子树，再检查根节点 · 蓝色箭头表示结果返回方向</text>
+
+<path d="M 278.37 264.51 L 400.82 176.08" stroke="#4783bb" stroke-width="2.2" fill="none" marker-end="url(#up)"/>
+<path d="M 648.95 268.85 L 461.94 171.61" stroke="#4783bb" stroke-width="2.2" fill="none" marker-end="url(#up)"/>
+<path d="M 134.75 400.25 L 224.54 310.46" stroke="#4783bb" stroke-width="2.2" fill="none" marker-end="url(#up)"/>
+<path d="M 365.25 400.25 L 275.46 310.46" stroke="#4783bb" stroke-width="2.2" fill="none" marker-end="url(#up)"/>
+<path d="M 301.15 542.12 L 368.24 453.68" stroke="#4783bb" stroke-width="2.2" fill="none" marker-end="url(#up)"/>
+<path d="M 487.69 543.04 L 412.95 452.73" stroke="#4783bb" stroke-width="2.2" fill="none" marker-end="url(#up)"/>
+<rect x="377" y="83" width="106" height="30" rx="9" fill="#eaf2fc"/><text x="430" y="104" font-size="18" fill="#2563a6">[1, 6]</text>
+<circle cx="430" cy="155" r="29" fill="#ffdaa0" stroke="#e9b567" stroke-width="2"/><text x="430" y="163" font-size="24" fill="#694719">5</text>
+<rect x="197" y="213" width="106" height="30" rx="9" fill="#eaf2fc"/><text x="250" y="234" font-size="18" fill="#2563a6">[1, 4]</text>
+<circle cx="250" cy="285" r="29" fill="#ffdaa0" stroke="#e9b567" stroke-width="2"/><text x="250" y="293" font-size="24" fill="#694719">2</text>
+<rect x="627" y="213" width="106" height="30" rx="9" fill="#eaf2fc"/><text x="680" y="234" font-size="18" fill="#2563a6">[6, 6]</text>
+<circle cx="680" cy="285" r="29" fill="#ffdaa0" stroke="#e9b567" stroke-width="2"/><text x="680" y="293" font-size="24" fill="#694719">6</text>
+<rect x="57" y="353" width="106" height="30" rx="9" fill="#eaf2fc"/><text x="110" y="374" font-size="18" fill="#2563a6">[1, 1]</text>
+<circle cx="110" cy="425" r="29" fill="#ffdaa0" stroke="#e9b567" stroke-width="2"/><text x="110" y="433" font-size="24" fill="#694719">1</text>
+<rect x="337" y="353" width="106" height="30" rx="9" fill="#eaf2fc"/><text x="390" y="374" font-size="18" fill="#2563a6">[3, 4]</text>
+<circle cx="390" cy="425" r="29" fill="#ffdaa0" stroke="#e9b567" stroke-width="2"/><text x="390" y="433" font-size="24" fill="#694719">4</text>
+<rect x="227" y="498" width="106" height="30" rx="9" fill="#eaf2fc"/><text x="280" y="519" font-size="18" fill="#2563a6">[3, 3]</text>
+<circle cx="280" cy="570" r="29" fill="#ffdaa0" stroke="#e9b567" stroke-width="2"/><text x="280" y="578" font-size="24" fill="#694719">3</text>
+<circle cx="510" cy="570" r="29" fill="#edf1f6" stroke="#a4b2c1" stroke-width="2"/><text x="510" y="578" font-size="24" fill="#694719">空</text>
+<rect x="587" y="387" width="253" height="127" rx="14" fill="#eef4fa"/>
+<text x="714" y="416" font-size="16" font-weight="700" fill="#254e79">根节点 5 的检查</text>
+<text x="714" y="446" font-size="15" fill="#475569">左右子树均有效，且 4 &lt; 5 &lt; 6</text>
+<text x="714" y="479" font-size="15" fill="#254e79">整棵子树有效，返回 [1, 6]</text>
+<rect x="564" y="538" width="276" height="68" rx="12" fill="#edf1f6"/>
+<text x="702" y="564" font-size="14" fill="#475569">空子树：min = +∞，max = −∞</text>
+<text x="702" y="589" font-size="13" fill="#64748b">这是哨兵值，不是实际的数值区间</text>
+<path d="M 55 638 H 825" stroke="#e0e7ef"/>
+<text x="440" y="671" font-size="16" fill="#475569">有效条件：左右子树均有效，且 左子树最大值 &lt; 根节点值 &lt; 右子树最小值</text>
+<text x="440" y="701" font-size="14" fill="#64748b">[min, max] 表示当前子树实际的最小值与最大值，不是前序方法中的合法范围</text>
+</g></svg>
