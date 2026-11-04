@@ -22,8 +22,8 @@ const stars = home ? Array.from({ length: 140 }, () => ({
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content={description} />
     <meta name="theme-color" content="#171717" />
-    <title>{title ? `${title} · ${portfolio.siteName}` : `${portfolio.siteName} · 项目与笔记`}</title>
-    <link rel="icon" type="image/svg+xml" href={url("/images/avatar.svg")} />
+    <title>{title ? `${title} · ${portfolio.siteName}` : `${portfolio.siteName} · 一直在路上`}</title>
+    <link rel="icon" type="image/svg+xml" href={url("/images/star-favicon.svg")} />
     <link rel="canonical" href={new URL(Astro.url.pathname, Astro.site)} />
     <link rel="alternate" type="application/rss+xml" title="笔记订阅" href={url("/rss.xml")} />
     <script is:inline>
@@ -39,7 +39,7 @@ const stars = home ? Array.from({ length: 140 }, () => ({
     <a class="skip-link" href="#main">跳到正文</a>
     <header class="site-header">
       <div class="header-inner">
-        <a class="brand" href={url("/")} aria-label={`${portfolio.siteName} 首页`}><svg class="brand-symbol" aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="8"/><ellipse cx="12" cy="12" rx="3.5" ry="8" transform="rotate(-35 12 12)"/><path d="M4 12h16"/></svg>{portfolio.siteName}</a>
+        <a class="brand" href={url("/")} aria-label={`${portfolio.siteName} 首页`}><svg class="brand-symbol brand-star" aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01Z"/></svg>{portfolio.siteName}</a>
         <nav aria-label="主导航">{links.map(([label, href]) => <a href={url(href)} aria-current={(href === "/" ? path === url(href) : path.startsWith(url(href)) || (href === "/notes/" && path.startsWith(url("/posts/")))) ? "page" : undefined}>{label}</a>)}</nav>
         <div class="header-tools">
           <a class="search-link" href={url("/search/")} aria-label="搜索笔记和项目"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 5 5"/></svg><span>搜索</span></a>

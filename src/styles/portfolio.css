@@ -156,6 +156,8 @@ button {
 .brand-symbol {
   flex-shrink: 0;
 }
+.brand-star { color: #b98a30; }
+:root.dark .brand-star { color: #ebc36c; }
 .header-inner nav {
   display: flex;
   align-items: center;
