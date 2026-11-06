@@ -1,5 +1,6 @@
 ---
 import "../styles/portfolio.css";
+import DaylightScene from "../components/portfolio/DaylightScene.astro";
 import { portfolio } from "../portfolio.config";
 import { url } from "../utils/url-utils";
 interface Props { title?: string; description?: string; home?: boolean; wide?: boolean; }
@@ -35,6 +36,7 @@ const stars = home ? Array.from({ length: 140 }, () => ({
     </script>
   </head>
   <body class:list={{ "home-page": home }}>
+    {home && <DaylightScene />}
     {home && <div class="sphere-sky" aria-hidden="true"><div class="star-field">{stars.map(star => <span class="star-particle" style={`--x:${star.x}%;--size:${star.size}px;--alpha:${star.opacity};--duration:${star.duration}s;--delay:${star.delay}s;--rest:${star.rest}%`}></span>)}</div><div class="sphere-horizon"></div><div class="lunar-surface"><picture><source media="(max-width: 639px)" srcset={url("/images/lunar-horizon-mobile.webp")} /><img src={url("/images/lunar-horizon.webp")} width="1536" height="1024" alt="" decoding="async" fetchpriority="high" /></picture></div><div class="lunar-shade"></div></div>}
     <a class="skip-link" href="#main">跳到正文</a>
     <header class="site-header">
@@ -43,7 +45,10 @@ const stars = home ? Array.from({ length: 140 }, () => ({
         <nav aria-label="主导航">{links.map(([label, href]) => <a href={url(href)} aria-current={(href === "/" ? path === url(href) : path.startsWith(url(href)) || (href === "/notes/" && path.startsWith(url("/posts/")))) ? "page" : undefined}>{label}</a>)}</nav>
         <div class="header-tools">
           <a class="search-link" href={url("/search/")} aria-label="搜索笔记和项目"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 5 5"/></svg><span>搜索</span></a>
-          <button id="theme-toggle" class="icon-button" aria-label="切换明暗主题" title="切换明暗主题"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M20.5 14A8.5 8.5 0 0 1 10 3.5 8.5 8.5 0 1 0 20.5 14Z"/></svg></button>
+          <button id="theme-toggle" class="icon-button" aria-label="切换明暗主题" title="切换明暗主题">
+            <svg class="theme-moon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M20.5 14A8.5 8.5 0 0 1 10 3.5 8.5 8.5 0 1 0 20.5 14Z"/></svg>
+            <svg class="theme-sun" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg>
+          </button>
         </div>
       </div>
     </header>
@@ -59,29 +64,116 @@ const stars = home ? Array.from({ length: 140 }, () => ({
         moon.addEventListener("error", () => moon.classList.remove("is-ready"));
         if (moon.complete) revealMoon();
       }
+      const daylight = document.querySelector<HTMLElement>(".daybreak-sky");
+      let sceneVisible = true;
+      const updateSceneActivity = () => {
+        const paused = !sceneVisible || document.hidden;
+        sky?.classList.toggle("sky-paused", paused);
+        daylight?.classList.toggle("sky-paused", paused);
+      };
       if (sky && "IntersectionObserver" in window) {
         const observer = new IntersectionObserver(([entry]) => {
-          sky.classList.toggle("sky-paused", !entry.isIntersecting);
+          sceneVisible = entry.isIntersecting;
+          updateSceneActivity();
         });
         observer.observe(sky);
       }
+      document.addEventListener("visibilitychange", updateSceneActivity);
+      updateSceneActivity();
       const header = document.querySelector<HTMLElement>(".site-header")!;
+      const cover = document.querySelector<HTMLElement>(".home-cover");
+      const syncCoverGeometry = () => {
+        if (!cover) return;
+        const body = document.body;
+        const headerHeight = header.offsetHeight;
+        const scale = header.getBoundingClientRect().height / headerHeight || 1;
+        body.style.setProperty("--header-height", `${headerHeight}px`);
+        body.style.setProperty("--scene-height", `${headerHeight + cover.offsetHeight}px`);
+        const name = cover.querySelector("h1");
+        if (name) body.style.setProperty("--moon-crest", `${(name.getBoundingClientRect().top + window.scrollY) / scale - 40}px`);
+      };
+      if (cover) {
+        syncCoverGeometry();
+        const coverObserver = new ResizeObserver(syncCoverGeometry);
+        coverObserver.observe(header);
+        coverObserver.observe(cover);
+        window.addEventListener("resize", syncCoverGeometry);
+        window.addEventListener("pageshow", syncCoverGeometry);
+      }
       const updateHeader = () => header.classList.toggle("is-scrolled", window.scrollY > 8);
       updateHeader();
       window.addEventListener("scroll", updateHeader, { passive: true });
       window.addEventListener("pageshow", updateHeader);
       const button = document.querySelector<HTMLButtonElement>("#theme-toggle")!;
-      function label() { button.setAttribute("aria-label", document.documentElement.classList.contains("dark") ? "切换到浅色主题" : "切换到深色主题"); }
+      const root = document.documentElement;
+      const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
+      let cleanupTimer: ReturnType<typeof setTimeout>;
+      let sceneFrame = 0;
+      let sceneProgress = root.classList.contains("dark") ? 1 : 0;
+      let sceneTarget = sceneProgress;
+      function paintScene(progress: number) {
+        sceneProgress = progress;
+        root.style.setProperty("--night-progress", String(progress));
+        root.style.setProperty("--curtain-edge", `${-35 + progress * 170}%`);
+      }
+      if (sky) paintScene(sceneProgress);
+      function animateScene(target: number, duration: number) {
+        cancelAnimationFrame(sceneFrame);
+        sceneTarget = target;
+        const from = sceneProgress;
+        const started = performance.now();
+        const travel = duration * Math.abs(target - from);
+        const tick = (now: number) => {
+          const t = travel ? Math.min(1, (now - started) / travel) : 1;
+          const eased = t * t * (3 - 2 * t);
+          paintScene(from + (target - from) * eased);
+          if (t < 1) sceneFrame = requestAnimationFrame(tick);
+          else finishTransition();
+        };
+        sceneFrame = requestAnimationFrame(tick);
+      }
+      let manualTheme: "light" | "dark" | undefined;
+      function label() {
+        const text = root.classList.contains("dark") ? "切换到浅色主题" : "切换到深色主题";
+        button.setAttribute("aria-label", text);
+        button.title = text;
+      }
+      function finishTransition() {
+        clearTimeout(cleanupTimer);
+        root.removeAttribute("data-theme-changing");
+        root.classList.remove("lunar-transition");
+      }
+      function prepareTransition(manual: boolean, target: number) {
+        clearTimeout(cleanupTimer);
+        const bounds = sky?.getBoundingClientRect();
+        const lunar = manual && !reducedMotion.matches && bounds && bounds.bottom > 0 && bounds.top < innerHeight;
+        root.classList.add("theme-transitions");
+        root.classList.toggle("lunar-transition", Boolean(lunar));
+        root.dataset.themeChanging = "true";
+        if (sky) animateScene(target, reducedMotion.matches ? 0 : lunar ? 1100 : 300);
+        else cleanupTimer = setTimeout(finishTransition, reducedMotion.matches ? 0 : 300);
+      }
+      reducedMotion.addEventListener("change", () => {
+        if (reducedMotion.matches) {
+          cancelAnimationFrame(sceneFrame);
+          if (sky) paintScene(sceneTarget);
+          finishTransition();
+        }
+      });
       label();
       button.addEventListener("click", () => {
-        document.documentElement.classList.add("theme-transitions");
         const next = document.documentElement.classList.contains("dark") ? "light" : "dark";
+        prepareTransition(true, next === "dark" ? 1 : 0);
+        manualTheme = next;
         try { setTheme(next); } catch { applyThemeToDocument(next); }
         label();
       });
       matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
-        document.documentElement.classList.add("theme-transitions");
-        try { if (getStoredTheme() === "auto") applyThemeToDocument("auto"); } catch { applyThemeToDocument("auto"); }
+        let automatic = !manualTheme;
+        try { automatic = !manualTheme && getStoredTheme() === "auto"; } catch { /* Keep the in-memory preference when storage is unavailable. */ }
+        if (!automatic) return;
+        prepareTransition(false, matchMedia("(prefers-color-scheme: dark)").matches ? 1 : 0);
+        applyThemeToDocument("auto");
         label();
       });
     </script>

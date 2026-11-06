@@ -1279,22 +1279,17 @@ button {
   .star-particle { animation: none; }
 }
 
-/* Daylight uses the same lunar pixels, with a silver tonal treatment. */
+/* Daylight opens onto a distant horizon; the original moon belongs to night. */
 .lunar-surface img { opacity: 0; }
 .lunar-surface img.is-ready { opacity: 1; }
 :root:not(.dark) .home-page {
   --text: #1b1d20;
-  --muted: #60656d;
+  --muted: #565d65;
 }
-:root:not(.dark) .home-page .sphere-sky { background: linear-gradient(#f4f6f8 0 320px, #fff 650px); }
-:root:not(.dark) .home-page .star-field { display: none; }
-:root:not(.dark) .home-page .star-particle { animation: none; }
-:root:not(.dark) .home-page .lunar-surface { background: #eeeeef; }
-:root:not(.dark) .home-page .lunar-surface img { filter: brightness(1.25) contrast(.65); }
-:root:not(.dark) .home-page .lunar-surface img.is-ready { opacity: .55; }
-.home-page .lunar-shade {
-  --day-shade: linear-gradient(to bottom, transparent 320px, #ffffff40 390px, #ffffffcc 520px, #fff 650px);
-}
+:root:not(.dark) .home-page .star-field { opacity: 0; visibility: hidden; }
+:root:not(.dark):not([data-theme-changing]) .home-page .star-particle { animation-play-state: paused; }
+.home-page .lunar-surface { opacity: 1; }
+:root:not(.dark) .home-page .sphere-sky { opacity: 0; }
 :root:not(.dark) .home-page .hello,
 :root:not(.dark) .home-page .hero-subtitle { color: #33373c; }
 :root:not(.dark) .home-page .intro-section { color: var(--muted); }
@@ -1302,20 +1297,198 @@ button {
 :root:not(.dark) .home-page .secondary:hover { background: #f4f6f8; border-color: #60656d; }
 :root:not(.dark) .home-page .primary:hover { opacity: 1; background: #36393e; }
 :root:not(.dark) .home-page .button:focus-visible { outline: 2px solid #60656d; outline-offset: 4px; }
-.theme-transitions .home-page,
-.theme-transitions .home-page .lunar-surface,
-.theme-transitions .home-page .lunar-surface img,
-.theme-transitions .home-page .hero h1,
-.theme-transitions .home-page .hero-subtitle,
-.theme-transitions .home-page .hello,
-.theme-transitions .home-page .button { transition: color .2s ease, background-color .2s ease, filter .2s ease, opacity .2s ease; }
-@media (max-width: 639px) {
-  .home-page .lunar-shade { --day-shade: linear-gradient(to bottom, transparent 350px, #ffffff55 430px, #ffffffdd 560px, #fff 650px); }
-}
 
 .home-page .lunar-shade::before, .home-page .lunar-shade::after { content: ""; position: absolute; inset: 0; }
-.home-page .lunar-shade::before { background: var(--night-shade); opacity: 0; }
-.home-page .lunar-shade::after { background: var(--day-shade); opacity: 1; }
+.home-page .lunar-shade::before { background: var(--night-shade); opacity: 1; }
+.home-page .lunar-shade::after { opacity: 0; }
 .dark .home-page .lunar-shade::before { opacity: 1; }
 .dark .home-page .lunar-shade::after { opacity: 0; }
-.theme-transitions .lunar-shade::before, .theme-transitions .lunar-shade::after { transition: opacity .2s ease; }
+.theme-transitions {
+  --theme-duration: 300ms;
+  --theme-ease: cubic-bezier(.22, .61, .36, 1);
+}
+.theme-transitions.lunar-transition { --theme-duration: 800ms; }
+.theme-transitions :where(.site-header, .site-footer, .site-main, .site-main *, .header-inner, .header-inner *) {
+  transition: background-color var(--theme-duration) var(--theme-ease), border-color var(--theme-duration) var(--theme-ease);
+}
+/* Animate color only at its owner, so inherited text cannot lag behind a
+   second transition on its parent (particularly the brand and secondary CTA). */
+.theme-transitions body,
+.theme-transitions :where(.hero h1, .hello, .hero-subtitle, .intro-section, .primary, .motto-english, .motto-translation, .motto-light, .brand-star, .header-inner nav a, .icon-button, .search-link) {
+  transition: color var(--theme-duration) var(--theme-ease), background-color var(--theme-duration) var(--theme-ease), border-color var(--theme-duration) var(--theme-ease);
+}
+.home-page .sphere-sky::before,
+.home-page .sphere-sky::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+}
+.home-page .sphere-sky::before { background: #101010; }
+.home-page .sphere-sky { mask-image: none; }
+.home-page .sphere-sky::after { content: none; }
+/* Composite the moon, black image backing, shade and night sky before fading.
+   Independent fades expose the image's black rim and double-darken its foot. */
+.home-page .sphere-sky { opacity: 1; }
+.theme-transitions .sphere-sky {
+  transition: opacity var(--theme-duration) var(--theme-ease);
+}
+/* Match the scene's sRGB opacity blend across the whole page. A CSS background
+   color transition can interpolate in a different color space, leaving a seam
+   at the 690px scene boundary even when both animations have identical timing. */
+.home-page { isolation: isolate; background: #fff; }
+.home-page::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: #101010;
+  opacity: 0;
+  pointer-events: none;
+}
+.dark .home-page::before { opacity: 1; }
+.theme-transitions .home-page::before { transition: opacity var(--theme-duration) var(--theme-ease); }
+.theme-transitions .lunar-surface img {
+  transition: filter var(--theme-duration) var(--theme-ease), opacity var(--theme-duration) var(--theme-ease);
+}
+.home-page .star-field { opacity: 1; visibility: visible; }
+.home-page .star-particle::before { background: #b0b0b0; }
+.theme-transitions .star-field {
+  transition: opacity var(--theme-duration) var(--theme-ease), visibility 0s var(--theme-duration);
+}
+.dark.theme-transitions .star-field { transition: opacity var(--theme-duration) var(--theme-ease), visibility 0s; }
+.dark.lunar-transition .star-field { transition: opacity 600ms 200ms var(--theme-ease), visibility 0s; }
+#theme-toggle { position: relative; }
+#theme-toggle svg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+#theme-toggle .theme-sun { opacity: 0; transform: translate(-50%, -50%) rotate(-45deg) scale(.75); }
+.dark #theme-toggle .theme-moon { opacity: 0; transform: translate(-50%, -50%) rotate(45deg) scale(.75); }
+.dark #theme-toggle .theme-sun { opacity: 1; transform: translate(-50%, -50%) rotate(0) scale(1); }
+.theme-transitions #theme-toggle svg { transition: opacity 300ms ease, transform 400ms var(--theme-ease); }
+
+/* Afternoon light: a fixed off-screen source and soft diagonal shafts. */
+:root { --night-progress: 0; --curtain-edge: -35%; }
+:root.dark { --night-progress: 1; --curtain-edge: 135%; }
+/* Light cores and their atmospheric falloff are separate SVG layers. */
+.daybreak-sky {
+  position: absolute; inset: 0 0 auto; height: 690px; overflow: hidden;
+  pointer-events: none; background: #fffefb;
+  mask-image: linear-gradient(#000 60%, transparent 94%);
+  opacity: calc(1 - var(--night-progress));
+}
+.sun-scene { display: block; width: 100%; height: 100%; }
+.sun-scene-mobile { display: none; }
+.sun-cloud { transform-box: view-box; transform-origin: center; }
+.sun-cloud-one { animation: cloud-drift-one 26s ease-in-out infinite; }
+.sun-cloud-two { animation: cloud-drift-two 37s ease-in-out -13s infinite; }
+@keyframes cloud-drift-one {
+  0%, 100% { transform: translate(8%, -30px); opacity: .65; }
+  50% { transform: translate(-10%, 35px); opacity: 1; }
+}
+@keyframes cloud-drift-two {
+  0%, 100% { transform: translate(-7%, 25px); opacity: 1; }
+  50% { transform: translate(12%, -40px); opacity: .7; }
+}
+.dark .sun-cloud, [data-theme-changing] .sun-cloud,
+.daybreak-sky.sky-paused .sun-cloud { animation-play-state: paused; }
+/* One progress drives the entire scene, including the seamless page backing. */
+.home-page::before, .dark .home-page::before {
+  opacity: var(--night-progress); transition: none;
+}
+.home-page .sphere-sky, :root:not(.dark) .home-page .sphere-sky {
+  opacity: var(--night-progress); transition: none;
+  mask-image: linear-gradient(#000 70%, transparent 94%);
+}
+:root.lunar-transition .home-page .sphere-sky {
+  opacity: 1;
+  mask-image: linear-gradient(to top right, #000 calc(var(--curtain-edge) - 22%), transparent calc(var(--curtain-edge) + 22%)),
+    linear-gradient(#000 70%, transparent 94%);
+  mask-composite: intersect;
+}
+/* Keep stars present until the curtain has passed, then stop their animation. */
+:root[data-theme-changing] .home-page .star-field { visibility: visible; opacity: clamp(0, calc((var(--night-progress) - .55) / .45), 1); transition: none; }
+.home-page .lunar-surface::after { content: none; }
+.lunar-surface img { transition: opacity 300ms ease; }
+.theme-transitions.lunar-transition { --theme-duration: 450ms; }
+.theme-transitions #theme-toggle svg { transition-duration: 350ms; }
+@media (max-width: 639px) {
+  .sun-scene-desktop { display: none; }
+  .sun-scene-mobile { display: block; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sun-cloud { animation: none; }
+}
+
+:root:not(.dark):not([data-theme-changing]) .home-page .star-field { transition: none; }
+
+/* A complete identity cover; reading content begins below the viewport. */
+.home-page {
+  --header-height: 76px;
+  --scene-height: 100vh;
+  --moon-crest: 43vh;
+}
+@supports (height: 100svh) { .home-page { --scene-height: 100svh; } }
+@supports (height: 100dvh) { .home-page { --scene-height: 100dvh; } }
+.home-cover {
+  min-height: calc(100vh - var(--header-height));
+  min-height: calc(100svh - var(--header-height));
+  min-height: calc(100dvh - var(--header-height));
+  display: grid; grid-template-rows: 1fr auto; gap: 32px;
+  padding: 32px 0 max(28px, env(safe-area-inset-bottom));
+}
+.cover-identity { align-self: center; width: 100%; }
+.home-cover .handwritten-motto { min-height: 0; max-width: 620px; padding: 0; margin: 0 auto 36px; }
+.home-cover .motto-en-line { width: calc(var(--ink-width) * 48px); }
+.home-cover .motto-translation { font-size: 12px; }
+.home-cover .motto-chinese-art svg { width: 16px; height: 16px; }
+.home-page .home-cover .hero { min-height: 0; padding: 0; }
+.home-cover .hero h1 { font-size: clamp(64px, 5vw, 80px); line-height: 1.2; margin-top: 8px; }
+.home-cover .hero-subtitle { margin-top: 16px; }
+.home-cover .actions { margin-top: 28px; }
+.scroll-cue {
+  justify-self: center; display: inline-flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 8px; min-height: 72px; padding: 0 14px 8px;
+  color: var(--muted); background: transparent; border: 0;
+  opacity: var(--cue-opacity, 1); text-decoration: none; transition: color 180ms ease;
+}
+.scroll-cue-label { font-size: 12px; font-weight: 400; line-height: 20px; letter-spacing: .06em; }
+.scroll-cue-ring { display: grid; place-items: center; width: 48px; height: 36px; }
+.scroll-cue-ring svg { display: block; width: 48px; height: 36px; overflow: visible; }
+.cue-chevron { animation: cue-downward-hint 2.6s ease-in-out infinite; }
+@keyframes cue-downward-hint {
+  0%, 18%, 100% { transform: translateY(0); opacity: .8; }
+  42%, 60% { transform: translateY(10px); opacity: 1; }
+  82% { transform: translateY(0); opacity: .8; }
+}
+.scroll-cue[data-cue-hidden] { visibility: hidden; pointer-events: none; }
+.scroll-cue[data-cue-hidden] .cue-chevron { animation-play-state: paused; }
+@media (hover: hover) and (pointer: fine) {
+  .scroll-cue:hover { color: var(--text); }
+}
+.scroll-cue:focus-visible { outline: 1px solid currentColor; outline-offset: 4px; border-radius: 2px; color: var(--text); }
+.scroll-cue:active, .scroll-cue[data-pressed] { color: var(--text); }
+@media (prefers-reduced-motion: reduce) {
+  .cue-chevron { animation: none; transform: none; opacity: 1; }
+}
+/* The heading owns the offset; do not also apply document scroll padding. */
+html:has(.home-page) { scroll-padding-top: 0; }
+#home-introduction { scroll-margin-top: calc(var(--header-height) + 24px); }
+.home-page .intro-section { margin: 0 auto 90px; padding-top: 64px; }
+.intro-section h2 { font-size: 24px; color: var(--text); margin-bottom: 24px; font-weight: 650; }
+.home-page .daybreak-sky, .home-page .sphere-sky { height: var(--scene-height); }
+.home-page .lunar-surface { top: calc(var(--moon-crest) - var(--moon-width) * .1); }
+.home-page .lunar-shade {
+  --night-shade: radial-gradient(ellipse 340px 220px at 50% calc(var(--moon-crest) + 60px), #101010d9, transparent), linear-gradient(to bottom, transparent 35%, #10101040 52%, #101010da 76%, #101010 94%);
+}
+@media (max-width: 639px) {
+  .home-page { --header-height: 112px; }
+  .home-cover { padding-top: 28px; gap: 28px; }
+  .home-cover .handwritten-motto { margin-bottom: 28px; }
+  .home-cover .motto-en-line { width: calc(var(--ink-width) * 37px); }
+  .home-cover .motto-en-line + .motto-en-line { margin-top: -12px; }
+  .home-cover .motto-chinese-art svg { width: 14px; height: 14px; }
+  .home-cover .hero h1 { font-size: clamp(44px, 12vw, 52px); }
+  .home-cover .hero-subtitle { font-size: 14px; }
+  .home-cover .actions { margin-top: 24px; }
+  .home-page .intro-section { padding-top: 40px; margin-bottom: 65px; }
+}
