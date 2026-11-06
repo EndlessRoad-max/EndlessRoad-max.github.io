@@ -1,0 +1,24 @@
+---
+import { url } from "../../utils/url-utils";
+import "../../styles/notes-galaxy.css";
+---
+<section id="knowledge-galaxy" aria-label="知识星系" hidden>
+  <div class="galaxy-toolbar">
+    <div class="galaxy-breadcrumb"><button id="galaxy-home" type="button">全部主题</button><span id="galaxy-path"></span></div>
+    <div class="galaxy-actions"><button id="galaxy-motion" type="button" aria-pressed="false">暂停公转</button><button id="galaxy-list-toggle" type="button" aria-expanded="false" aria-controls="galaxy-list">列表选择</button></div>
+  </div>
+  <div id="galaxy-map" class="galaxy-map" role="group" aria-label="可探索的银河地图" aria-describedby="galaxy-hint">
+    <canvas id="galaxy-canvas" aria-hidden="true"></canvas>
+    <div class="galaxy-map-caption" aria-hidden="true">知识星系<span>循着兴趣，发现下一篇笔记</span></div>
+    <button id="galaxy-core" class="galaxy-core" type="button"><strong>笔记本</strong><span>探索主题</span></button>
+    <div id="galaxy-nodes"></div>
+    <span id="galaxy-motion-status" class="galaxy-motion-status">缓慢公转中</span>
+  </div>
+  <div class="galaxy-footer"><p id="galaxy-hint">点击主题，进入它的标签星系</p><div id="galaxy-groups" hidden><button id="galaxy-prev" type="button" aria-label="上一组节点">上一组</button><span id="galaxy-group-label"></span><button id="galaxy-next" type="button" aria-label="下一组节点">下一组</button></div></div>
+  <div id="galaxy-list" class="galaxy-list" role="group" aria-label="列表选择主题或标签" hidden></div>
+  <a class="text-link galaxy-search" href={url("/search/")}>搜索笔记正文 ↗</a>
+</section>
+<script>
+  import { initNotesGalaxy } from "../../scripts/notes-galaxy";
+  initNotesGalaxy();
+</script>

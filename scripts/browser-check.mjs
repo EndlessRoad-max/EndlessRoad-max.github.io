@@ -11,7 +11,7 @@ const { chromium } = await import(
 const base = process.env.TEST_URL || "http://127.0.0.1:4321/";
 const output = process.env.TEST_OUTPUT || "test-results";
 await mkdir(output, { recursive: true });
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ headless: true, ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}) });
 class Site {
   constructor(page) {
     this.page = page;
@@ -110,14 +110,18 @@ try {
           0,
         );
         await site.open("notes/");
-        await page.getByLabel("按分类阅读").selectOption("工具与方法");
+        await page.getByRole("button", { name: "列表选择", exact: true }).click();
+        await page.getByRole("button", { name: "工具与方法 (1)", exact: true }).click();
         await site.visibleText("共 1 篇笔记");
         await page.reload();
         assert.equal(
-          await page.getByLabel("按分类阅读").inputValue(),
+          new URL(page.url()).searchParams.get("category"),
           "工具与方法",
         );
-        await page.getByLabel("按标签发现").selectOption("随笔");
+        await page.getByRole("button", { name: "列表选择", exact: true }).click();
+        await page.getByRole("button", { name: "Markdown (1)", exact: true }).click();
+        await site.visibleText("共 1 篇笔记");
+        await site.open("notes/?category=" + encodeURIComponent("工具与方法") + "&tag=" + encodeURIComponent("随笔"));
         await site.visibleText("还没有符合条件的笔记");
         await page.goBack();
         await site.visibleText("共 1 篇笔记");

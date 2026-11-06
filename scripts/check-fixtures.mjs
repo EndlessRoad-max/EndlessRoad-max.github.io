@@ -99,7 +99,8 @@ try {
   assert(page.url().includes("page=2"));
   await page.reload();
   assert.equal(await page.locator("[data-note]:visible").count(), 4);
-  await page.getByLabel("按分类阅读").selectOption("验收分类");
+  await page.getByRole("button", { name: "列表选择", exact: true }).click();
+  await page.getByRole("group", { name: "列表选择主题或标签", exact: true }).getByRole("button", { name: /^验收分类 \(/ }).click();
   assert.equal(await page.locator("[data-note]:visible").count(), 10);
   assert(!page.url().includes("page=2"));
   await page.getByRole("button", { name: "下一页" }).click();
