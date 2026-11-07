@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="410" viewBox="0 0 760 410" role="img" aria-labelledby="title desc">
+  <title id="title">BST 查询路径：q = 7</title>
+  <desc id="desc">访问 8、4、6，记录上界 8、下界 4、下界 6。其余节点 2、12、10、14 不必访问。结果为 6 和 8。</desc>
+  <rect width="760" height="410" rx="18" fill="#f8fafc"/>
+  <g font-family="Microsoft YaHei, sans-serif" text-anchor="middle">
+    <text x="380" y="37" font-size="22" fill="#0f172a">查询 q = 7：保留候选，沿一条路径下降</text>
+    <g fill="none" stroke="#cbd5e1" stroke-width="3">
+      <path d="M380 105L210 185 M380 105L550 185 M210 205L120 285 M210 205L300 285 M550 205L460 285 M550 205L640 285"/>
+      <path d="M380 105L210 185 M210 205L300 285" stroke="#2563eb" stroke-width="4"/>
+    </g>
+    <g fill="#e2e8f0" stroke="#94a3b8" stroke-width="2">
+      <circle cx="550" cy="195" r="32"/><circle cx="120" cy="295" r="32"/><circle cx="460" cy="295" r="32"/><circle cx="640" cy="295" r="32"/>
+    </g>
+    <g fill="#dbeafe" stroke="#2563eb" stroke-width="2">
+      <circle cx="380" cy="95" r="32"/><circle cx="210" cy="195" r="32"/><circle cx="300" cy="295" r="32"/>
+    </g>
+    <g font-size="23" fill="#334155" dominant-baseline="central">
+      <text x="380" y="95">8</text><text x="210" y="195">4</text><text x="300" y="295">6</text>
+      <text x="550" y="195">12</text><text x="120" y="295">2</text><text x="460" y="295">10</text><text x="640" y="295">14</text>
+    </g>
+    <g font-size="17" fill="#1d4ed8">
+      <text x="460" y="91">mx = 8</text><text x="135" y="187">mn = 4</text><text x="300" y="346">mn = 6</text>
+    </g>
+    <text x="380" y="386" font-size="19" fill="#0f172a">6 的右孩子为空，返回 [6, 8]</text>
+  </g>
+</svg>
