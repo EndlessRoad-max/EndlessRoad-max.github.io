@@ -1307,7 +1307,6 @@ button {
   --theme-duration: 300ms;
   --theme-ease: cubic-bezier(.22, .61, .36, 1);
 }
-.theme-transitions.lunar-transition { --theme-duration: 800ms; }
 .theme-transitions :where(.site-header, .site-footer, .site-main, .site-main *, .header-inner, .header-inner *) {
   transition: background-color var(--theme-duration) var(--theme-ease), border-color var(--theme-duration) var(--theme-ease);
 }
@@ -1358,7 +1357,6 @@ button {
   transition: opacity var(--theme-duration) var(--theme-ease), visibility 0s var(--theme-duration);
 }
 .dark.theme-transitions .star-field { transition: opacity var(--theme-duration) var(--theme-ease), visibility 0s; }
-.dark.lunar-transition .star-field { transition: opacity 600ms 200ms var(--theme-ease), visibility 0s; }
 #theme-toggle { position: relative; }
 #theme-toggle svg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
 #theme-toggle .theme-sun { opacity: 0; transform: translate(-50%, -50%) rotate(-45deg) scale(.75); }
@@ -1369,11 +1367,9 @@ button {
 /* Afternoon light: a fixed off-screen source and soft diagonal shafts. */
 /* Per-frame progress must not propagate through the page or filtered SVG tree. */
 @property --night-progress { syntax: "<number>"; inherits: false; initial-value: 0; }
-@property --curtain-edge { syntax: "<percentage>"; inherits: false; initial-value: -35%; }
-:root { --night-progress: 0; --curtain-edge: -35%; }
-:root.dark { --night-progress: 1; --curtain-edge: 135%; }
+:root { --night-progress: 0; }
+:root.dark { --night-progress: 1; }
 .dark :is(.home-page, .daybreak-sky, .sphere-sky, .star-field) { --night-progress: 1; }
-.dark .sphere-sky { --curtain-edge: 135%; }
 /* Light cores and their atmospheric falloff are separate SVG layers. */
 .daybreak-sky {
   position: absolute; inset: 0 0 auto; height: 690px; overflow: hidden;
@@ -1407,18 +1403,33 @@ button {
   opacity: var(--night-progress); transition: none;
   mask-image: linear-gradient(#000 70%, transparent 94%);
 }
-:root.lunar-transition .home-page .sphere-sky {
-  opacity: 1;
-  mask-image: linear-gradient(to top right, #000 calc(var(--curtain-edge) - 22%), transparent calc(var(--curtain-edge) + 22%)),
-    linear-gradient(#000 70%, transparent 94%);
-  mask-composite: intersect;
-}
 /* Keep stars present until the curtain has passed, then stop their animation. */
 :root[data-theme-changing] .home-page .star-field { visibility: visible; opacity: clamp(0, calc((var(--night-progress) - .55) / .45), 1); transition: none; }
 .home-page .lunar-surface::after { content: none; }
 .lunar-surface img { transition: opacity 300ms ease; }
-.theme-transitions.lunar-transition { --theme-duration: 450ms; }
 .theme-transitions #theme-toggle svg { transition-duration: 350ms; }
+
+/* A single feathered circle reveals the complete page, including text and footer.
+   The snapshots retain the static light filters; only their reveal mask moves. */
+@property --theme-radius { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --theme-origin-x { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --theme-origin-y { syntax: "<length>"; inherits: false; initial-value: 0px; }
+.theme-wave *, .theme-wave *::before, .theme-wave *::after { transition: none !important; }
+.theme-wave .star-particle { animation-play-state: paused; }
+.theme-wave::view-transition { pointer-events: none; }
+.theme-wave::view-transition-group(root) { animation: none; }
+.theme-wave::view-transition-old(root), .theme-wave::view-transition-new(root) {
+  animation: none; mix-blend-mode: normal;
+}
+.theme-wave::view-transition-old(root) { z-index: 1; }
+.theme-wave::view-transition-new(root) {
+  z-index: 2;
+  mask-image: radial-gradient(circle at var(--theme-origin-x) var(--theme-origin-y), #000 calc(var(--theme-radius) - 16px), transparent var(--theme-radius));
+}
+/* Dawn reveals the light page outside the shrinking night circle. */
+.theme-wave-light::view-transition-new(root) {
+  mask-image: radial-gradient(circle at var(--theme-origin-x) var(--theme-origin-y), transparent calc(var(--theme-radius) - 16px), #000 var(--theme-radius));
+}
 @media (max-width: 639px) {
   .sun-scene-desktop { display: none; }
   .sun-scene-mobile { display: block; }

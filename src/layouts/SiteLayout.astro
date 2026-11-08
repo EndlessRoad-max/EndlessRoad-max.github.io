@@ -56,6 +56,7 @@ const stars = home ? Array.from({ length: 140 }, () => ({
     <footer class="site-footer"><div><a class="footer-brand" href={url("/")}>{portfolio.siteName}</a><span>一直在路上，想看看前面还有什么</span></div><div><a href={url("/rss.xml")}>RSS 订阅</a><span>© {new Date().getFullYear()} {portfolio.name}</span></div></footer>
     <script>
       import { applyThemeToDocument, getStoredTheme, setTheme } from "../utils/setting-utils";
+      import { createThemeWave } from "../scripts/theme-wave";
       const sky = document.querySelector<HTMLElement>(".sphere-sky");
       const moon = sky?.querySelector<HTMLImageElement>(".lunar-surface img");
       if (moon) {
@@ -117,7 +118,6 @@ const stars = home ? Array.from({ length: 140 }, () => ({
       function paintScene(progress: number) {
         sceneProgress = progress;
         for (const layer of sceneLayers) layer?.style.setProperty("--night-progress", String(progress));
-        sky?.style.setProperty("--curtain-edge", `${-35 + progress * 170}%`);
       }
       if (sky) paintScene(sceneProgress);
       function animateScene(target: number, duration: number) {
@@ -136,28 +136,35 @@ const stars = home ? Array.from({ length: 140 }, () => ({
         sceneFrame = requestAnimationFrame(tick);
       }
       let manualTheme: "light" | "dark" | undefined;
+      const wave = typeof document.startViewTransition === "function" && typeof CSS.registerProperty === "function"
+        ? createThemeWave(button, (dark) => {
+          const theme = dark ? "dark" : "light";
+          try { setTheme(theme); } catch { applyThemeToDocument(theme); }
+          sceneTarget = dark ? 1 : 0;
+          if (sky) paintScene(sceneTarget);
+          label();
+        }) : undefined;
       function label() {
-        const text = root.classList.contains("dark") ? "切换到浅色主题" : "切换到深色主题";
+        const dark = manualTheme ? manualTheme === "dark" : root.classList.contains("dark");
+        const text = dark ? "切换到浅色主题" : "切换到深色主题";
         button.setAttribute("aria-label", text);
         button.title = text;
       }
       function finishTransition() {
         clearTimeout(cleanupTimer);
         root.removeAttribute("data-theme-changing");
-        root.classList.remove("lunar-transition");
       }
-      function prepareTransition(manual: boolean, target: number) {
+      function prepareTransition(target: number) {
         clearTimeout(cleanupTimer);
-        const bounds = sky?.getBoundingClientRect();
-        const lunar = manual && !reducedMotion.matches && bounds && bounds.bottom > 0 && bounds.top < innerHeight;
         root.classList.add("theme-transitions");
-        root.classList.toggle("lunar-transition", Boolean(lunar));
         root.dataset.themeChanging = "true";
-        if (sky) animateScene(target, reducedMotion.matches ? 0 : lunar ? 1100 : 300);
+        // Older browsers and automatic changes use a coordinated, brief fade.
+        if (sky) animateScene(target, reducedMotion.matches ? 0 : 300);
         else cleanupTimer = setTimeout(finishTransition, reducedMotion.matches ? 0 : 300);
       }
       reducedMotion.addEventListener("change", () => {
         if (reducedMotion.matches) {
+          wave?.finish();
           cancelAnimationFrame(sceneFrame);
           if (sky) paintScene(sceneTarget);
           finishTransition();
@@ -165,9 +172,18 @@ const stars = home ? Array.from({ length: 140 }, () => ({
       });
       label();
       button.addEventListener("click", () => {
-        const next = document.documentElement.classList.contains("dark") ? "light" : "dark";
-        prepareTransition(true, next === "dark" ? 1 : 0);
+        const dark = manualTheme ? manualTheme === "dark" : root.classList.contains("dark");
+        const next = dark ? "light" : "dark";
         manualTheme = next;
+        if (wave && !reducedMotion.matches && !document.hidden) {
+          cancelAnimationFrame(sceneFrame);
+          clearTimeout(cleanupTimer);
+          wave.change(next === "dark");
+          label();
+          return;
+        }
+        wave?.finish();
+        prepareTransition(next === "dark" ? 1 : 0);
         try { setTheme(next); } catch { applyThemeToDocument(next); }
         label();
       });
@@ -175,7 +191,7 @@ const stars = home ? Array.from({ length: 140 }, () => ({
         let automatic = !manualTheme;
         try { automatic = !manualTheme && getStoredTheme() === "auto"; } catch { /* Keep the in-memory preference when storage is unavailable. */ }
         if (!automatic) return;
-        prepareTransition(false, matchMedia("(prefers-color-scheme: dark)").matches ? 1 : 0);
+        prepareTransition(matchMedia("(prefers-color-scheme: dark)").matches ? 1 : 0);
         applyThemeToDocument("auto");
         label();
       });

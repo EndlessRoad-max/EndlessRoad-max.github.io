@@ -99,7 +99,7 @@ try {
       }
       await site.settled();
     }
-    await page.evaluate(() => { const button = document.getElementById('theme-toggle'); button.click(); requestAnimationFrame(() => { button.click(); requestAnimationFrame(() => button.click()); }); });
+    await page.evaluate(() => new Promise(resolve => { const button = document.getElementById('theme-toggle'); button.click(); requestAnimationFrame(() => { button.click(); requestAnimationFrame(() => { button.click(); resolve(); }); }); }));
     await site.settled();
     assert.equal(await page.evaluate(() => document.documentElement.classList.contains('dark')), true);
     assert.equal(await page.evaluate(() => localStorage.getItem('theme')), 'dark');
@@ -125,7 +125,8 @@ try {
     await page.waitForFunction(() => !document.querySelector('.daybreak-sky').classList.contains('sky-paused'));
     assert.deepEqual(await site.clouds(), cloudStart, 'returning to the foreground keeps cloud masks static');
     await site.open('notes/'); await site.toggle.click();
-    assert.equal(await page.locator('body').evaluate(e => getComputedStyle(e).transitionDuration.split(',')[0]), '0.3s');
+    await page.waitForFunction(() => document.getAnimations().some(a => a.effect?.pseudoElement === '::view-transition-new(root)'));
+    assert.equal(await page.evaluate(() => document.getAnimations().find(a => a.effect?.pseudoElement === '::view-transition-new(root)').effect.getTiming().duration), 900);
     await site.settled();
     await page.emulateMedia({ reducedMotion: 'reduce' }); await site.toggle.click();
     assert.equal(await page.locator('body').evaluate(e => getComputedStyle(e).transitionDuration), '0s');
