@@ -1,0 +1,60 @@
+/* Namespaced styles for the bilingual Doduo paper. */
+.custom-md .doduo-title {
+  padding-block: 20px 28px;
+  border-block: 1px solid var(--line);
+  margin-block: 32px;
+}
+.custom-md .doduo-title > p:first-child {
+  font: 600 24px/1.45 Georgia, "Times New Roman", serif;
+}
+.custom-md .doduo-zh-title { font-size: 19px; }
+.custom-md .doduo-authors { font-size: 14px; line-height: 1.8; }
+.custom-md .doduo-aff { color: var(--muted); font-size: 12px; }
+.custom-md .doduo-en,
+.custom-md .doduo-section-en {
+  color: var(--muted);
+  font-family: Georgia, "Times New Roman", serif;
+  line-height: 1.8;
+}
+.custom-md p.doduo-en { margin: 24px 0 10px; }
+.custom-md .doduo-zh {
+  border-left: 2px solid var(--line);
+  padding-left: 16px;
+  color: var(--text);
+}
+.custom-md p.doduo-zh { margin: 10px 0 30px; }
+.custom-md .doduo-section-en { margin: -8px 0 24px; font-size: 14px; }
+.custom-md .doduo-figure { margin: 32px 0; }
+.custom-md .doduo-figure img {
+  width: 100%; height: auto; background: #fff; padding: 8px;
+  border: 1px solid var(--line);
+}
+.custom-md .doduo-figure figcaption,
+.custom-md .doduo-tbl-cap { font-size: 13px; line-height: 1.8; }
+.custom-md .doduo-figure figcaption .doduo-zh,
+.custom-md .doduo-tbl-cap .doduo-zh { margin-top: 8px; }
+.custom-md .doduo-tbl-cap { margin-top: 28px; }
+.custom-md .doduo-table { width: 100%; margin-block: 16px 28px; }
+.custom-md .doduo-table :is(td, th) {
+  min-width: 76px; padding: 8px 10px; text-align: center;
+  overflow-wrap: normal;
+}
+.custom-md .doduo-table :is(td, th):first-child { text-align: left; }
+.custom-md .doduo-two-col { display: grid; gap: 24px; }
+.custom-md .doduo-two-col > div { min-width: 0; }
+.custom-md .doduo-algo {
+  background: var(--tint); color: var(--text);
+  border: 1px solid var(--line); padding: 18px;
+  font: 12px/1.8 "JetBrains Mono Variable", Consolas, monospace;
+  overflow-x: auto; white-space: pre; overflow-wrap: normal;
+}
+.custom-md .doduo-eq {
+  font: 16px/2 Georgia, "Times New Roman", serif;
+  text-align: center; overflow-x: auto; white-space: nowrap;
+  margin-block: 24px; padding: 16px; background: var(--tint);
+}
+.custom-md .doduo-note { color: var(--muted); font-size: 12px; margin-block: 24px; }
+.custom-md .doduo-refs { font-size: 13px; line-height: 1.8; }
+.custom-md .doduo-refs p { margin-block: 12px; }
+.custom-md .doduo-zh :is(b, strong),
+.custom-md .doduo-table :is(b, strong) { color: inherit; }
