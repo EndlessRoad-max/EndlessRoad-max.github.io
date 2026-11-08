@@ -34,12 +34,25 @@
 .custom-md .doduo-figure figcaption .doduo-zh,
 .custom-md .doduo-tbl-cap .doduo-zh { margin-top: 8px; }
 .custom-md .doduo-tbl-cap { margin-top: 28px; }
-.custom-md .doduo-table { width: 100%; margin-block: 16px 28px; }
-.custom-md .doduo-table :is(td, th) {
-  min-width: 76px; padding: 8px 10px; text-align: center;
-  overflow-wrap: normal;
+.custom-md .doduo-table-scroll {
+  max-width: 100%; overflow-x: auto; margin-block: 16px 28px;
+  border: 1px solid var(--line); border-radius: 6px;
 }
-.custom-md .doduo-table :is(td, th):first-child { text-align: left; }
+.custom-md .doduo-table-scroll:focus-visible,
+.custom-md .doduo-eq:focus-visible { outline: 2px solid var(--muted); outline-offset: 3px; }
+.custom-md .doduo-table {
+  display: table; width: 100%; max-width: none; margin: 0;
+  font-size: 14px; font-variant-numeric: tabular-nums;
+}
+.custom-md .doduo-table :is(td, th) {
+  min-width: 76px; padding: 11px 14px; vertical-align: middle;
+  overflow-wrap: normal; line-height: 1.65;
+}
+.custom-md .doduo-table th { text-align: center; white-space: normal; }
+.custom-md .doduo-table td { text-align: right; white-space: nowrap; }
+.custom-md .doduo-table td.doduo-label { text-align: left; }
+.custom-md .doduo-table-notes td:last-child { white-space: normal; min-width: 180px; }
+.custom-md .doduo-table tbody tr:nth-child(even) { background: var(--tint); }
 .custom-md .doduo-two-col { display: grid; gap: 24px; }
 .custom-md .doduo-two-col > div { min-width: 0; }
 .custom-md .doduo-algo {
@@ -49,10 +62,22 @@
   overflow-x: auto; white-space: pre; overflow-wrap: normal;
 }
 .custom-md .doduo-eq {
-  font: 16px/2 Georgia, "Times New Roman", serif;
-  text-align: center; overflow-x: auto; white-space: nowrap;
+  font-size: 16px; overflow-x: auto;
   margin-block: 24px; padding: 16px; background: var(--tint);
 }
+.custom-md .doduo-eq-row {
+  display: flex; align-items: center; gap: 24px;
+  width: 100%; min-width: max-content;
+}
+.custom-md .doduo-math-display { flex: 1; }
+.custom-md .doduo-eq-number { flex: none; color: var(--muted); }
+.custom-md .doduo-eq .katex-display { margin: 0; padding-block: 6px; }
+.custom-md .doduo-math { display: inline-block; white-space: nowrap; max-width: 100%; vertical-align: baseline; }
+.custom-md .doduo-math .katex { font-size: 1.08em; }
+.custom-md .doduo-inline-equation {
+  display: block; max-width: 100%; overflow-x: auto; padding: 12px 2px;
+}
+.custom-md .doduo-example { text-align: center; font: 16px/2 Georgia, serif; }
 .custom-md .doduo-note { color: var(--muted); font-size: 12px; margin-block: 24px; }
 .custom-md .doduo-refs { font-size: 13px; line-height: 1.8; }
 .custom-md .doduo-refs p { margin-block: 12px; }

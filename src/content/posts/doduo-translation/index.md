@@ -10,7 +10,7 @@ draft: false
 
 本文整理自个人阅读用的中英对照译稿，原论文为 **Annotating Columns with Pre-trained Language Models**（SIGMOD 2022），[论文 DOI](https://doi.org/10.1145/3514221.3517906)。译文为非官方学习整理；文中“最新”“最优”等表述均对应论文发表时的研究背景。
 
-**阅读方式**：英文原段在前，中文译文紧随其后并以左侧竖线区分。可通过本页目录跳转章节；较宽的实验表格可横向滚动，插图可点击查看原图。
+**阅读方式**：英文原段在前，中文译文紧随其后并以左侧竖线区分。可通过本页目录跳转章节；较长的公式和较宽的实验表格可横向滚动，插图可点击查看原图。
 
 <header class="doduo-title">
   <p>Annotating Columns with Pre-trained Language Models</p>
@@ -111,8 +111,8 @@ draft: false
 <p class="doduo-section-en" lang="en">2　RELATED WORK</p>
 
 
-<p class="doduo-en" lang="en">Existing column type prediction models enjoyed the recent advances in machine learning by formulating column type prediction as a multi-class classification task. Hulsebos et al. [22] developed a deep learning model called Sherlock, which applies neural networks on multiple feature sets such as word embeddings, character embeddings, and global statistics extracted from individual column values. Zhang et al. [66] developed Sato, which extends Sherlock by incorporating table context and structured output prediction to better model the nature of the correlation between columns in the same table. Other models such as ColNet [9], HNN [10], Meimei [48], <i>C</i><sup>2</sup> [24] use external Knowledge Bases (KBs) on top of machine learning models to improve column type prediction. Those techniques have shown success on column type prediction tasks, outperforming classical machine learning models. While those techniques identify the semantic types of individual columns, another line of work focuses on column relations between pairs of columns in the same table for better understanding tables [4, 13, 28, 29, 34, 54].</p>
-<p class="doduo-zh" lang="zh-CN">已有的列类型预测模型受益于近年来机器学习的进展，它们把列类型预测表述为一个多类分类任务。Hulsebos 等人 [22] 开发了一个名为 Sherlock 的深度学习模型，在多种特征集上应用神经网络，例如词嵌入、字符嵌入以及从单列取值中提取的全局统计量。Zhang 等人 [66] 开发了 Sato，它在 Sherlock 的基础上加入表格上下文和结构化输出预测，以更好地刻画同一表格中各列之间相关性的本质。其他模型如 ColNet [9]、HNN [10]、Meimei [48]、<i>C</i><sup>2</sup> [24] 则在机器学习模型之上使用外部知识库（KB）来改进列类型预测。这些技术已在列类型预测任务上取得成功，性能优于经典机器学习模型。上述技术关注单列的语义类型，而另一条研究路线则关注同一表格中列与列之间的关系，以更好地理解表格 [4, 13, 28, 29, 34, 54]。</p>
+<p class="doduo-en" lang="en">Existing column type prediction models enjoyed the recent advances in machine learning by formulating column type prediction as a multi-class classification task. Hulsebos et al. [22] developed a deep learning model called Sherlock, which applies neural networks on multiple feature sets such as word embeddings, character embeddings, and global statistics extracted from individual column values. Zhang et al. [66] developed Sato, which extends Sherlock by incorporating table context and structured output prediction to better model the nature of the correlation between columns in the same table. Other models such as ColNet [9], HNN [10], Meimei [48], <span class="paper-math">C^{2}</span> [24] use external Knowledge Bases (KBs) on top of machine learning models to improve column type prediction. Those techniques have shown success on column type prediction tasks, outperforming classical machine learning models. While those techniques identify the semantic types of individual columns, another line of work focuses on column relations between pairs of columns in the same table for better understanding tables [4, 13, 28, 29, 34, 54].</p>
+<p class="doduo-zh" lang="zh-CN">已有的列类型预测模型受益于近年来机器学习的进展，它们把列类型预测表述为一个多类分类任务。Hulsebos 等人 [22] 开发了一个名为 Sherlock 的深度学习模型，在多种特征集上应用神经网络，例如词嵌入、字符嵌入以及从单列取值中提取的全局统计量。Zhang 等人 [66] 开发了 Sato，它在 Sherlock 的基础上加入表格上下文和结构化输出预测，以更好地刻画同一表格中各列之间相关性的本质。其他模型如 ColNet [9]、HNN [10]、Meimei [48]、<span class="paper-math">C^{2}</span> [24] 则在机器学习模型之上使用外部知识库（KB）来改进列类型预测。这些技术已在列类型预测任务上取得成功，性能优于经典机器学习模型。上述技术关注单列的语义类型，而另一条研究路线则关注同一表格中列与列之间的关系，以更好地理解表格 [4, 13, 28, 29, 34, 54]。</p>
 
 <figure class="doduo-figure">
   <a href="/images/posts/doduo-translation/figure-2.webp" target="_blank" rel="noopener" aria-label="在新标签页查看原图"><img src="/images/posts/doduo-translation/figure-2.webp" alt="图 2 / Figure 2" width="700" height="215" loading="lazy" decoding="async"></a>
@@ -141,15 +141,19 @@ draft: false
   <div class="doduo-en" lang="en"><b>Table 1:</b> Notations.</div>
   <div class="doduo-zh" lang="zh-CN"><b>表 1：</b>符号说明。</div>
 </div>
-<table class="doduo-table" tabindex="0" aria-label="论文数据表，可横向滚动">
-  <tr><th>Symbol 符号</th><th>Description 描述</th></tr>
-  <tr><td><i>T</i> = (<i>c</i><sub>1</sub>, <i>c</i><sub>2</sub>, . . . , <i>c</i><sub>n</sub>)</td><td>Columns in a table.　表中的列。</td></tr>
-  <tr><td><i>c</i><sub>i</sub> = (<i>v</i><sup>i</sup><sub>1</sub>, <i>v</i><sup>i</sup><sub>2</sub>, . . . , <i>v</i><sup>i</sup><sub>m</sub>)</td><td>Column values.　列值。</td></tr>
-  <tr><td><i>v</i><sup>i</sup><sub>j</sub> = (<i>w</i><sup>i</sup><sub>j,1</sub>, <i>w</i><sup>i</sup><sub>j,2</sub>, . . . , <i>w</i><sup>i</sup><sub>j,K</sub>)</td><td>A single column value.　单个列值。</td></tr>
-  <tr><td><i>D</i><sub>train</sub> = {(<i>T</i><sup>(n)</sup>, <i>L</i><sup>(n)</sup><sub>type</sub>, <i>L</i><sup>(n)</sup><sub>rel</sub>)}<sup>N</sup><sub>n=1</sub></td><td>Training data　训练数据</td></tr>
-  <tr><td><i>L</i><sub>type</sub> = (<i>l</i><sub>1</sub>, <i>l</i><sub>2</sub>, . . . , <i>l</i><sub>n</sub>), <i>l</i><sub>*</sub> ∈ <i>C</i><sub>type</sub></td><td>Column type labels.　列类型标签。</td></tr>
-  <tr><td><i>L</i><sub>rel</sub> = (<i>l</i><sub>1,2</sub>, <i>l</i><sub>1,3</sub>, . . . , <i>l</i><sub>1,n</sub>), <i>l</i><sub>*,*</sub> ∈ <i>C</i><sub>rel</sub></td><td>Column relation labels.　列关系标签。</td></tr>
-</table>
+<div class="doduo-table-scroll" role="region" tabindex="0" aria-label="表 1：符号说明，可横向滚动"><table class="doduo-table doduo-table-notes">
+<thead>
+<tr><th scope="col">Symbol 符号</th><th scope="col">Description 描述</th></tr>
+</thead>
+<tbody>
+<tr><td class="doduo-label"><span class="paper-math">T=(c_1,c_2,\ldots,c_n)</span></td><td class="doduo-label">Columns in a table.　表中的列。</td></tr>
+<tr><td class="doduo-label"><span class="paper-math">c_i=(v_1^i,v_2^i,\ldots,v_m^i)</span></td><td class="doduo-label">Column values.　列值。</td></tr>
+<tr><td class="doduo-label"><span class="paper-math">v_j^i=(w_{j,1}^i,w_{j,2}^i,\ldots,w_{j,K}^i)</span></td><td class="doduo-label">A single column value.　单个列值。</td></tr>
+<tr><td class="doduo-label"><span class="paper-math">D_{\mathrm{train}}=\left\{(T^{(n)},L_{\mathrm{type}}^{(n)},L_{\mathrm{rel}}^{(n)})\right\}_{n=1}^{N}</span></td><td class="doduo-label">Training data　训练数据</td></tr>
+<tr><td class="doduo-label"><span class="paper-math">L_{\mathrm{type}}=(l_1,l_2,\ldots,l_n),\quad l_*\in C_{\mathrm{type}}</span></td><td class="doduo-label">Column type labels.　列类型标签。</td></tr>
+<tr><td class="doduo-label"><span class="paper-math">L_{\mathrm{rel}}=(l_{1,2},l_{1,3},\ldots,l_{1,n}),\quad l_{*,*}\in C_{\mathrm{rel}}</span></td><td class="doduo-label">Column relation labels.　列关系标签。</td></tr>
+</tbody>
+</table></div>
 
 <p class="doduo-en" lang="en">TURL is also a Transformer-based model like Doduo but it requires additional meta table information such as table headers for pre-training. Doduo is more generic as it predicts column types and relations only relying on cell values in the table. See Section 5 for a more detailed comparison.</p>
 <p class="doduo-zh" lang="zh-CN">TURL 与 Doduo 一样也是基于 Transformer 的模型，但它在预训练时需要额外的表元信息，例如表头。Doduo 更为通用，因为它在预测列类型和列关系时仅依赖表格中的单元值。更详细的比较见第 5 节。</p>
@@ -172,20 +176,20 @@ draft: false
 <p class="doduo-en" lang="en">The goal of the column type prediction task is to classify each column to its semantic type, such as “country name”, “population”, and “birthday” instead of the standard column types such as string, int, or Datetime. See also Figure 2 for more examples. For column relation annotation, our goal is to classify the relation of each pair of columns. In Figure 2, the relation between the “person” column and the “location” column can be “place_of_birth”.</p>
 <p class="doduo-zh" lang="zh-CN">列类型预测任务的目标是把每一列分类到其语义类型，例如“country name”“population”“birthday”，而不是 string、int 或 Datetime 等标准列类型。更多示例参见图 2。对于列关系标注，我们的目标是对每一对列的关系进行分类。在图 2 中，“person”列与“location”列之间的关系可以是“place_of_birth”。</p>
 
-<p class="doduo-en" lang="en">As summarized in Table 1, more formally, we consider a standard relational data model where a relation <i>T</i> (i.e., table) consists of a set of attributes <i>T</i> = (<i>c</i><sub>1</sub>, . . . <i>c</i><sub>n</sub>) (i.e., columns.) We denote by val(<i>T</i>.<i>c</i><sub>i</sub>) the sequence of data values stored at the column <i>c</i><sub>i</sub>. For each value <i>v</i> ∈ val(<i>T</i>.<i>c</i><sub>i</sub>), we assume <i>v</i> to be of the string type and can be split into a sequence of input tokens <i>v</i> = [<i>w</i><sub>1</sub>, . . . , <i>w</i><sub>k</sub>] to pre-trained LMs. This approach of casting cell values into text might seem restricted since tables columns can be of numeric types such as float or date. There has been extensions of the Transformer models to support numeric data [60] and providing such direct support of numeric data is important future work. We also provide a brief analysis on Doduo’s performance on numeric column types in Section 5.4.</p>
-<p class="doduo-zh" lang="zh-CN">如表 1 所总结，更形式化地说，我们考虑标准的关系数据模型，其中一个关系 <i>T</i>（即表格）由一组属性 <i>T</i> = (<i>c</i><sub>1</sub>, . . . <i>c</i><sub>n</sub>)（即列）组成。我们用 val(<i>T</i>.<i>c</i><sub>i</sub>) 表示存储在列 <i>c</i><sub>i</sub> 上的数据值序列。对于每个值 <i>v</i> ∈ val(<i>T</i>.<i>c</i><sub>i</sub>)，我们假定 <i>v</i> 为字符串类型，并可切分为预训练 LM 的输入 token 序列 <i>v</i> = [<i>w</i><sub>1</sub>, . . . , <i>w</i><sub>k</sub>]。由于表格列也可能是 float 或 date 等数值类型，这种把单元值转换为文本的做法看似有一定局限。已有研究对 Transformer 模型做了扩展以支持数值数据 [60]，而直接支持数值数据是重要的未来工作。我们也在第 5.4 节对 Doduo 在数值列类型上的表现做了简要分析。</p>
+<p class="doduo-en" lang="en">As summarized in Table 1, more formally, we consider a standard relational data model where a relation <span class="paper-math">T</span> (i.e., table) consists of a set of attributes <span class="paper-math">T</span> = (<span class="paper-math">c_{1}</span>, . . . <span class="paper-math">c_{n}</span>) (i.e., columns.) We denote by val(<span class="paper-math">T</span>.<span class="paper-math">c_{i}</span>) the sequence of data values stored at the column <span class="paper-math">c_{i}</span>. For each value <span class="paper-math">v</span> ∈ val(<span class="paper-math">T</span>.<span class="paper-math">c_{i}</span>), we assume <span class="paper-math">v</span> to be of the string type and can be split into a sequence of input tokens <span class="paper-math">v</span> = [<span class="paper-math">w_{1}</span>, . . . , <span class="paper-math">w_{k}</span>] to pre-trained LMs. This approach of casting cell values into text might seem restricted since tables columns can be of numeric types such as float or date. There has been extensions of the Transformer models to support numeric data [60] and providing such direct support of numeric data is important future work. We also provide a brief analysis on Doduo’s performance on numeric column types in Section 5.4.</p>
+<p class="doduo-zh" lang="zh-CN">如表 1 所总结，更形式化地说，我们考虑标准的关系数据模型，其中一个关系 <span class="paper-math">T</span>（即表格）由一组属性 <span class="paper-math">T</span> = (<span class="paper-math">c_{1}</span>, . . . <span class="paper-math">c_{n}</span>)（即列）组成。我们用 val(<span class="paper-math">T</span>.<span class="paper-math">c_{i}</span>) 表示存储在列 <span class="paper-math">c_{i}</span> 上的数据值序列。对于每个值 <span class="paper-math">v</span> ∈ val(<span class="paper-math">T</span>.<span class="paper-math">c_{i}</span>)，我们假定 <span class="paper-math">v</span> 为字符串类型，并可切分为预训练 LM 的输入 token 序列 <span class="paper-math">v</span> = [<span class="paper-math">w_{1}</span>, . . . , <span class="paper-math">w_{k}</span>]。由于表格列也可能是 float 或 date 等数值类型，这种把单元值转换为文本的做法看似有一定局限。已有研究对 Transformer 模型做了扩展以支持数值数据 [60]，而直接支持数值数据是重要的未来工作。我们也在第 5.4 节对 Doduo 在数值列类型上的表现做了简要分析。</p>
 
-<p class="doduo-en" lang="en"><b>Problem 1 (Column type prediction).</b> Given a table <i>T</i> and a column <i>c</i><sub>i</sub> in <i>T</i>, a column type prediction model M with type vocabulary <i>C</i><sub>type</sub> predicts a column type M(<i>T</i>, <i>c</i><sub>i</sub>) ∈ <i>C</i><sub>type</sub> that best describes the semantics of <i>c</i><sub>i</sub>.</p>
-<p class="doduo-zh" lang="zh-CN"><b>问题 1（列类型预测）。</b>给定表格 <i>T</i> 及 <i>T</i> 中的列 <i>c</i><sub>i</sub>，一个具有类型词表 <i>C</i><sub>type</sub> 的列类型预测模型 M 预测出一个列类型 M(<i>T</i>, <i>c</i><sub>i</sub>) ∈ <i>C</i><sub>type</sub>，以最好地描述 <i>c</i><sub>i</sub> 的语义。</p>
+<p class="doduo-en" lang="en"><b>Problem 1 (Column type prediction).</b> Given a table <span class="paper-math">T</span> and a column <span class="paper-math">c_{i}</span> in <span class="paper-math">T</span>, a column type prediction model M with type vocabulary <span class="paper-math">C_{\mathrm{type}}</span> predicts a column type M(<span class="paper-math">T</span>, <span class="paper-math">c_{i}</span>) ∈ <span class="paper-math">C_{\mathrm{type}}</span> that best describes the semantics of <span class="paper-math">c_{i}</span>.</p>
+<p class="doduo-zh" lang="zh-CN"><b>问题 1（列类型预测）。</b>给定表格 <span class="paper-math">T</span> 及 <span class="paper-math">T</span> 中的列 <span class="paper-math">c_{i}</span>，一个具有类型词表 <span class="paper-math">C_{\mathrm{type}}</span> 的列类型预测模型 M 预测出一个列类型 M(<span class="paper-math">T</span>, <span class="paper-math">c_{i}</span>) ∈ <span class="paper-math">C_{\mathrm{type}}</span>，以最好地描述 <span class="paper-math">c_{i}</span> 的语义。</p>
 
-<p class="doduo-en" lang="en"><b>Problem 2 (Column relation prediction).</b> Given a table <i>T</i> and a pair of columns (<i>c</i><sub>i</sub>, <i>c</i><sub>j</sub>) in <i>T</i>, a column relation prediction model M with relation vocabulary <i>C</i><sub>rel</sub> predicts a relation M(<i>T</i>, <i>c</i><sub>i</sub>, <i>c</i><sub>j</sub>) ∈ <i>C</i><sub>rel</sub> that best describes the semantics of the relation between <i>c</i><sub>i</sub> and <i>c</i><sub>j</sub>.</p>
-<p class="doduo-zh" lang="zh-CN"><b>问题 2（列关系预测）。</b>给定表格 <i>T</i> 及 <i>T</i> 中的一对列 (<i>c</i><sub>i</sub>, <i>c</i><sub>j</sub>)，一个具有关系词表 <i>C</i><sub>rel</sub> 的列关系预测模型 M 预测出一个关系 M(<i>T</i>, <i>c</i><sub>i</sub>, <i>c</i><sub>j</sub>) ∈ <i>C</i><sub>rel</sub>，以最好地描述 <i>c</i><sub>i</sub> 与 <i>c</i><sub>j</sub> 之间关系的语义。</p>
+<p class="doduo-en" lang="en"><b>Problem 2 (Column relation prediction).</b> Given a table <span class="paper-math">T</span> and a pair of columns (<span class="paper-math">c_{i}</span>, <span class="paper-math">c_{j}</span>) in <span class="paper-math">T</span>, a column relation prediction model M with relation vocabulary <span class="paper-math">C_{\mathrm{rel}}</span> predicts a relation M(<span class="paper-math">T</span>, <span class="paper-math">c_{i}</span>, <span class="paper-math">c_{j}</span>) ∈ <span class="paper-math">C_{\mathrm{rel}}</span> that best describes the semantics of the relation between <span class="paper-math">c_{i}</span> and <span class="paper-math">c_{j}</span>.</p>
+<p class="doduo-zh" lang="zh-CN"><b>问题 2（列关系预测）。</b>给定表格 <span class="paper-math">T</span> 及 <span class="paper-math">T</span> 中的一对列 (<span class="paper-math">c_{i}</span>, <span class="paper-math">c_{j}</span>)，一个具有关系词表 <span class="paper-math">C_{\mathrm{rel}}</span> 的列关系预测模型 M 预测出一个关系 M(<span class="paper-math">T</span>, <span class="paper-math">c_{i}</span>, <span class="paper-math">c_{j}</span>) ∈ <span class="paper-math">C_{\mathrm{rel}}</span>，以最好地描述 <span class="paper-math">c_{i}</span> 与 <span class="paper-math">c_{j}</span> 之间关系的语义。</p>
 
-<p class="doduo-en" lang="en">In Doduo, we consider the supervised setting of multi-class classification. This means that we assume a training data set <i>D</i><sub>train</sub> of tables annotated with columns types and relations from two fixed vocabularies (<i>C</i><sub>type</sub>, <i>C</i><sub>rel</sub>). Note that Doduo does not restrict itself to specific choices of vocabularies (<i>C</i><sub>type</sub>, <i>C</i><sub>rel</sub>) which are customizable by switching the training set <i>D</i><sub>train</sub>. In practice, the choice of (<i>C</i><sub>type</sub>, <i>C</i><sub>rel</sub>) is ideally application-dependent. For example, if the downstream task requires integration with a Knowledge Base (KB), it is ideal to have (<i>C</i><sub>type</sub>, <i>C</i><sub>rel</sub>) aligned with the KB’s type/relation vocabulary. In our experiment, we evaluated Doduo on datasets annotated with (1) KB types [2] and (2) DBPedia types [36].</p>
-<p class="doduo-zh" lang="zh-CN">在 Doduo 中，我们考虑多类分类的监督设定。这意味着我们假设有一个训练数据集 <i>D</i><sub>train</sub>，其中的表格带有来自两个固定词表（<i>C</i><sub>type</sub>、<i>C</i><sub>rel</sub>）的列类型和关系标注。请注意，Doduo 并不局限于特定的词表（<i>C</i><sub>type</sub>、<i>C</i><sub>rel</sub>）选择，这些词表可以通过更换训练集 <i>D</i><sub>train</sub> 来自定义。在实践中，（<i>C</i><sub>type</sub>、<i>C</i><sub>rel</sub>）的选择最好依赖于具体应用。例如，如果下游任务需要与某个知识库（KB）集成，那么最好使（<i>C</i><sub>type</sub>、<i>C</i><sub>rel</sub>）与该知识库的类型/关系词表保持一致。在我们的实验中，我们在分别带有 (1) KB 类型 [2] 和 (2) DBPedia 类型 [36] 标注的数据集上评估了 Doduo。</p>
+<p class="doduo-en" lang="en">In Doduo, we consider the supervised setting of multi-class classification. This means that we assume a training data set <span class="paper-math">D_{\mathrm{train}}</span> of tables annotated with columns types and relations from two fixed vocabularies (<span class="paper-math">C_{\mathrm{type}}</span>, <span class="paper-math">C_{\mathrm{rel}}</span>). Note that Doduo does not restrict itself to specific choices of vocabularies (<span class="paper-math">C_{\mathrm{type}}</span>, <span class="paper-math">C_{\mathrm{rel}}</span>) which are customizable by switching the training set <span class="paper-math">D_{\mathrm{train}}</span>. In practice, the choice of (<span class="paper-math">C_{\mathrm{type}}</span>, <span class="paper-math">C_{\mathrm{rel}}</span>) is ideally application-dependent. For example, if the downstream task requires integration with a Knowledge Base (KB), it is ideal to have (<span class="paper-math">C_{\mathrm{type}}</span>, <span class="paper-math">C_{\mathrm{rel}}</span>) aligned with the KB’s type/relation vocabulary. In our experiment, we evaluated Doduo on datasets annotated with (1) KB types [2] and (2) DBPedia types [36].</p>
+<p class="doduo-zh" lang="zh-CN">在 Doduo 中，我们考虑多类分类的监督设定。这意味着我们假设有一个训练数据集 <span class="paper-math">D_{\mathrm{train}}</span>，其中的表格带有来自两个固定词表（<span class="paper-math">C_{\mathrm{type}}</span>、<span class="paper-math">C_{\mathrm{rel}}</span>）的列类型和关系标注。请注意，Doduo 并不局限于特定的词表（<span class="paper-math">C_{\mathrm{type}}</span>、<span class="paper-math">C_{\mathrm{rel}}</span>）选择，这些词表可以通过更换训练集 <span class="paper-math">D_{\mathrm{train}}</span> 来自定义。在实践中，（<span class="paper-math">C_{\mathrm{type}}</span>、<span class="paper-math">C_{\mathrm{rel}}</span>）的选择最好依赖于具体应用。例如，如果下游任务需要与某个知识库（KB）集成，那么最好使（<span class="paper-math">C_{\mathrm{type}}</span>、<span class="paper-math">C_{\mathrm{rel}}</span>）与该知识库的类型/关系词表保持一致。在我们的实验中，我们在分别带有 (1) KB 类型 [2] 和 (2) DBPedia 类型 [36] 标注的数据集上评估了 Doduo。</p>
 
-<p class="doduo-en" lang="en">The size and quality of the training set are also important for training high-quality column annotation models. While manually creating such datasets can be quite expensive, the datasets used in our experiments rely on heuristics that map table meta-data (e.g., header names, entity links) to type names to create training sets of large scale. See Section 5.1 for more details. While KB can work as a training example provider, Doduo does not require the training examples to be from a single source but can combine labels from any resources such as human annotations, labeling rules, and meta-data that can be transformed into the column type/relation label format. We also note that the learning goal of Doduo is to train column annotation models with high accuracy while being generalizable to unannotated tables (e.g., as measured by an unseen test set <i>D</i><sub>test</sub>).</p>
-<p class="doduo-zh" lang="zh-CN">训练集的规模和质量对于训练高质量的列标注模型同样重要。虽然人工构建这类数据集可能相当昂贵，但我们实验中使用的数据集依赖启发式规则，将表元数据（如表头名称、实体链接）映射为类型名称，从而构建大规模训练集。更多细节见第 5.1 节。虽然知识库可以作为训练样本的提供者，但 Doduo 并不要求训练样本来自单一来源，而是可以组合任何资源产生的标签，例如人工标注、标注规则，以及能够转换为列类型/关系标签格式的元数据。我们还要指出，Doduo 的学习目标是在对未标注表格（例如以未见过的测试集 <i>D</i><sub>test</sub> 衡量）保持泛化能力的同时，训练出高准确率的列标注模型。</p>
+<p class="doduo-en" lang="en">The size and quality of the training set are also important for training high-quality column annotation models. While manually creating such datasets can be quite expensive, the datasets used in our experiments rely on heuristics that map table meta-data (e.g., header names, entity links) to type names to create training sets of large scale. See Section 5.1 for more details. While KB can work as a training example provider, Doduo does not require the training examples to be from a single source but can combine labels from any resources such as human annotations, labeling rules, and meta-data that can be transformed into the column type/relation label format. We also note that the learning goal of Doduo is to train column annotation models with high accuracy while being generalizable to unannotated tables (e.g., as measured by an unseen test set <span class="paper-math">D_{\mathrm{test}}</span>).</p>
+<p class="doduo-zh" lang="zh-CN">训练集的规模和质量对于训练高质量的列标注模型同样重要。虽然人工构建这类数据集可能相当昂贵，但我们实验中使用的数据集依赖启发式规则，将表元数据（如表头名称、实体链接）映射为类型名称，从而构建大规模训练集。更多细节见第 5.1 节。虽然知识库可以作为训练样本的提供者，但 Doduo 并不要求训练样本来自单一来源，而是可以组合任何资源产生的标签，例如人工标注、标注规则，以及能够转换为列类型/关系标签格式的元数据。我们还要指出，Doduo 的学习目标是在对未标注表格（例如以未见过的测试集 <span class="paper-math">D_{\mathrm{test}}</span> 衡量）保持泛化能力的同时，训练出高准确率的列标注模型。</p>
 
 <p class="doduo-en" lang="en">The column type/relation prediction models of Doduo only considers the table content (i.e., cell values) as input. This setting allows Doduo to be more flexible to practical applications without replying on auxiliary information such as column names, table titles/captions, or adjacent tables typically required by existing works (See Section 2 for a comprehensive overview).</p>
 <p class="doduo-zh" lang="zh-CN">Doduo 的列类型/关系预测模型只把表格内容（即单元值）作为输入。这一设定使 Doduo 在实际应用中更为灵活，无需依赖现有工作通常所需的辅助信息，例如列名、表标题/表注，或相邻表格（全面的综述见第 2 节）。</p>
@@ -232,11 +236,11 @@ draft: false
 <p class="doduo-section-en" lang="en">4.1　Single-column Model</p>
 
 
-<p class="doduo-en" lang="en">Since LMs take token sequences (i.e., text) as input, one first has to convert a table into token sequences so that they can be meaningfully processed by LMs. A straightforward serialization strategy is to simply concatenate column values to make a sequence of tokens and feed that sequence as input to the model. That is, suppose a column <i>C</i> has column values <i>v</i><sub>1</sub>, . . . <i>v</i><sub>m</sub>, the serialized sequence is serialize<sub>single</sub>(<i>C</i>) ::= [CLS] <i>v</i><sub>1</sub> . . . <i>v</i><sub>m</sub> [SEP], where [CLS] and [SEP] are special tokens used to mark the beginning and end of a sequence<sup>4</sup>. For example, the first column of the first table in Figure 2 is serialized as: [CLS] Happy Feet Cars Flushed Away [SEP]. This serialization converts the problem into a sequence classification task. Thus, it is straightforward to fine-tune a BERT model using training data.</p>
-<p class="doduo-zh" lang="zh-CN">由于 LM 以 token 序列（即文本）为输入，首先必须把表格转换为 token 序列，才能被 LM 有意义地处理。一种直接的序列化策略是简单地把列值拼接成一个 token 序列，并将该序列作为模型输入。也就是说，假设列 <i>C</i> 的列值为 <i>v</i><sub>1</sub>, . . . <i>v</i><sub>m</sub>，则序列化为 serialize<sub>single</sub>(<i>C</i>) ::= [CLS] <i>v</i><sub>1</sub> . . . <i>v</i><sub>m</sub> [SEP]，其中 [CLS] 和 [SEP] 是用于标记序列开始与结束的特殊 token<sup>4</sup>。例如，图 2 中第一张表的第一列被序列化为：[CLS] Happy Feet Cars Flushed Away [SEP]。这种序列化把问题转化为一个序列分类任务，因此用训练数据微调 BERT 模型是直接可行的。</p>
+<p class="doduo-en" lang="en">Since LMs take token sequences (i.e., text) as input, one first has to convert a table into token sequences so that they can be meaningfully processed by LMs. A straightforward serialization strategy is to simply concatenate column values to make a sequence of tokens and feed that sequence as input to the model. That is, suppose a column <span class="paper-math">C</span> has column values <span class="paper-math">v_{1}</span>, . . . <span class="paper-math">v_{m}</span>, the serialized sequence is <span class="doduo-inline-equation"><span class="paper-math">\operatorname{serialize}_{\mathrm{single}}(C)\mathrel{::=}\text{[CLS]}\;v_1\;\ldots\;v_m\;\text{[SEP]}</span></span>, where [CLS] and [SEP] are special tokens used to mark the beginning and end of a sequence<sup>4</sup>. For example, the first column of the first table in Figure 2 is serialized as: [CLS] Happy Feet Cars Flushed Away [SEP]. This serialization converts the problem into a sequence classification task. Thus, it is straightforward to fine-tune a BERT model using training data.</p>
+<p class="doduo-zh" lang="zh-CN">由于 LM 以 token 序列（即文本）为输入，首先必须把表格转换为 token 序列，才能被 LM 有意义地处理。一种直接的序列化策略是简单地把列值拼接成一个 token 序列，并将该序列作为模型输入。也就是说，假设列 <span class="paper-math">C</span> 的列值为 <span class="paper-math">v_{1}</span>, . . . <span class="paper-math">v_{m}</span>，则序列化为 <span class="doduo-inline-equation"><span class="paper-math">\operatorname{serialize}_{\mathrm{single}}(C)\mathrel{::=}\text{[CLS]}\;v_1\;\ldots\;v_m\;\text{[SEP]}</span></span>，其中 [CLS] 和 [SEP] 是用于标记序列开始与结束的特殊 token<sup>4</sup>。例如，图 2 中第一张表的第一列被序列化为：[CLS] Happy Feet Cars Flushed Away [SEP]。这种序列化把问题转化为一个序列分类任务，因此用训练数据微调 BERT 模型是直接可行的。</p>
 
-<p class="doduo-en" lang="en">The column relation prediction task can be also formulated as a sequence classification task by converting a pair of columns (instead of a single column) into a token sequence in a similar manner. For this case, we also insert additional [SEP] between values of two columns to help the pre-trained LM distinguish the two columns. Namely, given two columns <i>C</i> = <i>v</i><sub>1</sub>, . . . , <i>v</i><sub>m</sub> and <i>C</i>′ = <i>v</i>′<sub>1</sub>, . . . , <i>v</i>′<sub>m</sub>, the single-column model serializes the pair as: serialize<sub>single</sub>(<i>C</i>, <i>C</i>′) ::= [CLS] <i>v</i><sub>1</sub> . . . <i>v</i><sub>m</sub> [SEP] <i>v</i>′<sub>1</sub> . . . <i>v</i>′<sub>m</sub> [SEP].</p>
-<p class="doduo-zh" lang="zh-CN">列关系预测任务同样可以表述为序列分类任务：以类似方式把一对列（而非单列）转换为一个 token 序列。在这种情况下，我们还会在两列的取值之间插入额外的 [SEP]，以帮助预训练 LM 区分这两列。也就是说，给定两列 <i>C</i> = <i>v</i><sub>1</sub>, . . . , <i>v</i><sub>m</sub> 和 <i>C</i>′ = <i>v</i>′<sub>1</sub>, . . . , <i>v</i>′<sub>m</sub>，单列模型把这一对列序列化为：serialize<sub>single</sub>(<i>C</i>, <i>C</i>′) ::= [CLS] <i>v</i><sub>1</sub> . . . <i>v</i><sub>m</sub> [SEP] <i>v</i>′<sub>1</sub> . . . <i>v</i>′<sub>m</sub> [SEP]。</p>
+<p class="doduo-en" lang="en">The column relation prediction task can be also formulated as a sequence classification task by converting a pair of columns (instead of a single column) into a token sequence in a similar manner. For this case, we also insert additional [SEP] between values of two columns to help the pre-trained LM distinguish the two columns. Namely, given two columns <span class="paper-math">C</span> = <span class="paper-math">v_{1}</span>, . . . , <span class="paper-math">v_{m}</span> and <span class="paper-math">C^{\prime}</span> = <span class="paper-math">v^{\prime}_{1}</span>, . . . , <span class="paper-math">v^{\prime}_{m}</span>, the single-column model serializes the pair as: <span class="doduo-inline-equation"><span class="paper-math">\operatorname{serialize}_{\mathrm{single}}(C,C^{\prime})\mathrel{::=}\text{[CLS]}\;v_1\;\ldots\;v_m\;\text{[SEP]}\;v_1^{\prime}\;\ldots\;v_m^{\prime}\;\text{[SEP]}</span></span>.</p>
+<p class="doduo-zh" lang="zh-CN">列关系预测任务同样可以表述为序列分类任务：以类似方式把一对列（而非单列）转换为一个 token 序列。在这种情况下，我们还会在两列的取值之间插入额外的 [SEP]，以帮助预训练 LM 区分这两列。也就是说，给定两列 <span class="paper-math">C</span> = <span class="paper-math">v_{1}</span>, . . . , <span class="paper-math">v_{m}</span> 和 <span class="paper-math">C^{\prime}</span> = <span class="paper-math">v^{\prime}_{1}</span>, . . . , <span class="paper-math">v^{\prime}_{m}</span>，单列模型把这一对列序列化为：<span class="doduo-inline-equation"><span class="paper-math">\operatorname{serialize}_{\mathrm{single}}(C,C^{\prime})\mathrel{::=}\text{[CLS]}\;v_1\;\ldots\;v_m\;\text{[SEP]}\;v_1^{\prime}\;\ldots\;v_m^{\prime}\;\text{[SEP]}</span></span>。</p>
 
 <p class="doduo-en" lang="en">Using the above serialization scheme, we can cast the column type and relation prediction tasks as sequence classification and sequence-pair classification tasks, which can be solved by LM fine-tuning. However, such sequence classifications predict column types independently, even if they are in the same table. We refer to this method as the single-column model. Although the single-column model can leverage the language understanding capability and knowledge learned by the LM via pre-training, it has an obvious drawback of treating columns in the same table as independent sequences. As a result, the single-column model fails to capture the table context, which is known to be important for the column annotation tasks [10, 24, 66].</p>
 <p class="doduo-zh" lang="zh-CN">使用上述序列化方案，我们可以把列类型预测和列关系预测任务转化为序列分类与序列对分类任务，通过微调 LM 即可求解。然而，这类序列分类是独立地预测列类型，即便这些列位于同一张表格中。我们把这种方法称为单列模型。虽然单列模型可以利用 LM 通过预训练获得的语言理解能力和知识，但它有一个明显缺陷：把同一表格中的列当作彼此独立的序列。因此，单列模型无法捕捉表格上下文，而已有研究表明表格上下文对列标注任务十分重要 [10, 24, 66]。</p>
@@ -247,8 +251,8 @@ draft: false
 <p class="doduo-section-en" lang="en">4.2　Table Serialization</p>
 
 
-<p class="doduo-en" lang="en">In contrast to the single-column model described above, Doduo is a multi-column (or table-wise) model that takes an entire table as input. Doduo serializes data entries as follows: for each table that has <i>n</i> columns <i>T</i> = (<i>c</i><sub>i</sub>)<sup>n</sup><sub>i=1</sub>, where each column has <i>N</i><sub>m</sub> column values <i>c</i><sub>i</sub> = (<i>v</i><sup>i</sup><sub>j</sub>)<sup>m</sup><sub>j=1</sub>. We let serialize(<i>T</i>) ::= [CLS] <i>v</i><sup>1</sup><sub>1</sub> . . . [CLS] <i>v</i><sup>n</sup><sub>1</sub> . . . <i>v</i><sup>n</sup><sub>m</sub> [SEP]. For example, the first table in Figure 2 is serialized as:</p>
-<p class="doduo-zh" lang="zh-CN">与上述单列模型不同，Doduo 是一个多列（或表格级）模型，以整张表格为输入。Doduo 对数据条目做如下序列化：对于有 <i>n</i> 列的表格 <i>T</i> = (<i>c</i><sub>i</sub>)<sup>n</sup><sub>i=1</sub>，其中每列有 <i>N</i><sub>m</sub> 个列值 <i>c</i><sub>i</sub> = (<i>v</i><sup>i</sup><sub>j</sub>)<sup>m</sup><sub>j=1</sub>。令 serialize(<i>T</i>) ::= [CLS] <i>v</i><sup>1</sup><sub>1</sub> . . . [CLS] <i>v</i><sup>n</sup><sub>1</sub> . . . <i>v</i><sup>n</sup><sub>m</sub> [SEP]。例如，图 2 中的第一张表被序列化为：</p>
+<p class="doduo-en" lang="en">In contrast to the single-column model described above, Doduo is a multi-column (or table-wise) model that takes an entire table as input. Doduo serializes data entries as follows: for each table that has <span class="paper-math">n</span> columns <span class="paper-math">T=(c_i)_{i=1}^{n}</span>, where each column has <span class="paper-math">N_{m}</span> column values <span class="paper-math">c_i=(v_j^i)_{j=1}^{m}</span>. We let <span class="doduo-inline-equation"><span class="paper-math">\operatorname{serialize}(T)\mathrel{::=}\text{[CLS]}\;v_1^1\;\ldots\;\text{[CLS]}\;v_1^n\;\ldots\;v_m^n\;\text{[SEP]}</span></span>. For example, the first table in Figure 2 is serialized as:</p>
+<p class="doduo-zh" lang="zh-CN">与上述单列模型不同，Doduo 是一个多列（或表格级）模型，以整张表格为输入。Doduo 对数据条目做如下序列化：对于有 <span class="paper-math">n</span> 列的表格 <span class="paper-math">T=(c_i)_{i=1}^{n}</span>，其中每列有 <span class="paper-math">N_{m}</span> 个列值 <span class="paper-math">c_i=(v_j^i)_{j=1}^{m}</span>。令 <span class="doduo-inline-equation"><span class="paper-math">\operatorname{serialize}(T)\mathrel{::=}\text{[CLS]}\;v_1^1\;\ldots\;\text{[CLS]}\;v_1^n\;\ldots\;v_m^n\;\text{[SEP]}</span></span>。例如，图 2 中的第一张表被序列化为：</p>
 
 <p class="doduo-en" lang="en">[CLS] Happy Feet, . . . [CLS] George Miller, . . . [CLS] USA, . . . , France [SEP].</p>
 <p class="doduo-zh" lang="zh-CN">（即：[CLS] Happy Feet，…… [CLS] George Miller，…… [CLS] USA，……，France [SEP]。）</p>
@@ -288,25 +292,25 @@ draft: false
 <p class="doduo-en" lang="en">Furthermore, a Transformer-based model usually has multiple attention heads (e.g., 12 attention heads for the BERT base model.) Different attention heads have different parameters for K, Q, V calculation so that they can capture different characteristics of input data holistically. Finally, the output of a Transformer block is converted into the same dimension size as that of the input (e.g, 768 for BERT) so that the output of the previous Transformer block can be directly used as the input to the next Transformer block. The same procedure is carried out as many as the number of Transformer blocks (i.e., 12 blocks for the BERT Base model.)</p>
 <p class="doduo-zh" lang="zh-CN">此外，基于 Transformer 的模型通常有多个注意力头（例如 BERT base 模型有 12 个注意力头）。不同注意力头在计算 K、Q、V 时具有不同的参数，从而能够整体地捕捉输入数据的不同特征。最后，一个 Transformer 模块的输出会被转换为与输入相同的维度（例如 BERT 为 768 维），使得前一个 Transformer 模块的输出可以直接作为下一个 Transformer 模块的输入。该过程重复的次数等于 Transformer 模块的数量（即 BERT Base 模型为 12 个模块）。</p>
 
-<p class="doduo-en" lang="en"><b>Column representations.</b> Since Doduo inserts dummy [CLS] symbols for each column, we can consider the output embeddings of the pre-trained LM for those symbols as contextualized column representations. Note that Doduo is a table-wise model, which takes the entire table as input and thus contextualized column representations take into account table context in a holistic manner. For column type prediction, Doduo attaches an additional dense layer followed by output layer with the size of |<i>C</i><sub>type</sub>|.</p>
-<p class="doduo-zh" lang="zh-CN"><b>列表示。</b>由于 Doduo 为每一列插入了哑符号 [CLS]，我们可以把预训练 LM 对这些符号的输出嵌入视为上下文化的列表示。需要注意的是，Doduo 是表格级模型，以整张表格为输入，因此上下文化的列表示以整体方式考虑了表格上下文。对于列类型预测，Doduo 附加一个额外的稠密层，其后再接一个规模为 |<i>C</i><sub>type</sub>| 的输出层。</p>
+<p class="doduo-en" lang="en"><b>Column representations.</b> Since Doduo inserts dummy [CLS] symbols for each column, we can consider the output embeddings of the pre-trained LM for those symbols as contextualized column representations. Note that Doduo is a table-wise model, which takes the entire table as input and thus contextualized column representations take into account table context in a holistic manner. For column type prediction, Doduo attaches an additional dense layer followed by output layer with the size of |<span class="paper-math">C_{\mathrm{type}}</span>|.</p>
+<p class="doduo-zh" lang="zh-CN"><b>列表示。</b>由于 Doduo 为每一列插入了哑符号 [CLS]，我们可以把预训练 LM 对这些符号的输出嵌入视为上下文化的列表示。需要注意的是，Doduo 是表格级模型，以整张表格为输入，因此上下文化的列表示以整体方式考虑了表格上下文。对于列类型预测，Doduo 附加一个额外的稠密层，其后再接一个规模为 |<span class="paper-math">C_{\mathrm{type}}</span>| 的输出层。</p>
 
 <p class="doduo-en" lang="en"><b>Column-pair representations.</b> For column relation prediction, Doduo concatenates a corresponding pair of contextualized column representations as a contextualized column-pair representation. The additional dense layer should capture combinatorial information between two column-level representations. Same as the column representations, column-pair representations are also table-wise representations. In the experiment, we also tested a variant of Doduo that only takes a single column (a single column pair) as input for the column type (column relation) prediction task.</p>
 <p class="doduo-zh" lang="zh-CN"><b>列对表示。</b>对于列关系预测，Doduo 把对应的一对上下文化列表示拼接为上下文化的列对表示。额外的稠密层应能捕捉两个列级表示之间的组合信息。与列表示相同，列对表示同样是表格级的表示。在实验中，我们还测试了 Doduo 的一个变体，它在列类型（列关系）预测任务中只以单列（单个列对）为输入。</p>
 
-<p class="doduo-en" lang="en">More formally, given a table <i>T</i>, the language model LM takes the serialized sequence serialize(<i>T</i>) = {<i>t</i><sub>1</sub>, . . . , <i>t</i><sub>p</sub>} of <i>p</i> tokens as input and outputs a sequence LM(<i>T</i>) where each element LM(<i>T</i>)<sub>i</sub> is a <i>d</i>-dimensional context-aware embedding of the token <i>t</i><sub>i</sub>. Let {<i>i</i><sub>1</sub>, . . . , <i>i</i><sub>n</sub>} be the indices of the inserted special [CLS] tokens. Let <i>g</i><sub>type</sub> be the column type prediction dense layer of dimension <i>d</i> × |<i>C</i><sub>type</sub>|. The column type model computes:</p>
-<p class="doduo-zh" lang="zh-CN">更形式化地，给定表格 <i>T</i>，语言模型 LM 以 <i>p</i> 个 token 的序列化序列 serialize(<i>T</i>) = {<i>t</i><sub>1</sub>, . . . , <i>t</i><sub>p</sub>} 为输入，输出一个序列 LM(<i>T</i>)，其中每个元素 LM(<i>T</i>)<sub>i</sub> 是 token <i>t</i><sub>i</sub> 的 <i>d</i> 维上下文感知嵌入。令 {<i>i</i><sub>1</sub>, . . . , <i>i</i><sub>n</sub>} 为所插入特殊 [CLS] token 的下标。令 <i>g</i><sub>type</sub> 为维度是 <i>d</i> × |<i>C</i><sub>type</sub>| 的列类型预测稠密层。列类型模型计算：</p>
+<p class="doduo-en" lang="en">More formally, given a table <span class="paper-math">T</span>, the language model LM takes the serialized sequence serialize(<span class="paper-math">T</span>) = {<span class="paper-math">t_{1}</span>, . . . , <span class="paper-math">t_{p}</span>} of <span class="paper-math">p</span> tokens as input and outputs a sequence LM(<span class="paper-math">T</span>) where each element <span class="paper-math">\mathrm{LM}(T)_i</span> is a <span class="paper-math">d</span>-dimensional context-aware embedding of the token <span class="paper-math">t_{i}</span>. Let {<span class="paper-math">i_{1}</span>, . . . , <span class="paper-math">i_{n}</span>} be the indices of the inserted special [CLS] tokens. Let <span class="paper-math">g_{\mathrm{type}}</span> be the column type prediction dense layer of dimension <span class="paper-math">d</span> × |<span class="paper-math">C_{\mathrm{type}}</span>|. The column type model computes:</p>
+<p class="doduo-zh" lang="zh-CN">更形式化地，给定表格 <span class="paper-math">T</span>，语言模型 LM 以 <span class="paper-math">p</span> 个 token 的序列化序列 serialize(<span class="paper-math">T</span>) = {<span class="paper-math">t_{1}</span>, . . . , <span class="paper-math">t_{p}</span>} 为输入，输出一个序列 LM(<span class="paper-math">T</span>)，其中每个元素 <span class="paper-math">\mathrm{LM}(T)_i</span> 是 token <span class="paper-math">t_{i}</span> 的 <span class="paper-math">d</span> 维上下文感知嵌入。令 {<span class="paper-math">i_{1}</span>, . . . , <span class="paper-math">i_{n}</span>} 为所插入特殊 [CLS] token 的下标。令 <span class="paper-math">g_{\mathrm{type}}</span> 为维度是 <span class="paper-math">d</span> × |<span class="paper-math">C_{\mathrm{type}}</span>| 的列类型预测稠密层。列类型模型计算：</p>
 
-<div class="doduo-eq">softmax(<i>g</i><sub>type</sub>(LM(<i>T</i>)<sub><i>i<sub>j</sub></i></sub>))　　(1)</div>
-<p class="doduo-en" lang="en">as the predicted column type of the <i>j</i>-th column.</p>
-<p class="doduo-zh" lang="zh-CN">作为第 <i>j</i> 列的预测列类型。</p>
+<div class="doduo-eq" id="doduo-equation-1" role="region" tabindex="0" aria-label="公式 1，可横向滚动"><div class="doduo-eq-row"><span class="paper-math-display">\operatorname{softmax}\!\left(g_{\mathrm{type}}\!\left(\mathrm{LM}(T)_{i_j}\right)\right)</span><span class="doduo-eq-number">(1)</span></div></div>
+<p class="doduo-en" lang="en">as the predicted column type of the <span class="paper-math">j</span>-th column.</p>
+<p class="doduo-zh" lang="zh-CN">作为第 <span class="paper-math">j</span> 列的预测列类型。</p>
 
-<p class="doduo-en" lang="en">Similarly, for column relation prediction with dense layer <i>g</i><sub>rel</sub> of dimension 2<i>d</i> × |<i>C</i><sub>rel</sub>|, the column relation model computes:</p>
-<p class="doduo-zh" lang="zh-CN">类似地，对于使用维度为 2<i>d</i> × |<i>C</i><sub>rel</sub>| 的稠密层 <i>g</i><sub>rel</sub> 的列关系预测，列关系模型计算：</p>
+<p class="doduo-en" lang="en">Similarly, for column relation prediction with dense layer <span class="paper-math">g_{\mathrm{rel}}</span> of dimension 2<span class="paper-math">d</span> × |<span class="paper-math">C_{\mathrm{rel}}</span>|, the column relation model computes:</p>
+<p class="doduo-zh" lang="zh-CN">类似地，对于使用维度为 2<span class="paper-math">d</span> × |<span class="paper-math">C_{\mathrm{rel}}</span>| 的稠密层 <span class="paper-math">g_{\mathrm{rel}}</span> 的列关系预测，列关系模型计算：</p>
 
-<div class="doduo-eq">softmax(<i>g</i><sub>rel</sub>(LM(<i>T</i>)<sub><i>i<sub>j</sub></i></sub> ⊕ LM(<i>T</i>)<sub><i>i<sub>k</sub></i></sub>))　　(2)</div>
-<p class="doduo-en" lang="en">as the predicted relation between the <i>j</i>-th and the <i>k</i>-th column of table <i>T</i>. The ⊕ symbol denotes concatenation of two vectors. Doduo then feeds the predictions and the groundtruth labels into a cross entropy loss function to update the model parameters (Line 9-10, Algorithm 1).</p>
-<p class="doduo-zh" lang="zh-CN">作为表格 <i>T</i> 中第 <i>j</i> 列与第 <i>k</i> 列之间关系的预测值。符号 ⊕ 表示两个向量的拼接。随后，Doduo 把预测值与真实标签送入交叉熵损失函数，以更新模型参数（算法 1 第 9–10 行）。</p>
+<div class="doduo-eq" id="doduo-equation-2" role="region" tabindex="0" aria-label="公式 2，可横向滚动"><div class="doduo-eq-row"><span class="paper-math-display">\operatorname{softmax}\!\left(g_{\mathrm{rel}}\!\left(\mathrm{LM}(T)_{i_j}\oplus\mathrm{LM}(T)_{i_k}\right)\right)</span><span class="doduo-eq-number">(2)</span></div></div>
+<p class="doduo-en" lang="en">as the predicted relation between the <span class="paper-math">j</span>-th and the <span class="paper-math">k</span>-th column of table <span class="paper-math">T</span>. The ⊕ symbol denotes concatenation of two vectors. Doduo then feeds the predictions and the groundtruth labels into a cross entropy loss function to update the model parameters (Line 9-10, Algorithm 1).</p>
+<p class="doduo-zh" lang="zh-CN">作为表格 <span class="paper-math">T</span> 中第 <span class="paper-math">j</span> 列与第 <span class="paper-math">k</span> 列之间关系的预测值。符号 ⊕ 表示两个向量的拼接。随后，Doduo 把预测值与真实标签送入交叉熵损失函数，以更新模型参数（算法 1 第 9–10 行）。</p>
 
 
 ### 4.4 多任务学习
@@ -314,8 +318,8 @@ draft: false
 <p class="doduo-section-en" lang="en">4.4　Learning from Multiple Tasks</p>
 
 
-<p class="doduo-en" lang="en">In the training phase, Doduo fine-tunes a pre-trained LM using two different training data and two different objectives. As shown in Algorithm 1, Doduo switches the task every epoch and updates the parameters for different objectives using different optimization schedulers. This design choice enables Doduo to naturally handle imbalanced training data for different tasks. Furthermore, with a single objective function and a single optimizer, we need to carefully choose hyper-parameter(s) that balance different objective terms to create a single objective function (e.g., ℓ = <i>λ</i>ℓ<sub>1</sub> + (1 − <i>λ</i>)ℓ<sub>2</sub> like TCN [57].) With our strategy, we can avoid adjusting the hyper-parameter. Also, in Section 6, we will show that Doduo can be robustly trained with imbalanced training data.</p>
-<p class="doduo-zh" lang="zh-CN">在训练阶段，Doduo 使用两份不同的训练数据和两个不同的目标函数来微调预训练 LM。如算法 1 所示，Doduo 每隔一个 epoch 切换一次任务，并使用不同的优化调度器为不同目标更新参数。这一设计选择使 Doduo 能够自然地处理不同任务训练数据不均衡的问题。此外，若采用单一目标函数和单一优化器，就需要仔细选择超参数来平衡不同的目标项，以构造单一目标函数（例如像 TCN [57] 那样令 ℓ = <i>λ</i>ℓ<sub>1</sub> + (1 − <i>λ</i>)ℓ<sub>2</sub>）。采用我们的策略，就可以避免调整该超参数。同时，第 6 节将表明，Doduo 在训练数据不均衡时仍能被稳健地训练。</p>
+<p class="doduo-en" lang="en">In the training phase, Doduo fine-tunes a pre-trained LM using two different training data and two different objectives. As shown in Algorithm 1, Doduo switches the task every epoch and updates the parameters for different objectives using different optimization schedulers. This design choice enables Doduo to naturally handle imbalanced training data for different tasks. Furthermore, with a single objective function and a single optimizer, we need to carefully choose hyper-parameter(s) that balance different objective terms to create a single objective function (e.g., <span class="paper-math">\ell=\lambda\ell_1+(1-\lambda)\ell_2</span> like TCN [57].) With our strategy, we can avoid adjusting the hyper-parameter. Also, in Section 6, we will show that Doduo can be robustly trained with imbalanced training data.</p>
+<p class="doduo-zh" lang="zh-CN">在训练阶段，Doduo 使用两份不同的训练数据和两个不同的目标函数来微调预训练 LM。如算法 1 所示，Doduo 每隔一个 epoch 切换一次任务，并使用不同的优化调度器为不同目标更新参数。这一设计选择使 Doduo 能够自然地处理不同任务训练数据不均衡的问题。此外，若采用单一目标函数和单一优化器，就需要仔细选择超参数来平衡不同的目标项，以构造单一目标函数（例如像 TCN [57] 那样令 <span class="paper-math">\ell=\lambda\ell_1+(1-\lambda)\ell_2</span>）。采用我们的策略，就可以避免调整该超参数。同时，第 6 节将表明，Doduo 在训练数据不均衡时仍能被稳健地训练。</p>
 
 <p class="doduo-en" lang="en">Note that Doduo is not limited to training with just two tasks. By adding more output layers and corresponding loss functions, Doduo can be used for more than two tasks. We also note that finding relevant tasks is challenging as adding new tasks might not necessarily improve the model’s performance. This can be due to the tasks not sharing enough common knowledge to improve each other, or noisy labels in training sets which can propagate among tasks. Finding more relevant tasks and testing Doduo on them are part of our future work.</p>
 <p class="doduo-zh" lang="zh-CN">请注意，Doduo 并不局限于只训练两个任务。通过增加更多输出层及相应的损失函数，Doduo 可用于两个以上的任务。我们也要指出，找到相关任务是具有挑战性的，因为增加新任务未必能提升模型性能。原因可能是这些任务没有共享足够的共通知识以彼此促进，也可能是训练集中的噪声标签会在任务之间传播。寻找更多相关任务并在其上测试 Doduo，是我们未来工作的一部分。</p>
@@ -324,11 +328,15 @@ draft: false
   <div class="doduo-en" lang="en"><b>Table 2:</b> Dataset description.</div>
   <div class="doduo-zh" lang="zh-CN"><b>表 2：</b>数据集描述。</div>
 </div>
-<table class="doduo-table" tabindex="0" aria-label="论文数据表，可横向滚动">
-  <tr><th>Name 名称</th><th># tables 表数</th><th># col 列数</th><th># col types 列类型数</th><th># col rels 列关系数</th></tr>
-  <tr><td>WikiTable</td><td>580,171</td><td>3,230,757</td><td>255</td><td>121</td></tr>
-  <tr><td>VizNet</td><td>78,733</td><td>119,360</td><td>78</td><td>–</td></tr>
-</table>
+<div class="doduo-table-scroll" role="region" tabindex="0" aria-label="表 2：数据集，可横向滚动"><table class="doduo-table">
+<thead>
+<tr><th scope="col">Name 名称</th><th scope="col"># tables 表数</th><th scope="col"># col 列数</th><th scope="col"># col types 列类型数</th><th scope="col"># col rels 列关系数</th></tr>
+</thead>
+<tbody>
+<tr><td class="doduo-label">WikiTable</td><td>580,171</td><td>3,230,757</td><td>255</td><td>121</td></tr>
+<tr><td class="doduo-label">VizNet</td><td>78,733</td><td>119,360</td><td>78</td><td>–</td></tr>
+</tbody>
+</table></div>
 
 
 ## 5 实验评估
@@ -367,15 +375,19 @@ draft: false
   <div class="doduo-en" lang="en"><b>Table 3:</b> Performance on the WikiTable dataset.</div>
   <div class="doduo-zh" lang="zh-CN"><b>表 3：</b>在 WikiTable 数据集上的性能。</div>
 </div>
-<table class="doduo-table" tabindex="0" aria-label="论文数据表，可横向滚动">
-  <tr><th rowspan="2">Method 方法</th><th colspan="3">Col type 列类型</th><th colspan="3">Col rel 列关系</th></tr>
-  <tr><th>P</th><th>R</th><th>F1</th><th>P</th><th>R</th><th>F1</th></tr>
-  <tr><td>Sherlock</td><td>88.40</td><td>70.55</td><td>78.47</td><td>–</td><td>–</td><td>–</td></tr>
-  <tr><td>TURL</td><td>90.54</td><td>87.23</td><td>88.86</td><td>91.18</td><td>90.69</td><td>90.94</td></tr>
-  <tr><td>Doduo</td><td>92.69</td><td>92.21</td><td>92.45</td><td>91.97</td><td>91.47</td><td>91.72</td></tr>
-  <tr><td>TURL+metadata</td><td>92.75</td><td>92.63</td><td>92.69</td><td>92.90</td><td>93.80</td><td>93.35</td></tr>
-  <tr><td>Doduo+metadata</td><td>93.25</td><td>92.34</td><td>92.79</td><td>91.20</td><td>94.50</td><td>92.82</td></tr>
-</table>
+<div class="doduo-table-scroll" role="region" tabindex="0" aria-label="表 3：WikiTable 实验，可横向滚动"><table class="doduo-table">
+<thead>
+<tr><th rowspan="2" scope="col">Method 方法</th><th colspan="3" scope="colgroup">Col type 列类型</th><th colspan="3" scope="colgroup">Col rel 列关系</th></tr>
+<tr><th scope="col">P</th><th scope="col">R</th><th scope="col">F1</th><th scope="col">P</th><th scope="col">R</th><th scope="col">F1</th></tr>
+</thead>
+<tbody>
+<tr><td class="doduo-label">Sherlock</td><td>88.40</td><td>70.55</td><td>78.47</td><td>–</td><td>–</td><td>–</td></tr>
+<tr><td class="doduo-label">TURL</td><td>90.54</td><td>87.23</td><td>88.86</td><td>91.18</td><td>90.69</td><td>90.94</td></tr>
+<tr><td class="doduo-label">Doduo</td><td>92.69</td><td>92.21</td><td>92.45</td><td>91.97</td><td>91.47</td><td>91.72</td></tr>
+<tr><td class="doduo-label">TURL+metadata</td><td>92.75</td><td>92.63</td><td>92.69</td><td>92.90</td><td>93.80</td><td>93.35</td></tr>
+<tr><td class="doduo-label">Doduo+metadata</td><td>93.25</td><td>92.34</td><td>92.79</td><td>91.20</td><td>94.50</td><td>92.82</td></tr>
+</tbody>
+</table></div>
 
 
 ### 5.3 实验设置
@@ -383,8 +395,8 @@ draft: false
 <p class="doduo-section-en" lang="en">5.3　Experimental Settings</p>
 
 
-<p class="doduo-en" lang="en">We used Adam optimizer with an <i>ϵ</i> of 10<sup>−8</sup>. The initial learning rate was set to be 5 × 10<sup>−5</sup> with a linear decay scheduler with no warm up. We trained Doduo for 30 epochs and chose the checkpoint with the highest F1 score on the validation set. Since the WikiTable dataset can have multiple labels on each column/column pair, we used Binary Cross Entropy loss to formulate as a multi-label prediction task. For the VizNet dataset, which only has a single annotation on each column, we used Cross Entropy loss to formulate as a multi-class prediction task. Models and experiments were implemented with PyTorch [38] and the Transformers library [59]. All experiments were conducted on an AWS p3.8xlarge instance (V100 (16GB)). Following the previous studies [13, 66], we use micro F1 for the WikiTable dataset, and micro F1 and macro F1 for the VizNet dataset, as evaluation metrics. The micro F1 score is the weighted average of F1 values based on the sample size of each class, while the macro F1 score is the simple average of F1 values for all classes. Additional results and analysis can be found in Appendix.</p>
-<p class="doduo-zh" lang="zh-CN">我们使用 Adam 优化器，<i>ϵ</i> 取 10<sup>−8</sup>。初始学习率设为 5 × 10<sup>−5</sup>，采用线性衰减调度且不做预热。我们训练 Doduo 30 个 epoch，并选择验证集上 F1 分数最高的检查点。由于 WikiTable 数据集的每个列/列对可能有多个标签，我们使用二元交叉熵损失，将其表述为多标签预测任务。对于每个列只有一个标注的 VizNet 数据集，我们使用交叉熵损失，将其表述为多类预测任务。模型与实验使用 PyTorch [38] 和 Transformers 库 [59] 实现。所有实验均在 AWS p3.8xlarge 实例（V100 (16GB)）上进行。遵循已有研究 [13, 66]，我们对 WikiTable 数据集使用 micro F1，对 VizNet 数据集使用 micro F1 与 macro F1 作为评价指标。micro F1 分数是基于各类样本量的 F1 加权平均，而 macro F1 分数是所有类别 F1 值的简单平均。更多结果与分析见附录。</p>
+<p class="doduo-en" lang="en">We used Adam optimizer with an <span class="paper-math">\epsilon</span> of <span class="paper-math">10^{-8}</span>. The initial learning rate was set to be <span class="paper-math">5\times10^{-5}</span> with a linear decay scheduler with no warm up. We trained Doduo for 30 epochs and chose the checkpoint with the highest F1 score on the validation set. Since the WikiTable dataset can have multiple labels on each column/column pair, we used Binary Cross Entropy loss to formulate as a multi-label prediction task. For the VizNet dataset, which only has a single annotation on each column, we used Cross Entropy loss to formulate as a multi-class prediction task. Models and experiments were implemented with PyTorch [38] and the Transformers library [59]. All experiments were conducted on an AWS p3.8xlarge instance (V100 (16GB)). Following the previous studies [13, 66], we use micro F1 for the WikiTable dataset, and micro F1 and macro F1 for the VizNet dataset, as evaluation metrics. The micro F1 score is the weighted average of F1 values based on the sample size of each class, while the macro F1 score is the simple average of F1 values for all classes. Additional results and analysis can be found in Appendix.</p>
+<p class="doduo-zh" lang="zh-CN">我们使用 Adam 优化器，<span class="paper-math">\epsilon</span> 取 <span class="paper-math">10^{-8}</span>。初始学习率设为 <span class="paper-math">5\times10^{-5}</span>，采用线性衰减调度且不做预热。我们训练 Doduo 30 个 epoch，并选择验证集上 F1 分数最高的检查点。由于 WikiTable 数据集的每个列/列对可能有多个标签，我们使用二元交叉熵损失，将其表述为多标签预测任务。对于每个列只有一个标注的 VizNet 数据集，我们使用交叉熵损失，将其表述为多类预测任务。模型与实验使用 PyTorch [38] 和 Transformers 库 [59] 实现。所有实验均在 AWS p3.8xlarge 实例（V100 (16GB)）上进行。遵循已有研究 [13, 66]，我们对 WikiTable 数据集使用 micro F1，对 VizNet 数据集使用 micro F1 与 macro F1 作为评价指标。micro F1 分数是基于各类样本量的 F1 加权平均，而 macro F1 分数是所有类别 F1 值的简单平均。更多结果与分析见附录。</p>
 
 
 ### 5.4 主要结果
@@ -405,13 +417,17 @@ draft: false
   <div class="doduo-en" lang="en"><b>Table 4:</b> Performance on the VizNet dataset.</div>
   <div class="doduo-zh" lang="zh-CN"><b>表 4：</b>在 VizNet 数据集上的性能。</div>
 </div>
-<table class="doduo-table" tabindex="0" aria-label="论文数据表，可横向滚动">
-  <tr><th rowspan="2">Method 方法</th><th colspan="2">Full 完整集</th><th colspan="2">Multi-column only 仅多列</th></tr>
-  <tr><th>Macro F1</th><th>Micro F1</th><th>Macro F1</th><th>Micro F1</th></tr>
-  <tr><td>Sherlock</td><td>69.2</td><td>86.7</td><td>64.2</td><td>87.9</td></tr>
-  <tr><td>Sato</td><td>75.6</td><td>88.4</td><td>73.5</td><td>92.5</td></tr>
-  <tr><td>Doduo</td><td>84.6</td><td>94.3</td><td>83.8</td><td>96.4</td></tr>
-</table>
+<div class="doduo-table-scroll" role="region" tabindex="0" aria-label="表 4：VizNet 实验，可横向滚动"><table class="doduo-table">
+<thead>
+<tr><th rowspan="2" scope="col">Method 方法</th><th colspan="2" scope="colgroup">Full 完整集</th><th colspan="2" scope="colgroup">Multi-column only 仅多列</th></tr>
+<tr><th scope="col">Macro F1</th><th scope="col">Micro F1</th><th scope="col">Macro F1</th><th scope="col">Micro F1</th></tr>
+</thead>
+<tbody>
+<tr><td class="doduo-label">Sherlock</td><td>69.2</td><td>86.7</td><td>64.2</td><td>87.9</td></tr>
+<tr><td class="doduo-label">Sato</td><td>75.6</td><td>88.4</td><td>73.5</td><td>92.5</td></tr>
+<tr><td class="doduo-label">Doduo</td><td>84.6</td><td>94.3</td><td>83.8</td><td>96.4</td></tr>
+</tbody>
+</table></div>
 
 <p class="doduo-en" lang="en"><b>VizNet</b>　Table 4 shows the results on the VizNet dataset. Note that Doduo is trained only using the column prediction task for the VizNet dataset, as column relation labels are not available for the dataset. The results show that Doduo outperforms Sherlock and Sato, the SoTA method for the dataset, by a large margin and establishes new state-of-the-art performance with micro F1 (macro F1) improvements of 11.9% (6.7%.)</p>
 <p class="doduo-zh" lang="zh-CN"><b>VizNet</b>　表 4 展示了在 VizNet 数据集上的结果。需要注意的是，由于该数据集没有列关系标签，Doduo 在 VizNet 上只使用列类型预测任务进行训练。结果表明，Doduo 大幅优于 Sherlock 以及该数据集上的最优方法 Sato，建立了新的最优性能，micro F1（macro F1）提升 11.9%（6.7%）。</p>
@@ -426,14 +442,18 @@ draft: false
   <div class="doduo-en" lang="en"><b>Table 5:</b> Doduo’s column type prediction performance on the 15 most numeric types of the VizNet dataset. We use %num to measure how many cell values of a type can be cast as a numeric type (e.g., int, float, date).</div>
   <div class="doduo-zh" lang="zh-CN"><b>表 5：</b>Doduo 在 VizNet 数据集数值化程度最高的 15 种列类型上的列类型预测性能。我们用 %num 衡量某一类型的单元值中有多少可以被转换为数值类型（如 int、float、date）。</div>
 </div>
-<table class="doduo-table" tabindex="0" aria-label="论文数据表，可横向滚动">
-  <tr><th>type 类型</th><th>%num</th><th>F1</th><th>type 类型</th><th>%num</th><th>F1</th><th>type 类型</th><th>%num</th><th>F1</th></tr>
-  <tr><td>plays</td><td>100.00</td><td>88.55</td><td>fileSize</td><td>87.84</td><td>88.23</td><td>grades</td><td>67.18</td><td>97.68</td></tr>
-  <tr><td>rank</td><td>93.01</td><td>94.52</td><td>elevation</td><td>87.39</td><td>92.14</td><td>weight</td><td>60.41</td><td>97.59</td></tr>
-  <tr><td>depth</td><td>92.86</td><td>88.45</td><td>ranking</td><td>86.88</td><td>33.21</td><td>isbn</td><td>43.77</td><td>96.51</td></tr>
-  <tr><td>sales</td><td>92.05</td><td>75.13</td><td>age</td><td>81.04</td><td>98.53</td><td>capacity</td><td>42.06</td><td>62.55</td></tr>
-  <tr><td>year</td><td>91.47</td><td>98.94</td><td>birthDate</td><td>67.85</td><td>95.64</td><td>code</td><td>35.93</td><td>95.43</td></tr>
-</table>
+<div class="doduo-table-scroll" role="region" tabindex="0" aria-label="表 5：数值列，可横向滚动"><table class="doduo-table">
+<thead>
+<tr><th scope="col">type 类型</th><th scope="col">%num</th><th scope="col">F1</th><th scope="col">type 类型</th><th scope="col">%num</th><th scope="col">F1</th><th scope="col">type 类型</th><th scope="col">%num</th><th scope="col">F1</th></tr>
+</thead>
+<tbody>
+<tr><td class="doduo-label">plays</td><td>100.00</td><td>88.55</td><td class="doduo-label">fileSize</td><td>87.84</td><td>88.23</td><td class="doduo-label">grades</td><td>67.18</td><td>97.68</td></tr>
+<tr><td class="doduo-label">rank</td><td>93.01</td><td>94.52</td><td class="doduo-label">elevation</td><td>87.39</td><td>92.14</td><td class="doduo-label">weight</td><td>60.41</td><td>97.59</td></tr>
+<tr><td class="doduo-label">depth</td><td>92.86</td><td>88.45</td><td class="doduo-label">ranking</td><td>86.88</td><td>33.21</td><td class="doduo-label">isbn</td><td>43.77</td><td>96.51</td></tr>
+<tr><td class="doduo-label">sales</td><td>92.05</td><td>75.13</td><td class="doduo-label">age</td><td>81.04</td><td>98.53</td><td class="doduo-label">capacity</td><td>42.06</td><td>62.55</td></tr>
+<tr><td class="doduo-label">year</td><td>91.47</td><td>98.94</td><td class="doduo-label">birthDate</td><td>67.85</td><td>95.64</td><td class="doduo-label">code</td><td>35.93</td><td>95.43</td></tr>
+</tbody>
+</table></div>
 
 
 ## 6 分析
@@ -454,24 +474,32 @@ draft: false
   <div class="doduo-en" lang="en"><b>Table 6:</b> Ablation study on the WikiTable dataset.</div>
   <div class="doduo-zh" lang="zh-CN"><b>表 6：</b>在 WikiTable 数据集上的消融研究。</div>
 </div>
-<table class="doduo-table" tabindex="0" aria-label="论文数据表，可横向滚动">
-  <tr><th>Method 方法</th><th>Type prediction 类型预测</th><th>Relation prediction 关系预测</th></tr>
-  <tr><td>Doduo</td><td>92.50</td><td>91.90</td></tr>
-  <tr><td>w/ shuffled rows（行打乱）</td><td>91.94</td><td>91.61</td></tr>
-  <tr><td>w/ shuffled cols（列打乱）</td><td>92.68</td><td>91.98</td></tr>
-  <tr><td>Dosolo</td><td>91.37 (1.23% ↓)</td><td>91.24 (0.7% ↓)</td></tr>
-  <tr><td>Dosolo<sub>SCol</sub></td><td>82.45 (21.9% ↓)</td><td>83.08 (9.6% ↓)</td></tr>
-</table>
+<div class="doduo-table-scroll" role="region" tabindex="0" aria-label="表 6：WikiTable 消融，可横向滚动"><table class="doduo-table">
+<thead>
+<tr><th scope="col">Method 方法</th><th scope="col">Type prediction 类型预测</th><th scope="col">Relation prediction 关系预测</th></tr>
+</thead>
+<tbody>
+<tr><td class="doduo-label">Doduo</td><td>92.50</td><td>91.90</td></tr>
+<tr><td class="doduo-label">w/ shuffled rows（行打乱）</td><td>91.94</td><td>91.61</td></tr>
+<tr><td class="doduo-label">w/ shuffled cols（列打乱）</td><td>92.68</td><td>91.98</td></tr>
+<tr><td class="doduo-label">Dosolo</td><td>91.37 (1.23% ↓)</td><td>91.24 (0.7% ↓)</td></tr>
+<tr><td class="doduo-label">Dosolo<sub>SCol</sub></td><td>82.45 (21.9% ↓)</td><td>83.08 (9.6% ↓)</td></tr>
+</tbody>
+</table></div>
 
 <div class="doduo-tbl-cap">
   <div class="doduo-en" lang="en"><b>Table 7:</b> Ablation study on the VizNet dataset (Full.)</div>
   <div class="doduo-zh" lang="zh-CN"><b>表 7：</b>在 VizNet 数据集（完整集）上的消融研究。</div>
 </div>
-<table class="doduo-table" tabindex="0" aria-label="论文数据表，可横向滚动">
-  <tr><th>Method 方法</th><th>Macro F1</th><th>Micro F1</th></tr>
-  <tr><td>Doduo</td><td>84.6</td><td>94.3</td></tr>
-  <tr><td>Dosolo<sub>SCol</sub></td><td>77.4 (8.5% ↓)</td><td>90.2 (4.3% ↓)</td></tr>
-</table>
+<div class="doduo-table-scroll" role="region" tabindex="0" aria-label="表 7：VizNet 消融，可横向滚动"><table class="doduo-table">
+<thead>
+<tr><th scope="col">Method 方法</th><th scope="col">Macro F1</th><th scope="col">Micro F1</th></tr>
+</thead>
+<tbody>
+<tr><td class="doduo-label">Doduo</td><td>84.6</td><td>94.3</td></tr>
+<tr><td class="doduo-label">Dosolo<sub>SCol</sub></td><td>77.4 (8.5% ↓)</td><td>90.2 (4.3% ↓)</td></tr>
+</tbody>
+</table></div>
 
 <p class="doduo-en" lang="en">Table 6 shows the results of the ablation study. For both of the tasks, Dosolo degraded the performance compared to the multi-task learning of Doduo. As Dosolo<sub>SCol</sub> shows significantly lower performance than the others, the results also confirm that the multi-column architecture of Doduo successfully captures table context to improve the performance on the column type prediction and column relation prediction tasks.</p>
 <p class="doduo-zh" lang="zh-CN">表 6 展示了消融研究的结果。在两个任务上，Dosolo 相比 Doduo 的多任务学习都出现了性能下降。由于 Dosolo<sub>SCol</sub> 的性能显著低于其他变体，结果也确认了 Doduo 的多列架构成功捕捉了表格上下文，从而提升了列类型预测与列关系预测任务的性能。</p>
@@ -512,12 +540,16 @@ draft: false
   <div class="doduo-en" lang="en"><b>Table 8:</b> Comparisons of Doduo with different input token size on the WikiTable dataset.</div>
   <div class="doduo-zh" lang="zh-CN"><b>表 8：</b>在 WikiTable 数据集上 Doduo 在不同输入 token 规模下的比较。</div>
 </div>
-<table class="doduo-table" tabindex="0" aria-label="论文数据表，可横向滚动">
-  <tr><th>MaxToken/col 每列最大 token</th><th>Col type (F1)</th><th>Col rel (F1)</th><th>Max. # of cols 最大列数</th></tr>
-  <tr><td>8</td><td>89.8</td><td>88.9</td><td>56</td></tr>
-  <tr><td>16</td><td>91.4</td><td>90.7</td><td>30</td></tr>
-  <tr><td>32</td><td>92.4</td><td>91.7</td><td>15</td></tr>
-</table>
+<div class="doduo-table-scroll" role="region" tabindex="0" aria-label="表 8：输入 token，可横向滚动"><table class="doduo-table">
+<thead>
+<tr><th scope="col">MaxToken/col 每列最大 token</th><th scope="col">Col type (F1)</th><th scope="col">Col rel (F1)</th><th scope="col">Max. # of cols 最大列数</th></tr>
+</thead>
+<tbody>
+<tr><td>8</td><td>89.8</td><td>88.9</td><td>56</td></tr>
+<tr><td>16</td><td>91.4</td><td>90.7</td><td>30</td></tr>
+<tr><td>32</td><td>92.4</td><td>91.7</td><td>15</td></tr>
+</tbody>
+</table></div>
 
 <p class="doduo-en" lang="en">For the VizNet dataset, we confirm that Doduo with 8 max tokens per column with Doduo (92.5 F1) outperforms the state-of-the-art method (i.e., Sato) (88.4 F1) on the task. Table 8 reports how many columns each variant can support under the maximum token configuration. The average numbers of columns in Web Tables, Enterprise Data, and Open Data are reported to be 4, 12, and 16, respectively [12, 33]. Thus, we confirm that Doduo still has the advantage of leveraging partial context of the input table to improve prediction quality.</p>
 <p class="doduo-zh" lang="zh-CN">对于 VizNet 数据集，我们确认每列最多 8 个 token 的 Doduo（92.5 F1）在该任务上优于当时的最优方法（即 Sato）（88.4 F1）。表 8 报告了在最大 token 配置下每个变体可以支持多少列。据报道，Web 表格、企业数据和开放数据中的平均列数分别为 4、12 和 16 [12, 33]。因此，我们确认 Doduo 仍具有利用输入表格部分上下文来提升预测质量的优势。</p>
@@ -553,15 +585,19 @@ draft: false
   <div class="doduo-en" lang="en"><b>Table 9:</b> Case study results.</div>
   <div class="doduo-zh" lang="zh-CN"><b>表 9：</b>案例研究结果。</div>
 </div>
-<table class="doduo-table" tabindex="0" aria-label="论文数据表，可横向滚动">
-  <tr><th>Method 方法</th><th>Prec. 精确率</th><th>Recall 召回率</th><th>F1</th></tr>
-  <tr><td>Doduo+column value emb</td><td>68.19</td><td>70.40</td><td>69.28</td></tr>
-  <tr><td>Doduo+predicted type</td><td>44.87</td><td>61.32</td><td>51.82</td></tr>
-  <tr><td>fastText+column value emb</td><td>35.90</td><td>76.61</td><td>48.89</td></tr>
-  <tr><td>fastText+column name emb</td><td>56.62</td><td>74.68</td><td>64.40</td></tr>
-  <tr><td>COMA (with column name)</td><td>58.47</td><td>66.06</td><td>62.03</td></tr>
-  <tr><td>DistributionBased (with column name)</td><td>23.87</td><td>69.51</td><td>35.53</td></tr>
-</table>
+<div class="doduo-table-scroll" role="region" tabindex="0" aria-label="表 9：列聚类，可横向滚动"><table class="doduo-table">
+<thead>
+<tr><th scope="col">Method 方法</th><th scope="col">Prec. 精确率</th><th scope="col">Recall 召回率</th><th scope="col">F1</th></tr>
+</thead>
+<tbody>
+<tr><td class="doduo-label">Doduo+column value emb</td><td>68.19</td><td>70.40</td><td>69.28</td></tr>
+<tr><td class="doduo-label">Doduo+predicted type</td><td>44.87</td><td>61.32</td><td>51.82</td></tr>
+<tr><td class="doduo-label">fastText+column value emb</td><td>35.90</td><td>76.61</td><td>48.89</td></tr>
+<tr><td class="doduo-label">fastText+column name emb</td><td>56.62</td><td>74.68</td><td>64.40</td></tr>
+<tr><td class="doduo-label">COMA (with column name)</td><td>58.47</td><td>66.06</td><td>62.03</td></tr>
+<tr><td class="doduo-label">DistributionBased (with column name)</td><td>23.87</td><td>69.51</td><td>35.53</td></tr>
+</tbody>
+</table></div>
 
 <div class="doduo-note">
   <div class="doduo-en" lang="en"><sup>5</sup>We used column name and description for ground-truth creation purpose only as it is not available for all tables in practice. The initial clustering uses a combination of TF-IDF vectors and fastText embeddings.</div>
@@ -700,26 +736,34 @@ draft: false
 </div>
 <div class="doduo-two-col">
   <div>
-    <table class="doduo-table" tabindex="0" aria-label="论文数据表，可横向滚动">
-      <tr><th>Column type 列类型</th><th>Doduo (F1)</th><th>Dosolo (F1)</th></tr>
-      <tr><td>music.artist</td><td>84.03</td><td>81.87</td></tr>
-      <tr><td>music.genre</td><td>93.33</td><td>87.50</td></tr>
-      <tr><td>music.writer</td><td>75.00</td><td>40.00</td></tr>
-      <tr><td>american_football.football_coach</td><td>70.59</td><td>66.67</td></tr>
-      <tr><td>american_football.football_conference</td><td>44.44</td><td>36.36</td></tr>
-      <tr><td>american_football.football_team</td><td>86.67</td><td>86.36</td></tr>
-    </table>
+    <div class="doduo-table-scroll" role="region" tabindex="0" aria-label="表 10：列类型预测，可横向滚动"><table class="doduo-table">
+<thead>
+<tr><th scope="col">Column type 列类型</th><th scope="col">Doduo (F1)</th><th scope="col">Dosolo (F1)</th></tr>
+</thead>
+<tbody>
+<tr><td class="doduo-label">music.artist</td><td>84.03</td><td>81.87</td></tr>
+<tr><td class="doduo-label">music.genre</td><td>93.33</td><td>87.50</td></tr>
+<tr><td class="doduo-label">music.writer</td><td>75.00</td><td>40.00</td></tr>
+<tr><td class="doduo-label">american_football.football_coach</td><td>70.59</td><td>66.67</td></tr>
+<tr><td class="doduo-label">american_football.football_conference</td><td>44.44</td><td>36.36</td></tr>
+<tr><td class="doduo-label">american_football.football_team</td><td>86.67</td><td>86.36</td></tr>
+</tbody>
+</table></div>
   </div>
   <div>
-    <table class="doduo-table" tabindex="0" aria-label="论文数据表，可横向滚动">
-      <tr><th>Column relation 列关系</th><th>Doduo (F1)</th><th>Dosolo (F1)</th></tr>
-      <tr><td>film.film.production_companies</td><td>80.95</td><td>74.29</td></tr>
-      <tr><td>film.film.produced_by</td><td>43.90</td><td>38.89</td></tr>
-      <tr><td>film.film.story_by</td><td>100.00</td><td>90.91</td></tr>
-      <tr><td>people.person.place_of_birth</td><td>92.00</td><td>90.79</td></tr>
-      <tr><td>people.person.place_lived</td><td>85.98</td><td>77.67</td></tr>
-      <tr><td>people.person.nationality</td><td>100.00</td><td>98.80</td></tr>
-    </table>
+    <div class="doduo-table-scroll" role="region" tabindex="0" aria-label="表 10：列关系预测，可横向滚动"><table class="doduo-table">
+<thead>
+<tr><th scope="col">Column relation 列关系</th><th scope="col">Doduo (F1)</th><th scope="col">Dosolo (F1)</th></tr>
+</thead>
+<tbody>
+<tr><td class="doduo-label">film.film.production_companies</td><td>80.95</td><td>74.29</td></tr>
+<tr><td class="doduo-label">film.film.produced_by</td><td>43.90</td><td>38.89</td></tr>
+<tr><td class="doduo-label">film.film.story_by</td><td>100.00</td><td>90.91</td></tr>
+<tr><td class="doduo-label">people.person.place_of_birth</td><td>92.00</td><td>90.79</td></tr>
+<tr><td class="doduo-label">people.person.place_lived</td><td>85.98</td><td>77.67</td></tr>
+<tr><td class="doduo-label">people.person.nationality</td><td>100.00</td><td>98.80</td></tr>
+</tbody>
+</table></div>
   </div>
 </div>
 
@@ -736,15 +780,19 @@ draft: false
   <div class="doduo-en" lang="en"><b>Table 11:</b> Comparisons with different input token size on the VizNet (Full) dataset.</div>
   <div class="doduo-zh" lang="zh-CN"><b>表 11：</b>在 VizNet（完整集）数据集上不同输入 token 规模的比较。</div>
 </div>
-<table class="doduo-table" tabindex="0" aria-label="论文数据表，可横向滚动">
-  <tr><th>Method 方法</th><th>MaxToken/col 每列最大 token</th><th>Macro F1</th><th>Micro F1</th></tr>
-  <tr><td rowspan="3">Doduo</td><td>8</td><td>81.0</td><td>92.5</td></tr>
-  <tr><td>16</td><td>83.6</td><td>93.6</td></tr>
-  <tr><td>32</td><td>83.4</td><td>94.2</td></tr>
-  <tr><td rowspan="3">Dosolo<sub>SCol</sub></td><td>8</td><td>72.7</td><td>87.2</td></tr>
-  <tr><td>16</td><td>76.1</td><td>89.1</td></tr>
-  <tr><td>32</td><td>77.4</td><td>90.2</td></tr>
-</table>
+<div class="doduo-table-scroll" role="region" tabindex="0" aria-label="表 11：输入 token，可横向滚动"><table class="doduo-table">
+<thead>
+<tr><th scope="col">Method 方法</th><th scope="col">MaxToken/col 每列最大 token</th><th scope="col">Macro F1</th><th scope="col">Micro F1</th></tr>
+</thead>
+<tbody>
+<tr><td rowspan="3" class="doduo-label">Doduo</td><td>8</td><td>81.0</td><td>92.5</td></tr>
+<tr><td>16</td><td>83.6</td><td>93.6</td></tr>
+<tr><td>32</td><td>83.4</td><td>94.2</td></tr>
+<tr><td rowspan="3" class="doduo-label">Dosolo<sub>SCol</sub></td><td>8</td><td>72.7</td><td>87.2</td></tr>
+<tr><td>16</td><td>76.1</td><td>89.1</td></tr>
+<tr><td>32</td><td>77.4</td><td>90.2</td></tr>
+</tbody>
+</table></div>
 
 
 ### A.3 学习效率
@@ -767,17 +815,17 @@ draft: false
 <p class="doduo-en" lang="en">Thus, we conduct attention analysis to further understand how the attention mechanisms of Doduo (i.e., the pre-trained LM) captures the inter-column dependency and the semantic similarity between them. Following the literature of attention analysis in NLP [11, 43, 51], we look into attention weights for the analysis. It is known that in pre-trained Transformer-based LMs, the deep layer focuses on semantic similarity between tokens [11, 51]. Therefore, to investigate the high-level (semantic) similarity between columns, we looked into the attention weights of the last Transformer block. We used the VizNet dataset (Multi-column only) for the analysis.</p>
 <p class="doduo-zh" lang="zh-CN">因此，我们进行注意力分析，以进一步理解 Doduo（即预训练 LM）的注意力机制如何捕捉列间依赖以及列之间的语义相似性。遵循 NLP 中注意力分析的文献 [11, 43, 51]，我们考察注意力权重来进行分析。已有研究表明，在预训练 Transformer LM 中，深层关注 token 之间的语义相似性 [11, 51]。因此，为考察列之间的高层（语义）相似性，我们观察最后一层 Transformer 模块的注意力权重。分析使用 VizNet 数据集（仅多列）。</p>
 
-<p class="doduo-en" lang="en">Specifically, we focus on attention weights between [CLS] tokens (i.e., column representations.) Since Transformer-based LMs usually have multiple attention heads (e.g., 12 heads in the BERT Base model,) we aggregate attention weights of all attention heads. As a result, we obtain an <i>S</i> × <i>S</i> matrix, where <i>S</i> denotes the input sequence length. We disregard aggregated attention weights other than those for [CLS] tokens. After masking out any attention weights other than [CLS] tokens, we averaged the matrices obtained from all tables in the dataset so that we can create a single |<i>C</i><sub>type</sub>| × |<i>C</i><sub>type</sub>| matrix that represents the dependency between column types. This gives us aggregated information about the dependency between column types.</p>
-<p class="doduo-zh" lang="zh-CN">具体而言，我们关注 [CLS] token（即列表示）之间的注意力权重。由于基于 Transformer 的 LM 通常有多个注意力头（例如 BERT Base 模型有 12 个），我们把所有注意力头的注意力权重聚合起来。结果得到一个 <i>S</i> × <i>S</i> 矩阵，其中 <i>S</i> 表示输入序列长度。我们忽略 [CLS] token 之外的聚合注意力权重。在把 [CLS] token 之外的注意力权重屏蔽掉之后，我们对数据集中所有表格得到的矩阵取平均，从而构造一个 |<i>C</i><sub>type</sub>| × |<i>C</i><sub>type</sub>| 的矩阵，用于表示列类型之间的依赖关系。这为我们提供了关于列类型之间依赖关系的聚合信息。</p>
+<p class="doduo-en" lang="en">Specifically, we focus on attention weights between [CLS] tokens (i.e., column representations.) Since Transformer-based LMs usually have multiple attention heads (e.g., 12 heads in the BERT Base model,) we aggregate attention weights of all attention heads. As a result, we obtain an <span class="paper-math">S</span> × <span class="paper-math">S</span> matrix, where <span class="paper-math">S</span> denotes the input sequence length. We disregard aggregated attention weights other than those for [CLS] tokens. After masking out any attention weights other than [CLS] tokens, we averaged the matrices obtained from all tables in the dataset so that we can create a single |<span class="paper-math">C_{\mathrm{type}}</span>| × |<span class="paper-math">C_{\mathrm{type}}</span>| matrix that represents the dependency between column types. This gives us aggregated information about the dependency between column types.</p>
+<p class="doduo-zh" lang="zh-CN">具体而言，我们关注 [CLS] token（即列表示）之间的注意力权重。由于基于 Transformer 的 LM 通常有多个注意力头（例如 BERT Base 模型有 12 个），我们把所有注意力头的注意力权重聚合起来。结果得到一个 <span class="paper-math">S</span> × <span class="paper-math">S</span> 矩阵，其中 <span class="paper-math">S</span> 表示输入序列长度。我们忽略 [CLS] token 之外的聚合注意力权重。在把 [CLS] token 之外的注意力权重屏蔽掉之后，我们对数据集中所有表格得到的矩阵取平均，从而构造一个 |<span class="paper-math">C_{\mathrm{type}}</span>| × |<span class="paper-math">C_{\mathrm{type}}</span>| 的矩阵，用于表示列类型之间的依赖关系。这为我们提供了关于列类型之间依赖关系的聚合信息。</p>
 
-<p class="doduo-en" lang="en">Each element (<i>i</i>, <i>j</i>) in the final matrix represents how much the column type <i>i</i> relies on the other column type <i>j</i> for its contextualized representation. Note that the dependency of column type <i>i</i> (or <i>j</i>) for column type <i>j</i> (or <i>i</i>) can be different, and thus the matrix is not symmetric. For example, age highly relies on the type origin, whereas the opposite direction has negative attention weight showing a low degree of dependency. To eliminate the influence of the co-occurrence of column types, we counted the co-occurrence of column types in the same table and normalized the matrix to make the reference point to be zero for more straightforward interpretation. As a result, the final matrix consists of relative importance scores, and higher/lower values mean more/less influence from the column type.</p>
-<p class="doduo-zh" lang="zh-CN">最终矩阵中的每个元素 (<i>i</i>, <i>j</i>) 表示列类型 <i>i</i> 在构造其上下文化表示时对另一个列类型 <i>j</i> 的依赖程度。需要注意，列类型 <i>i</i> 对 <i>j</i>（或 <i>j</i> 对 <i>i</i>）的依赖可以不同，因此该矩阵并不对称。例如，age 高度依赖类型 origin，而反方向的注意力权重为负，显示出较低的依赖程度。为消除列类型共现带来的影响，我们统计了同一表格中列类型的共现情况，并对矩阵做归一化，使参照点为零，以便更直观地解释。最终矩阵由相对重要性分数构成，数值越高/越低表示来自该列类型的影响越强/越弱。</p>
+<p class="doduo-en" lang="en">Each element (<span class="paper-math">i</span>, <span class="paper-math">j</span>) in the final matrix represents how much the column type <span class="paper-math">i</span> relies on the other column type <span class="paper-math">j</span> for its contextualized representation. Note that the dependency of column type <span class="paper-math">i</span> (or <span class="paper-math">j</span>) for column type <span class="paper-math">j</span> (or <span class="paper-math">i</span>) can be different, and thus the matrix is not symmetric. For example, age highly relies on the type origin, whereas the opposite direction has negative attention weight showing a low degree of dependency. To eliminate the influence of the co-occurrence of column types, we counted the co-occurrence of column types in the same table and normalized the matrix to make the reference point to be zero for more straightforward interpretation. As a result, the final matrix consists of relative importance scores, and higher/lower values mean more/less influence from the column type.</p>
+<p class="doduo-zh" lang="zh-CN">最终矩阵中的每个元素 (<span class="paper-math">i</span>, <span class="paper-math">j</span>) 表示列类型 <span class="paper-math">i</span> 在构造其上下文化表示时对另一个列类型 <span class="paper-math">j</span> 的依赖程度。需要注意，列类型 <span class="paper-math">i</span> 对 <span class="paper-math">j</span>（或 <span class="paper-math">j</span> 对 <span class="paper-math">i</span>）的依赖可以不同，因此该矩阵并不对称。例如，age 高度依赖类型 origin，而反方向的注意力权重为负，显示出较低的依赖程度。为消除列类型共现带来的影响，我们统计了同一表格中列类型的共现情况，并对矩阵做归一化，使参照点为零，以便更直观地解释。最终矩阵由相对重要性分数构成，数值越高/越低表示来自该列类型的影响越强/越弱。</p>
 
 <figure class="doduo-figure">
   <a href="/images/posts/doduo-translation/figure-6.webp" target="_blank" rel="noopener" aria-label="在新标签页查看原图"><img src="/images/posts/doduo-translation/figure-6.webp" alt="图 6 / Figure 6" width="540" height="450" loading="lazy" decoding="async"></a>
   <figcaption>
-    <div class="doduo-en" lang="en"><b>Figure 6:</b> Inter-column dependency based on attention analysis on the VizNet dataset. A higher value (red) indicates that the column type (<i>y</i>-axis) “relies on” the other column type (<i>x</i>-axis) for prediction. Each row denotes the degree of “dependence” against each column. For example, age in <i>y</i>-axis has a high attention weight against origin in <i>x</i>-axis, indicating that predicting age relies on signals from the origin column.</div>
-    <div class="doduo-zh" lang="zh-CN"><b>图 6：</b>基于 VizNet 数据集上注意力分析的列间依赖。数值越高（红色）表示该列类型（<i>y</i> 轴）在预测时“依赖”另一个列类型（<i>x</i> 轴）。每一行表示相对于各列的“依赖”程度。例如，<i>y</i> 轴上的 age 相对于 <i>x</i> 轴上的 origin 具有较高的注意力权重，表明预测 age 依赖来自 origin 列的信号。</div>
+    <div class="doduo-en" lang="en"><b>Figure 6:</b> Inter-column dependency based on attention analysis on the VizNet dataset. A higher value (red) indicates that the column type (<span class="paper-math">y</span>-axis) “relies on” the other column type (<span class="paper-math">x</span>-axis) for prediction. Each row denotes the degree of “dependence” against each column. For example, age in <span class="paper-math">y</span>-axis has a high attention weight against origin in <span class="paper-math">x</span>-axis, indicating that predicting age relies on signals from the origin column.</div>
+    <div class="doduo-zh" lang="zh-CN"><b>图 6：</b>基于 VizNet 数据集上注意力分析的列间依赖。数值越高（红色）表示该列类型（<span class="paper-math">y</span> 轴）在预测时“依赖”另一个列类型（<span class="paper-math">x</span> 轴）。每一行表示相对于各列的“依赖”程度。例如，<span class="paper-math">y</span> 轴上的 age 相对于 <span class="paper-math">x</span> 轴上的 origin 具有较高的注意力权重，表明预测 age 依赖来自 origin 列的信号。</div>
   </figcaption>
 </figure>
 
@@ -793,16 +841,16 @@ draft: false
 <p class="doduo-en" lang="en">In the analysis, following the line of work [23, 40, 42], we use the template-based approach to test if a pre-trained LM knows the factual knowledge. Specifically, we use a template that has a blank field for the column type like below:</p>
 <p class="doduo-zh" lang="zh-CN">在分析中，遵循 [23, 40, 42] 的研究路线，我们使用基于模板的方法来检验预训练 LM 是否掌握事实性知识。具体而言，我们使用一个为列类型留有空白字段的模板，如下所示：</p>
 
-<div class="doduo-eq">Judy Morris is ______.</div>
+<div class="doduo-example">Judy Morris is ______.</div>
 <p class="doduo-zh" lang="zh-CN">（朱迪·莫里斯是 ______。）</p>
 
-<p class="doduo-en" lang="en">In this example, “director” should be a better fit than other column types (e.g., “actor”, “player”, etc.) In this way, we conclude that the model knows the fact if the model judges the template with the true column type (e.g., “director”) more likely than other sentences that use different column types (e.g., “actor”, “player”, etc.). To evaluate the likelihood of a sequence after filling the blank in the template, we use the perplexity score of a sequence using the pre-trained LM. Perplexity is used to measure how well the LM can predict each token from the context (i.e., the other tokens in the sequence<sup>6</sup>) and is calculated by the average likelihood of a sequence. It is a common metric to evaluate how “natural” the text is from the LM perspective. The perplexity of a sequence of tokens <i>X</i> = (<i>x</i><sub>1</sub>, <i>x</i><sub>2</sub>, . . . , <i>x</i><sub>t</sub>) is defined by:</p>
-<p class="doduo-zh" lang="zh-CN">在这个例子中，“director”（导演）应当比其他列类型（如“actor”“player”等）更合适。按这种方式，如果模型认为填入真实列类型（如“director”）的模板比其他使用不同列类型（如“actor”“player”等）的句子更可能成立，我们就断定模型掌握该事实。为评估模板填空后序列的似然，我们使用预训练 LM 计算序列的困惑度（perplexity）分数。困惑度用于衡量 LM 能从上下文中（即序列中的其他 token<sup>6</sup>）多好地预测每个 token，由序列的平均似然计算得到。它是从 LM 视角评估文本“自然程度”的常用指标。token 序列 <i>X</i> = (<i>x</i><sub>1</sub>, <i>x</i><sub>2</sub>, . . . , <i>x</i><sub>t</sub>) 的困惑度定义为：</p>
+<p class="doduo-en" lang="en">In this example, “director” should be a better fit than other column types (e.g., “actor”, “player”, etc.) In this way, we conclude that the model knows the fact if the model judges the template with the true column type (e.g., “director”) more likely than other sentences that use different column types (e.g., “actor”, “player”, etc.). To evaluate the likelihood of a sequence after filling the blank in the template, we use the perplexity score of a sequence using the pre-trained LM. Perplexity is used to measure how well the LM can predict each token from the context (i.e., the other tokens in the sequence<sup>6</sup>) and is calculated by the average likelihood of a sequence. It is a common metric to evaluate how “natural” the text is from the LM perspective. The perplexity of a sequence of tokens <span class="paper-math">X</span> = (<span class="paper-math">x_{1}</span>, <span class="paper-math">x_{2}</span>, . . . , <span class="paper-math">x_{t}</span>) is defined by:</p>
+<p class="doduo-zh" lang="zh-CN">在这个例子中，“director”（导演）应当比其他列类型（如“actor”“player”等）更合适。按这种方式，如果模型认为填入真实列类型（如“director”）的模板比其他使用不同列类型（如“actor”“player”等）的句子更可能成立，我们就断定模型掌握该事实。为评估模板填空后序列的似然，我们使用预训练 LM 计算序列的困惑度（perplexity）分数。困惑度用于衡量 LM 能从上下文中（即序列中的其他 token<sup>6</sup>）多好地预测每个 token，由序列的平均似然计算得到。它是从 LM 视角评估文本“自然程度”的常用指标。token 序列 <span class="paper-math">X</span> = (<span class="paper-math">x_{1}</span>, <span class="paper-math">x_{2}</span>, . . . , <span class="paper-math">x_{t}</span>) 的困惑度定义为：</p>
 
-<div class="doduo-eq">PPL(<i>X</i>) = exp( − (1/<i>t</i>) Σ<sup><i>t</i></sup><sub><i>i</i></sub> log <i>p</i><sub><i>θ</i></sub>(<i>x</i><sub><i>i</i></sub> | <i>x</i><sub>\<i>i</i></sub>) )　　(3)</div>
+<div class="doduo-eq" id="doduo-equation-3" role="region" tabindex="0" aria-label="公式 3，可横向滚动"><div class="doduo-eq-row"><span class="paper-math-display">\operatorname{PPL}(X)=\exp\!\left\{-\frac{1}{t}\sum_{i}^{t}\log p_{\theta}\!\left(x_i\mid x_{\backslash i}\right)\right\}</span><span class="doduo-eq-number">(3)</span></div></div>
 
-<p class="doduo-en" lang="en">where <i>p</i><sub><i>θ</i></sub>(<i>x</i><sub><i>i</i></sub> | <i>x</i><sub>\<i>i</i></sub>) denotes the probability of an LM <i>θ</i> (e.g., BERT) predicting a target token <i>x</i><sub><i>i</i></sub> given the context in <i>X</i> with <i>x</i><sub><i>i</i></sub> masked out. With the same LM, the lower perplexity score for a sentence indicates it is easier for the LM to generate the sentence. We use the perplexity to score column types for each column value (e.g., Judy Morris) by filling each column type name in the template. Then, we can evaluate if the ground truth label (i.e., “director” in this case) has the best (i.e., lowest) perplexity among all candidates.</p>
-<p class="doduo-zh" lang="zh-CN">其中 <i>p</i><sub><i>θ</i></sub>(<i>x</i><sub><i>i</i></sub> | <i>x</i><sub>\<i>i</i></sub>) 表示语言模型 <i>θ</i>（如 BERT）在给定 <i>X</i> 中其余上下文（<i>x</i><sub><i>i</i></sub> 被掩码）的条件下预测目标 token <i>x</i><sub><i>i</i></sub> 的概率。对同一个 LM 而言，句子的困惑度越低，说明 LM 越容易生成该句子。我们利用困惑度为每个列值（如 Judy Morris）给各列类型打分，做法是把每个列类型名称填入模板。然后，我们就可以评估真实标签（此例中为“director”）是否在所有候选中具有最好（即最低）的困惑度。</p>
+<p class="doduo-en" lang="en">where <span class="paper-math">p_{\theta}(x_i\mid x_{\backslash i})</span> denotes the probability of an LM <span class="paper-math">\theta</span> (e.g., BERT) predicting a target token <span class="paper-math">x_{i}</span> given the context in <span class="paper-math">X</span> with <span class="paper-math">x_{i}</span> masked out. With the same LM, the lower perplexity score for a sentence indicates it is easier for the LM to generate the sentence. We use the perplexity to score column types for each column value (e.g., Judy Morris) by filling each column type name in the template. Then, we can evaluate if the ground truth label (i.e., “director” in this case) has the best (i.e., lowest) perplexity among all candidates.</p>
+<p class="doduo-zh" lang="zh-CN">其中 <span class="paper-math">p_{\theta}(x_i\mid x_{\backslash i})</span> 表示语言模型 <span class="paper-math">\theta</span>（如 BERT）在给定 <span class="paper-math">X</span> 中其余上下文（<span class="paper-math">x_{i}</span> 被掩码）的条件下预测目标 token <span class="paper-math">x_{i}</span> 的概率。对同一个 LM 而言，句子的困惑度越低，说明 LM 越容易生成该句子。我们利用困惑度为每个列值（如 Judy Morris）给各列类型打分，做法是把每个列类型名称填入模板。然后，我们就可以评估真实标签（此例中为“director”）是否在所有候选中具有最好（即最低）的困惑度。</p>
 
 <p class="doduo-en" lang="en">For the analysis, we use the vanilla BERT (bert-base-uncased) model, which is the same base model used for Doduo in the experiments. We use the average rank and the normalized PPL (= PPL / Avg. PPL, where Avg. PPL denotes the average perplexity of all column types for evaluation.) Since perplexity values for sequences with different lengths are not directly comparable, we selected column types that are tokenized into a single token by the BERT tokenizer<sup>7</sup>. As a result, 80 (out of 255) and 75 (out of 78) column types were selected for the WikiTable and VizNet datasets for the analysis, respectively.</p>
 <p class="doduo-zh" lang="zh-CN">分析中我们使用原始 BERT（bert-base-uncased）模型，它与实验中 Doduo 所使用的基础模型相同。我们使用平均排名和归一化 PPL（= PPL / Avg. PPL，其中 Avg. PPL 表示用于评估的所有列类型的平均困惑度）。由于不同长度序列的困惑度数值不能直接比较，我们挑选了被 BERT 分词器切分为单个 token 的列类型<sup>7</sup>。最终，WikiTable 和 VizNet 数据集分别选出 80 个（共 255 个）和 75 个（共 78 个）列类型用于分析。</p>
@@ -822,34 +870,42 @@ draft: false
 </div>
 <div class="doduo-two-col">
   <div>
-    <table class="doduo-table" tabindex="0" aria-label="论文数据表，可横向滚动">
-      <tr><th>Column type 列类型</th><th>Avg. rank (↓)</th><th>PPL / Avg.PPL (↓)</th></tr>
-      <tr><td>government.election</td><td>6.74</td><td>0.787</td></tr>
-      <tr><td>geography.river</td><td>9.25</td><td>0.788</td></tr>
-      <tr><td>religion.religion</td><td>10.10</td><td>0.799</td></tr>
-      <tr><td>book.author</td><td>12.72</td><td>0.810</td></tr>
-      <tr><td>education.university</td><td>15.62</td><td>0.829</td></tr>
-      <tr><td>royalty.monarch</td><td>58.24</td><td>1.147</td></tr>
-      <tr><td>astronomy.constellation</td><td>67.47</td><td>1.170</td></tr>
-      <tr><td>law.invention</td><td>61.60</td><td>1.181</td></tr>
-      <tr><td>biology.organism</td><td>71.56</td><td>1.205</td></tr>
-      <tr><td>royalty.kingdom</td><td>73.37</td><td>1.368</td></tr>
-    </table>
+    <div class="doduo-table-scroll" role="region" tabindex="0" aria-label="表 12：列类型探测，可横向滚动"><table class="doduo-table">
+<thead>
+<tr><th scope="col">Column type 列类型</th><th scope="col">Avg. rank (↓)</th><th scope="col">PPL / Avg.PPL (↓)</th></tr>
+</thead>
+<tbody>
+<tr><td class="doduo-label">government.election</td><td>6.74</td><td>0.787</td></tr>
+<tr><td class="doduo-label">geography.river</td><td>9.25</td><td>0.788</td></tr>
+<tr><td class="doduo-label">religion.religion</td><td>10.10</td><td>0.799</td></tr>
+<tr><td class="doduo-label">book.author</td><td>12.72</td><td>0.810</td></tr>
+<tr><td class="doduo-label">education.university</td><td>15.62</td><td>0.829</td></tr>
+<tr><td class="doduo-label">royalty.monarch</td><td>58.24</td><td>1.147</td></tr>
+<tr><td class="doduo-label">astronomy.constellation</td><td>67.47</td><td>1.170</td></tr>
+<tr><td class="doduo-label">law.invention</td><td>61.60</td><td>1.181</td></tr>
+<tr><td class="doduo-label">biology.organism</td><td>71.56</td><td>1.205</td></tr>
+<tr><td class="doduo-label">royalty.kingdom</td><td>73.37</td><td>1.368</td></tr>
+</tbody>
+</table></div>
   </div>
   <div>
-    <table class="doduo-table" tabindex="0" aria-label="论文数据表，可横向滚动">
-      <tr><th>Column relation 列关系</th><th>Avg. rank (↓)</th><th>PPL / Avg.PPL (↓)</th></tr>
-      <tr><td>person.place_of_birth</td><td>3.69</td><td>0.946</td></tr>
-      <tr><td>baseball_player.position_s</td><td>5.04</td><td>0.961</td></tr>
-      <tr><td>location.nearby_airports</td><td>8.66</td><td>0.979</td></tr>
-      <tr><td>mailing_address.citytown</td><td>7.24</td><td>0.980</td></tr>
-      <tr><td>film.directed_by</td><td>8.08</td><td>0.984</td></tr>
-      <tr><td>award.award_nominee</td><td>16.53</td><td>1.019</td></tr>
-      <tr><td>tv_program.country_of_origin</td><td>16.83</td><td>1.030</td></tr>
-      <tr><td>country.languages_spoken</td><td>14.79</td><td>1.042</td></tr>
-      <tr><td>award_honor.award_winner</td><td>21.40</td><td>1.047</td></tr>
-      <tr><td>event.entity_involved</td><td>19.82</td><td>1.072</td></tr>
-    </table>
+    <div class="doduo-table-scroll" role="region" tabindex="0" aria-label="表 12：列关系探测，可横向滚动"><table class="doduo-table">
+<thead>
+<tr><th scope="col">Column relation 列关系</th><th scope="col">Avg. rank (↓)</th><th scope="col">PPL / Avg.PPL (↓)</th></tr>
+</thead>
+<tbody>
+<tr><td class="doduo-label">person.place_of_birth</td><td>3.69</td><td>0.946</td></tr>
+<tr><td class="doduo-label">baseball_player.position_s</td><td>5.04</td><td>0.961</td></tr>
+<tr><td class="doduo-label">location.nearby_airports</td><td>8.66</td><td>0.979</td></tr>
+<tr><td class="doduo-label">mailing_address.citytown</td><td>7.24</td><td>0.980</td></tr>
+<tr><td class="doduo-label">film.directed_by</td><td>8.08</td><td>0.984</td></tr>
+<tr><td class="doduo-label">award.award_nominee</td><td>16.53</td><td>1.019</td></tr>
+<tr><td class="doduo-label">tv_program.country_of_origin</td><td>16.83</td><td>1.030</td></tr>
+<tr><td class="doduo-label">country.languages_spoken</td><td>14.79</td><td>1.042</td></tr>
+<tr><td class="doduo-label">award_honor.award_winner</td><td>21.40</td><td>1.047</td></tr>
+<tr><td class="doduo-label">event.entity_involved</td><td>19.82</td><td>1.072</td></tr>
+</tbody>
+</table></div>
   </div>
 </div>
 
@@ -860,19 +916,23 @@ draft: false
   <div class="doduo-en" lang="en"><b>Table 13:</b> Language model probing results on the VizNet dataset. We observe that the language model stores a certain amount of factual knowledge about column types listed in Top-5, compared to Bottom-5. The general trend is consistent with Table 12.</div>
   <div class="doduo-zh" lang="zh-CN"><b>表 13：</b>在 VizNet 数据集上的语言模型探测结果。我们观察到，与 Bottom-5 相比，语言模型对 Top-5 中列类型存储了相当数量的事实性知识。总体趋势与表 12 一致。</div>
 </div>
-<table class="doduo-table" tabindex="0" aria-label="论文数据表，可横向滚动">
-  <tr><th>Column type 列类型</th><th>Avg. rank (↓)</th><th>PPL / Avg.PPL (↓)</th></tr>
-  <tr><td>year</td><td>6.60</td><td>0.799</td></tr>
-  <tr><td>manufacturer</td><td>20.19</td><td>0.810</td></tr>
-  <tr><td>day</td><td>14.21</td><td>0.819</td></tr>
-  <tr><td>state</td><td>16.88</td><td>0.825</td></tr>
-  <tr><td>language</td><td>17.23</td><td>0.840</td></tr>
-  <tr><td>organisation</td><td>61.83</td><td>1.146</td></tr>
-  <tr><td>nationality</td><td>65.81</td><td>1.218</td></tr>
-  <tr><td>creator</td><td>57.39</td><td>1.232</td></tr>
-  <tr><td>affiliation</td><td>63.85</td><td>1.239</td></tr>
-  <tr><td>birthPlace</td><td>72.30</td><td>1.334</td></tr>
-</table>
+<div class="doduo-table-scroll" role="region" tabindex="0" aria-label="表 13：VizNet 探测，可横向滚动"><table class="doduo-table">
+<thead>
+<tr><th scope="col">Column type 列类型</th><th scope="col">Avg. rank (↓)</th><th scope="col">PPL / Avg.PPL (↓)</th></tr>
+</thead>
+<tbody>
+<tr><td class="doduo-label">year</td><td>6.60</td><td>0.799</td></tr>
+<tr><td class="doduo-label">manufacturer</td><td>20.19</td><td>0.810</td></tr>
+<tr><td class="doduo-label">day</td><td>14.21</td><td>0.819</td></tr>
+<tr><td class="doduo-label">state</td><td>16.88</td><td>0.825</td></tr>
+<tr><td class="doduo-label">language</td><td>17.23</td><td>0.840</td></tr>
+<tr><td class="doduo-label">organisation</td><td>61.83</td><td>1.146</td></tr>
+<tr><td class="doduo-label">nationality</td><td>65.81</td><td>1.218</td></tr>
+<tr><td class="doduo-label">creator</td><td>57.39</td><td>1.232</td></tr>
+<tr><td class="doduo-label">affiliation</td><td>63.85</td><td>1.239</td></tr>
+<tr><td class="doduo-label">birthPlace</td><td>72.30</td><td>1.334</td></tr>
+</tbody>
+</table></div>
 
 <p class="doduo-en" lang="en">The probing analysis on the VizNet dataset shows the same trend as in the WikiTable dataset. In Figure 5, we confirm that Doduo has better performance than Sato for all the top-5 column types. Meanwhile, birthPlace and nationality, which are in the bottom-5 column types for the language model probing analysis, are among the few column types where Doduo underperforms Sato. The results support that Doduo may not benefit from relevant factual knowledge stored in the pre-trained LM for the column type. Note that the BERT model used for the analysis is not fine-tuned on the WikiTable/VizNet dataset, but the vanilla BERT model. Thus, the language model probing analysis shows the inherent ability of the BERT model, and we confirm that the pre-trained LM does store factual knowledge that is useful for the column annotation problem. This especially explains the significant improvements over the previous SoTA method that does not use pre-trained LM (i.e., Sato), as shown in Figure 5.</p>
 <p class="doduo-zh" lang="zh-CN">在 VizNet 数据集上的探测分析呈现出与 WikiTable 数据集相同的趋势。在图 5 中，我们确认 Doduo 在全部 top-5 列类型上都优于 Sato。与此同时，在语言模型探测分析中处于 bottom-5 的 birthPlace 和 nationality，正是 Doduo 表现不如 Sato 的少数列类型之一。这些结果支持如下判断：对这类列类型，Doduo 可能无法受益于预训练 LM 中存储的相关事实性知识。需要注意，分析中使用的 BERT 模型并未在 WikiTable/VizNet 数据集上微调，而是原始 BERT。因此，语言模型探测分析展现的是 BERT 模型的内在能力，我们由此确认预训练 LM 确实存储了对列标注问题有用的事实性知识。这尤其解释了如图 5 所示、相对不使用预训练 LM 的先前最优方法（即 Sato）所取得的显著提升。</p>

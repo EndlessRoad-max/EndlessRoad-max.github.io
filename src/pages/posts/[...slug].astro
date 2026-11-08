@@ -4,6 +4,7 @@ import ArticleLayout from "../../layouts/ArticleLayout.astro";
 import { publishedNotes, dateLabel } from "../../utils/portfolio";
 import { url } from "../../utils/url-utils";
 import "../../styles/doduo-translation.css";
+import "katex/dist/katex.min.css";
 export async function getStaticPaths() {
   return (await publishedNotes()).map(post => ({ params: { slug: post.slug }, props: { post } }));
 }
