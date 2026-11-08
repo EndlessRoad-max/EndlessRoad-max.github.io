@@ -1378,8 +1378,9 @@ button {
 .sun-scene { display: block; width: 100%; height: 100%; }
 .sun-scene-mobile { display: none; }
 .sun-cloud { transform-box: view-box; transform-origin: center; }
-.sun-cloud-one { animation: cloud-drift-one 26s ease-in-out infinite; }
-.sun-cloud-two { animation: cloud-drift-two 37s ease-in-out -13s infinite; }
+/* Keep the initial cloud shading without repainting the filtered light field. */
+.sun-cloud-one { animation: cloud-drift-one 26s ease-in-out infinite paused; }
+.sun-cloud-two { animation: cloud-drift-two 37s ease-in-out -13s infinite paused; }
 @keyframes cloud-drift-one {
   0%, 100% { transform: translate(8%, -30px); opacity: .65; }
   50% { transform: translate(-10%, 35px); opacity: 1; }
@@ -1388,8 +1389,6 @@ button {
   0%, 100% { transform: translate(-7%, 25px); opacity: 1; }
   50% { transform: translate(12%, -40px); opacity: .7; }
 }
-.dark .sun-cloud, [data-theme-changing] .sun-cloud,
-.daybreak-sky.sky-paused .sun-cloud { animation-play-state: paused; }
 /* One progress drives the entire scene, including the seamless page backing. */
 .home-page::before, .dark .home-page::before {
   opacity: var(--night-progress); transition: none;

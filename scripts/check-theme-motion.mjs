@@ -13,6 +13,17 @@ class ThemePage {
   }
   async settled() { await this.page.waitForFunction(() => !document.documentElement.hasAttribute('data-theme-changing')); }
   async geometry() { return this.page.locator('main').boundingBox(); }
+  async clouds() {
+    return this.page.evaluate(() => {
+      const scene = document.querySelector(innerWidth < 640 ? '.sun-scene-mobile' : '.sun-scene-desktop');
+      return [...scene.querySelectorAll('.sun-cloud')].map(cloud => ({
+        transform: getComputedStyle(cloud).transform,
+        opacity: getComputedStyle(cloud).opacity,
+        playState: getComputedStyle(cloud).animationPlayState,
+        times: cloud.getAnimations().map(animation => animation.currentTime),
+      }));
+    });
+  }
   async frame(name, progress) {
     if (progress !== null) await this.page.waitForFunction(p => {
       const root = document.documentElement;
@@ -44,25 +55,16 @@ try {
     const errors = []; page.on('pageerror', error => errors.push(error.message));
     await site.open(); const before = await site.geometry();
     await page.screenshot({ path: `test-results/theme-motion/${width}-day.png` });
-    await page.evaluate(() => {
-      for (const a of document.getAnimations()) if (a instanceof CSSAnimation && a.animationName.startsWith('cloud-drift')) { a.pause(); a.currentTime = 0; }
-    });
-    const cloudSelector = '.sun-scene-' + (width < 640 ? 'mobile' : 'desktop') + ' .sun-cloud-one';
-    const cloudStart = await page.locator(cloudSelector).evaluate(e => getComputedStyle(e).transform);
-    await page.evaluate(() => {
-      for (const a of document.getAnimations()) if (a instanceof CSSAnimation && a.animationName.startsWith('cloud-drift')) a.currentTime = 13000;
-    });
-    assert.notEqual(await page.locator(cloudSelector).evaluate(e => getComputedStyle(e).transform), cloudStart, 'cloud mask moves instead of individual beams pulsing');
-    await page.screenshot({ path: `test-results/theme-motion/${width}-clouds-middle.png` });
-    await page.evaluate(() => {
-      for (const a of document.getAnimations()) if (a instanceof CSSAnimation && a.animationName.startsWith('cloud-drift')) a.play();
-    });
+    const cloudStart = await site.clouds();
+    assert.equal(cloudStart.length, 2);
+    assert(cloudStart.every(cloud => cloud.playState === 'paused'), 'cloud masks remain static while light filters are retained');
     await site.toggle.focus(); await page.keyboard.press('Enter');
     await site.frame(`${width}-dusk-middle`, .5); await site.settled();
     await page.screenshot({ path: `test-results/theme-motion/${width}-night.png` });
     assert.equal(await site.toggle.getAttribute('title'), '切换到浅色主题');
     assert.deepEqual(await site.geometry(), before);
     await site.toggle.click(); await site.frame(`${width}-dawn-middle`, .5); await site.settled();
+    assert.deepEqual(await site.clouds(), cloudStart, 'theme changes do not advance the cloud masks');
     // Also inspect real shared-clock frames: normalizing each transition's time
     // can hide a synchronization bug between the scene and the page background.
     for (const direction of ['dusk', 'dawn']) {
@@ -90,7 +92,7 @@ try {
     await site.settled();
     await page.evaluate(() => scrollTo({ top: 0, behavior: 'instant' }));
     await page.waitForFunction(() => !document.querySelector('.daybreak-sky').classList.contains('sky-paused'));
-    assert.equal(await page.locator('.sun-scene-' + (width < 640 ? 'mobile' : 'desktop') + ' .sun-cloud-one').evaluate(e => getComputedStyle(e).animationPlayState), 'running');
+    assert.deepEqual(await site.clouds(), cloudStart, 'returning onscreen does not restart cloud animation');
     await page.evaluate(() => {
       Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
       document.dispatchEvent(new Event('visibilitychange'));
@@ -101,11 +103,14 @@ try {
       document.dispatchEvent(new Event('visibilitychange'));
     });
     await page.waitForFunction(() => !document.querySelector('.daybreak-sky').classList.contains('sky-paused'));
+    assert.deepEqual(await site.clouds(), cloudStart, 'returning to the foreground keeps cloud masks static');
     await site.open('notes/'); await site.toggle.click();
     assert.equal(await page.locator('body').evaluate(e => getComputedStyle(e).transitionDuration.split(',')[0]), '0.3s');
     await site.settled();
     await page.emulateMedia({ reducedMotion: 'reduce' }); await site.toggle.click();
     assert.equal(await page.locator('body').evaluate(e => getComputedStyle(e).transitionDuration), '0s');
+    await site.open(); await site.toggle.click(); await site.settled();
+    assert(await page.evaluate(() => [...document.querySelectorAll('.sun-cloud')].every(cloud => getComputedStyle(cloud).animationName === 'none')), 'reduced motion also disables cloud timelines');
     assert.deepEqual(errors, []);
     await context.tracing.stop({ path: `test-results/theme-motion/${width}-trace.zip` }); await context.close();
   }));
@@ -116,5 +121,5 @@ try {
   await page.emulateMedia({ colorScheme: 'dark' }); await page.emulateMedia({ colorScheme: 'light' });
   assert.equal(await page.evaluate(() => document.documentElement.classList.contains('dark')), true);
   await context.close();
-  console.log('PASS: desktop/mobile motion frames, keyboard, interruption, layout, offscreen, inner pages, reduced motion, unavailable storage');
+  console.log('PASS: desktop/mobile static clouds, theme transition frames, keyboard, interruption, layout, offscreen, inner pages, reduced motion, unavailable storage');
 } finally { await browser.close(); }
