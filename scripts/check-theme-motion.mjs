@@ -12,6 +12,24 @@ class ThemePage {
     if (!route) await this.page.waitForFunction(() => document.querySelector('.lunar-surface img').classList.contains('is-ready') && document.querySelector('.handwritten-motto').dataset.state === 'complete');
   }
   async settled() { await this.page.waitForFunction(() => !document.documentElement.hasAttribute('data-theme-changing')); }
+  async assertSceneClock() {
+    const state = await this.page.evaluate(() => {
+      const progress = Number(document.documentElement.style.getPropertyValue('--night-progress'));
+      const backing = getComputedStyle(document.body, '::before');
+      return {
+        progress,
+        backing: Number(backing.opacity),
+        daylight: Number(getComputedStyle(document.querySelector('.daybreak-sky')).opacity),
+        backingTransition: backing.transitionDuration,
+        layers: [document.body, ...document.querySelectorAll('.daybreak-sky, .sphere-sky, .star-field')]
+          .map(layer => Number(getComputedStyle(layer).getPropertyValue('--night-progress'))),
+      };
+    });
+    assert.equal(state.backingTransition, '0s', 'background must not interpolate the scene clock a second time');
+    assert(Math.abs(state.backing - state.progress) < 0.00001, 'background follows the shared scene clock without a tail');
+    assert(Math.abs(state.daylight - (1 - state.progress)) < 0.00001, 'daylight follows the shared scene clock');
+    assert(state.layers.every(progress => Math.abs(progress - state.progress) < 0.00001), 'all scene layers receive the same non-inherited progress');
+  }
   async geometry() { return this.page.locator('main').boundingBox(); }
   async clouds() {
     return this.page.evaluate(() => {
@@ -30,6 +48,7 @@ class ThemePage {
       const value = Number(root.style.getPropertyValue('--night-progress'));
       return root.classList.contains('dark') ? value >= p : value <= 1 - p;
     }, progress);
+    await this.assertSceneClock();
     // Bring both sides of the scene boundary into the viewport: full-page
     // screenshots do not extend the fixed theme backing below the viewport.
     await this.page.evaluate(() => scrollTo({top: 180, behavior: 'instant'}));
@@ -64,6 +83,7 @@ try {
     assert.equal(await site.toggle.getAttribute('title'), '切换到浅色主题');
     assert.deepEqual(await site.geometry(), before);
     await site.toggle.click(); await site.frame(`${width}-dawn-middle`, .5); await site.settled();
+    await site.assertSceneClock();
     assert.deepEqual(await site.clouds(), cloudStart, 'theme changes do not advance the cloud masks');
     // Also inspect real shared-clock frames: normalizing each transition's time
     // can hide a synchronization bug between the scene and the page background.

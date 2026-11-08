@@ -111,10 +111,13 @@ const stars = home ? Array.from({ length: 140 }, () => ({
       let sceneFrame = 0;
       let sceneProgress = root.classList.contains("dark") ? 1 : 0;
       let sceneTarget = sceneProgress;
+      // Non-inherited scene properties are updated only at their consumers.
+      // Keep the root clock available without invalidating every descendant.
+      const sceneLayers = [root, document.body, daylight, sky, sky?.querySelector<HTMLElement>(".star-field")];
       function paintScene(progress: number) {
         sceneProgress = progress;
-        root.style.setProperty("--night-progress", String(progress));
-        root.style.setProperty("--curtain-edge", `${-35 + progress * 170}%`);
+        for (const layer of sceneLayers) layer?.style.setProperty("--night-progress", String(progress));
+        sky?.style.setProperty("--curtain-edge", `${-35 + progress * 170}%`);
       }
       if (sky) paintScene(sceneProgress);
       function animateScene(target: number, duration: number) {

@@ -1347,7 +1347,8 @@ button {
   pointer-events: none;
 }
 .dark .home-page::before { opacity: 1; }
-.theme-transitions .home-page::before { transition: opacity var(--theme-duration) var(--theme-ease); }
+/* The scene clock already interpolates opacity; a second transition adds a tail. */
+.theme-transitions .home-page::before { transition: none; }
 .theme-transitions .lunar-surface img {
   transition: filter var(--theme-duration) var(--theme-ease), opacity var(--theme-duration) var(--theme-ease);
 }
@@ -1366,16 +1367,24 @@ button {
 .theme-transitions #theme-toggle svg { transition: opacity 300ms ease, transform 400ms var(--theme-ease); }
 
 /* Afternoon light: a fixed off-screen source and soft diagonal shafts. */
+/* Per-frame progress must not propagate through the page or filtered SVG tree. */
+@property --night-progress { syntax: "<number>"; inherits: false; initial-value: 0; }
+@property --curtain-edge { syntax: "<percentage>"; inherits: false; initial-value: -35%; }
 :root { --night-progress: 0; --curtain-edge: -35%; }
 :root.dark { --night-progress: 1; --curtain-edge: 135%; }
+.dark :is(.home-page, .daybreak-sky, .sphere-sky, .star-field) { --night-progress: 1; }
+.dark .sphere-sky { --curtain-edge: 135%; }
 /* Light cores and their atmospheric falloff are separate SVG layers. */
 .daybreak-sky {
   position: absolute; inset: 0 0 auto; height: 690px; overflow: hidden;
   pointer-events: none; background: #fffefb;
+  /* SVG fills are explicit; inherited text-color animation must not repaint them. */
+  color: #000;
   mask-image: linear-gradient(#000 60%, transparent 94%);
   opacity: calc(1 - var(--night-progress));
 }
-.sun-scene { display: block; width: 100%; height: 100%; }
+/* Composite the static filtered light separately while its parent fades. */
+.sun-scene { display: block; width: 100%; height: 100%; transform: translateZ(0); }
 .sun-scene-mobile { display: none; }
 .sun-cloud { transform-box: view-box; transform-origin: center; }
 /* Keep the initial cloud shading without repainting the filtered light field. */
@@ -1391,6 +1400,7 @@ button {
 }
 /* One progress drives the entire scene, including the seamless page backing. */
 .home-page::before, .dark .home-page::before {
+  --night-progress: inherit;
   opacity: var(--night-progress); transition: none;
 }
 .home-page .sphere-sky, :root:not(.dark) .home-page .sphere-sky {
