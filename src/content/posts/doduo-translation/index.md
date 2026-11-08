@@ -66,7 +66,7 @@ draft: false
 <p class="doduo-zh" lang="zh-CN">图 1 描绘了 Doduo 的模型架构。Doduo 以经过序列化的表格多列取值为输入，输出列类型和列关系的预测。Doduo 通过把同一表格中所有列的列值序列化后一并输入来考虑表格上下文。这样一来，列内信息（即同一列内 token 的共现）和列间信息（即不同列中 token 的共现）都被纳入考虑。Doduo 在每一列的开头附加一个哑符号 [CLS]，并把该符号对应的嵌入作为该列学习到的列表示。位于列嵌入（即 [CLS]）之上的输出层用于列类型预测，而列关系预测的输出层则接收每一对列的列嵌入。</p>
 
 <figure class="doduo-figure">
-  <a href="/images/posts/doduo-translation/figure-1.webp" target="_blank" rel="noopener" aria-label="在新标签页查看原图"><img src="/images/posts/doduo-translation/figure-1.webp" alt="图 1 / Figure 1" width="547" height="542" loading="lazy" decoding="async"></a>
+  <a href="/images/posts/doduo-translation/figure-1.webp" target="_blank" rel="noopener" aria-label="在新标签页查看原图"><img src="/images/posts/doduo-translation/figure-1.webp" alt="图 1 / Figure 1" width="547" height="350" loading="lazy" decoding="async"></a>
   <figcaption>
     <div class="doduo-en" lang="en"><b>Figure 1:</b> Overview of Doduo’s model architecture. Doduo serializes the entire table into a sequence of tokens to make it compatible with the Transformer-based architecture. To handle the column type prediction and column relation extraction tasks, Doduo implements two different output layers on top of column representations and a pair of column representations, respectively.</div>
     <div class="doduo-zh" lang="zh-CN"><b>图 1：</b>Doduo 模型架构总览。Doduo 将整张表格序列化为一个 token 序列，使其与基于 Transformer 的架构相兼容。为处理列类型预测和列关系抽取这两个任务，Doduo 分别在列表示之上和一对列的表示之上实现了两种不同的输出层。</div>
@@ -115,7 +115,7 @@ draft: false
 <p class="doduo-zh" lang="zh-CN">已有的列类型预测模型受益于近年来机器学习的进展，它们把列类型预测表述为一个多类分类任务。Hulsebos 等人 [22] 开发了一个名为 Sherlock 的深度学习模型，在多种特征集上应用神经网络，例如词嵌入、字符嵌入以及从单列取值中提取的全局统计量。Zhang 等人 [66] 开发了 Sato，它在 Sherlock 的基础上加入表格上下文和结构化输出预测，以更好地刻画同一表格中各列之间相关性的本质。其他模型如 ColNet [9]、HNN [10]、Meimei [48]、<i>C</i><sup>2</sup> [24] 则在机器学习模型之上使用外部知识库（KB）来改进列类型预测。这些技术已在列类型预测任务上取得成功，性能优于经典机器学习模型。上述技术关注单列的语义类型，而另一条研究路线则关注同一表格中列与列之间的关系，以更好地理解表格 [4, 13, 28, 29, 34, 54]。</p>
 
 <figure class="doduo-figure">
-  <a href="/images/posts/doduo-translation/figure-2.webp" target="_blank" rel="noopener" aria-label="在新标签页查看原图"><img src="/images/posts/doduo-translation/figure-2.webp" alt="图 2 / Figure 2" width="1138" height="348" loading="lazy" decoding="async"></a>
+  <a href="/images/posts/doduo-translation/figure-2.webp" target="_blank" rel="noopener" aria-label="在新标签页查看原图"><img src="/images/posts/doduo-translation/figure-2.webp" alt="图 2 / Figure 2" width="700" height="215" loading="lazy" decoding="async"></a>
   <figcaption>
     <div class="doduo-en" lang="en"><b>Figure 2:</b> Two example tables from the WikiTable dataset. (a) The task is to predict the column type of each column based on the table values. (b) The task is to predict both column types and relationships between columns. The column types (the column relations) are depicted at the top (at the bottom) of the table. This example also shows that column types and column relations are inter-dependent and hence, our motivation to develop a unified model for predicting both tasks.</div>
     <div class="doduo-zh" lang="zh-CN"><b>图 2：</b>来自 WikiTable 数据集的两张示例表格。(a) 任务是基于表格取值为每一列预测列类型。(b) 任务同时预测列类型与列间关系。列类型（列关系）标注在表格顶部（底部）。该示例还表明，列类型与列关系相互依赖，这也是我们开发统一模型同时预测两个任务的动机。</div>
@@ -275,7 +275,7 @@ draft: false
 <p class="doduo-zh" lang="zh-CN">我们描述 Doduo 如何借助 Transformer 架构，通过上下文化的列嵌入获得表格上下文。图 3 描绘了 Doduo 的每个 Transformer 模块如何从同一表格的所有列值（包括哑符号 [CLS] 及其自身）聚合上下文信息。具体而言，该示例展示了第一层 Transformer 如何以第二列的 [CLS] token 为参照，根据与其他 token 的相似度聚合它们的嵌入来计算注意力向量。因此，同一个符号（如 George）出现在不同上下文中时，其注意力向量可以不同。这解决了 word2vec 或 GloVe 等传统词嵌入技术的歧义问题。</p>
 
 <figure class="doduo-figure">
-  <a href="/images/posts/doduo-translation/figure-3.webp" target="_blank" rel="noopener" aria-label="在新标签页查看原图"><img src="/images/posts/doduo-translation/figure-3.webp" alt="图 3 / Figure 3" width="600" height="281" loading="lazy" decoding="async"></a>
+  <a href="/images/posts/doduo-translation/figure-3.webp" target="_blank" rel="noopener" aria-label="在新标签页查看原图"><img src="/images/posts/doduo-translation/figure-3.webp" alt="图 3 / Figure 3" width="470" height="145" loading="lazy" decoding="async"></a>
   <figcaption>
     <div class="doduo-en" lang="en"><b>Figure 3:</b> How Doduo computes contextualized column embeddings using the Transformer layers. Each Transformer block calculates an embedding vector for every token based on surrounding tokens.</div>
     <div class="doduo-zh" lang="zh-CN"><b>图 3：</b>Doduo 如何利用 Transformer 层计算上下文化的列嵌入。每个 Transformer 模块基于周围的 token 为每个 token 计算一个嵌入向量。</div>
@@ -492,7 +492,7 @@ draft: false
 <p class="doduo-zh" lang="zh-CN"><b>学习效率</b>　预训练 LM 以能用相对少量的标注样本训练出高质量模型而著称。此外，多任务学习（即同时训练多个任务）应在每个任务训练数据更少时进一步稳定性能。为验证 Doduo 与 Dosolo 在标签效率方面的表现，我们比较了用不同训练数据规模（10%、25%、50%、100%）训练的 Doduo 模型，并在列类型预测和列关系预测任务上评估性能。如图 4 所示，Doduo 始终优于 Dosolo，即使只用一半训练数据，在两个任务上也都达到高于 0.9 的 F1 分数。特别地，仅使用 50% 或更少的标注样本，Doduo 在列类型预测上就优于最优方法 TURL，在列关系预测上也达到可与之相比的性能。</p>
 
 <figure class="doduo-figure">
-  <a href="/images/posts/doduo-translation/figure-4.webp" target="_blank" rel="noopener" aria-label="在新标签页查看原图"><img src="/images/posts/doduo-translation/figure-4.webp" alt="图 4 / Figure 4" width="547" height="374" loading="lazy" decoding="async"></a>
+  <a href="/images/posts/doduo-translation/figure-4.webp" target="_blank" rel="noopener" aria-label="在新标签页查看原图"><img src="/images/posts/doduo-translation/figure-4.webp" alt="图 4 / Figure 4" width="547" height="252" loading="lazy" decoding="async"></a>
   <figcaption>
     <div class="doduo-en" lang="en"><b>Figure 4:</b> Performance improvements over increasing the training data size on the WikiTable dataset. The dashed lines in the plots denote the state-of-the-art methods (TURL.)</div>
     <div class="doduo-zh" lang="zh-CN"><b>图 4：</b>在 WikiTable 数据集上，性能随训练数据规模增加而提升的情况。图中的虚线表示当时的最优方法（TURL）。</div>
@@ -684,7 +684,7 @@ draft: false
 <p class="doduo-zh" lang="zh-CN">图 5 展示了 Doduo 与 Sato 在 VizNet（完整集）和 VizNet（仅多列）数据集上每个类别的 F1 分数。在 VizNet 的两个变体上相对 Sato 的提升表明，Doduo 稳健且一致地优于 Sato，尤其是在单列表格上——在单列表格中 Sato 无法受益于表格特征和 CRF。我们发现，Sato 在 religion、education、organisation 这几类上的 F1 为零或非常差。VizNet（完整集）第 1 折的训练数据中，这三类的标注列分别只有 24、22 和 14 个。Sato 应当是由于这些列类型的训练样本不足（很可能还有列类型分布偏斜）而表现不佳。我们表明，Doduo 在这类列类型上表现稳健。</p>
 
 <figure class="doduo-figure">
-  <a href="/images/posts/doduo-translation/figure-5.webp" target="_blank" rel="noopener" aria-label="在新标签页查看原图"><img src="/images/posts/doduo-translation/figure-5.webp" alt="图 5 / Figure 5" width="1127" height="605" loading="lazy" decoding="async"></a>
+  <a href="/images/posts/doduo-translation/figure-5.webp" target="_blank" rel="noopener" aria-label="在新标签页查看原图"><img src="/images/posts/doduo-translation/figure-5.webp" alt="图 5 / Figure 5" width="1090" height="535" loading="lazy" decoding="async"></a>
   <figcaption>
     <div class="doduo-en" lang="en"><b>Figure 5:</b> Class F1 values by Doduo and Sato on the VizNet dataset (Above: Full set; Below: Multi-column only.)</div>
     <div class="doduo-zh" lang="zh-CN"><b>图 5：</b>Doduo 与 Sato 在 VizNet 数据集上各分类的 F1 值（上：完整集；下：仅多列）。</div>
@@ -774,7 +774,7 @@ draft: false
 <p class="doduo-zh" lang="zh-CN">最终矩阵中的每个元素 (<i>i</i>, <i>j</i>) 表示列类型 <i>i</i> 在构造其上下文化表示时对另一个列类型 <i>j</i> 的依赖程度。需要注意，列类型 <i>i</i> 对 <i>j</i>（或 <i>j</i> 对 <i>i</i>）的依赖可以不同，因此该矩阵并不对称。例如，age 高度依赖类型 origin，而反方向的注意力权重为负，显示出较低的依赖程度。为消除列类型共现带来的影响，我们统计了同一表格中列类型的共现情况，并对矩阵做归一化，使参照点为零，以便更直观地解释。最终矩阵由相对重要性分数构成，数值越高/越低表示来自该列类型的影响越强/越弱。</p>
 
 <figure class="doduo-figure">
-  <a href="/images/posts/doduo-translation/figure-6.webp" target="_blank" rel="noopener" aria-label="在新标签页查看原图"><img src="/images/posts/doduo-translation/figure-6.webp" alt="图 6 / Figure 6" width="556" height="663" loading="lazy" decoding="async"></a>
+  <a href="/images/posts/doduo-translation/figure-6.webp" target="_blank" rel="noopener" aria-label="在新标签页查看原图"><img src="/images/posts/doduo-translation/figure-6.webp" alt="图 6 / Figure 6" width="540" height="450" loading="lazy" decoding="async"></a>
   <figcaption>
     <div class="doduo-en" lang="en"><b>Figure 6:</b> Inter-column dependency based on attention analysis on the VizNet dataset. A higher value (red) indicates that the column type (<i>y</i>-axis) “relies on” the other column type (<i>x</i>-axis) for prediction. Each row denotes the degree of “dependence” against each column. For example, age in <i>y</i>-axis has a high attention weight against origin in <i>x</i>-axis, indicating that predicting age relies on signals from the origin column.</div>
     <div class="doduo-zh" lang="zh-CN"><b>图 6：</b>基于 VizNet 数据集上注意力分析的列间依赖。数值越高（红色）表示该列类型（<i>y</i> 轴）在预测时“依赖”另一个列类型（<i>x</i> 轴）。每一行表示相对于各列的“依赖”程度。例如，<i>y</i> 轴上的 age 相对于 <i>x</i> 轴上的 origin 具有较高的注意力权重，表明预测 age 依赖来自 origin 列的信号。</div>
