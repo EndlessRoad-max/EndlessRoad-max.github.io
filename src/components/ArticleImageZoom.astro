@@ -1,0 +1,44 @@
+<span hidden data-article-image-zoom></span>
+
+<script>
+  import PhotoSwipeLightbox from "photoswipe/lightbox";
+  import "photoswipe/style.css";
+
+  const marker = document.querySelector("[data-article-image-zoom]");
+  const article = marker?.closest("article");
+  if (article) {
+    for (const img of article.querySelectorAll<HTMLImageElement>("img[alt]")) {
+      if (img.closest("a")) continue;
+      const link = document.createElement("a");
+      link.href = img.currentSrc || img.src;
+      link.className = "article-diagram-zoom";
+      link.setAttribute("aria-label", `放大图解：${img.alt}`);
+      link.dataset.pswpWidth = String(img.naturalWidth || Number(img.getAttribute("width")) || img.width);
+      link.dataset.pswpHeight = String(img.naturalHeight || Number(img.getAttribute("height")) || img.height);
+      img.before(link);
+      link.append(img);
+    }
+    const lightbox = new PhotoSwipeLightbox({
+      gallery: article,
+      children: "a.article-diagram-zoom",
+      pswpModule: () => import("photoswipe"),
+      closeTitle: "关闭图解",
+      zoomTitle: "放大或缩小图解",
+      arrowPrev: false,
+      arrowNext: false,
+      counter: false,
+      wheelToZoom: true,
+      imageClickAction: "zoom",
+      doubleTapAction: "zoom",
+      secondaryZoomLevel: 1,
+      maxZoomLevel: 4,
+      showHideAnimationType: "none",
+    });
+    lightbox.init();
+  }
+</script>
+
+<style is:global>
+  a.article-diagram-zoom { display: block; cursor: zoom-in; }
+  a.article-diagram-zoom:focus-visible { outline: 3px solid currentColor; outline-offset: 4px; }
+</style>

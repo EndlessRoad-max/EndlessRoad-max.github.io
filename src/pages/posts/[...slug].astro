@@ -1,6 +1,7 @@
 ---
 import type { CollectionEntry } from "astro:content";
 import ArticleLayout from "../../layouts/ArticleLayout.astro";
+import ArticleImageZoom from "../../components/ArticleImageZoom.astro";
 import { publishedNotes, dateLabel } from "../../utils/portfolio";
 import { url } from "../../utils/url-utils";
 import "../../styles/doduo-translation.css";
@@ -12,4 +13,4 @@ interface Props { post: CollectionEntry<"posts">; }
 const { post } = Astro.props;
 const { Content, headings } = await post.render();
 ---
-<ArticleLayout title={post.data.title} description={post.data.description} headings={headings} kind="笔记" image={post.data.image}><div slot="meta"><div class="article-meta"><span>{post.data.category || "未分类"}</span><time datetime={post.data.published.toISOString()}>发布于 {dateLabel(post.data.published)}</time>{post.data.updated && <time datetime={post.data.updated.toISOString()}>更新于 {dateLabel(post.data.updated)}</time>}</div><div class="note-tags">{post.data.tags.map(tag => <a href={url(`/notes/?tag=${encodeURIComponent(tag)}`)}>#{tag}</a>)}</div></div><Content /></ArticleLayout>
+<ArticleLayout title={post.data.title} description={post.data.description} headings={headings} kind="笔记" image={post.data.image}><div slot="meta"><div class="article-meta"><span>{post.data.category || "未分类"}</span><time datetime={post.data.published.toISOString()}>发布于 {dateLabel(post.data.published)}</time>{post.data.updated && <time datetime={post.data.updated.toISOString()}>更新于 {dateLabel(post.data.updated)}</time>}</div><div class="note-tags">{post.data.tags.map(tag => <a href={url(`/notes/?tag=${encodeURIComponent(tag)}`)}>#{tag}</a>)}</div></div><Content />{post.slug === "pi-agent-single-flight-dual-queues" && <ArticleImageZoom />}</ArticleLayout>
