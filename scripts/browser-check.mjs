@@ -110,30 +110,31 @@ try {
           0,
         );
         await site.open("notes/");
-        await page.getByRole("button", { name: "工具与方法，1 篇笔记", exact: true }).click();
+        await page.getByRole("button", { name: "科研方法，1 篇笔记", exact: true }).click();
         await site.visibleText("共 1 篇笔记");
         await page.reload();
         assert.equal(
           new URL(page.url()).searchParams.get("category"),
-          "工具与方法",
+          "科研方法",
         );
-        await page.getByRole("button", { name: "#Markdown，1 篇笔记", exact: true }).click();
+        await page.getByRole("button", { name: "#深度学习，1 篇笔记", exact: true }).click();
         await site.visibleText("共 1 篇笔记");
-        await site.open("notes/?category=" + encodeURIComponent("工具与方法") + "&tag=" + encodeURIComponent("随笔"));
+        await site.open("notes/?category=" + encodeURIComponent("科研方法") + "&tag=" + encodeURIComponent("不存在的标签"));
         await site.visibleText("还没有符合条件的笔记");
         await page.goBack();
         await site.visibleText("共 1 篇笔记");
-        await site.open("posts/markdown-writing/");
+        await site.open("posts/binary-search-tree/");
         await site.noOverflow();
         await page
           .getByRole("button", { name: "Copy code", exact: true })
+          .first() // Verify copying the first Java example.
           .click();
         await page
           .getByRole("button", { name: "已复制代码", exact: true })
           .waitFor();
         assert(
           (await page.evaluate(() => navigator.clipboard.readText())).includes(
-            "const notebook",
+            "isValidBST",
           ),
         );
         if (width < 1000) {
@@ -142,13 +143,13 @@ try {
             .filter({ visible: true })
             .click();
           await page
-            .getByRole("link", { name: "用表格比较信息", exact: true })
+            .getByRole("link", { name: "2.2 中序", exact: true })
             .filter({ visible: true })
             .click();
         } else {
           await page
             .getByRole("complementary", { name: "文章目录" })
-            .getByRole("link", { name: "用表格比较信息", exact: false })
+            .getByRole("link", { name: "2.2 中序", exact: false })
             .click();
         }
         assert(page.url().includes("#"));
@@ -158,16 +159,16 @@ try {
         });
         await site.open("search/");
         const search = page.getByRole("textbox");
-        await search.fill("记录");
+        await search.fill("三遍阅读法");
         await page
           .getByRole("link", {
-            name: "从这里开始，留下一页自己的记录",
+            name: "深度学习论文三遍阅读法",
             exact: true,
           })
           .waitFor();
         const resultLink = await page
           .getByRole("link", {
-            name: "从这里开始，留下一页自己的记录",
+            name: "深度学习论文三遍阅读法",
             exact: true,
           })
           .getAttribute("href");

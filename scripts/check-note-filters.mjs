@@ -105,8 +105,8 @@ try {
   }));
   const touch = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
   const tp = await touch.newPage(), tn = new Notes(tp); await tn.open();
-  await tn.category('工具与方法', 1).tap(); await tn.count(1);
-  await tn.tag('Markdown', 1).tap(); await tn.count(1);
+  await tn.category('科研方法', 1).tap(); await tn.count(1);
+  await tn.tag('深度学习', 1).tap(); await tn.count(1);
   await touch.close();
   const plain = await browser.newContext({ javaScriptEnabled: false });
   const pp = await plain.newPage(); await pp.goto(new URL('notes/', base).href);
