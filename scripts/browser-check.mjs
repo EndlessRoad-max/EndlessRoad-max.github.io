@@ -110,16 +110,14 @@ try {
           0,
         );
         await site.open("notes/");
-        await page.getByRole("button", { name: "列表选择", exact: true }).click();
-        await page.getByRole("button", { name: "工具与方法 (1)", exact: true }).click();
+        await page.getByRole("button", { name: "工具与方法，1 篇笔记", exact: true }).click();
         await site.visibleText("共 1 篇笔记");
         await page.reload();
         assert.equal(
           new URL(page.url()).searchParams.get("category"),
           "工具与方法",
         );
-        await page.getByRole("button", { name: "列表选择", exact: true }).click();
-        await page.getByRole("button", { name: "Markdown (1)", exact: true }).click();
+        await page.getByRole("button", { name: "#Markdown，1 篇笔记", exact: true }).click();
         await site.visibleText("共 1 篇笔记");
         await site.open("notes/?category=" + encodeURIComponent("工具与方法") + "&tag=" + encodeURIComponent("随笔"));
         await site.visibleText("还没有符合条件的笔记");

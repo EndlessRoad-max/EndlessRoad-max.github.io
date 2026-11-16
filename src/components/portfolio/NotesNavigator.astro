@@ -1,0 +1,20 @@
+---
+import "../../styles/notes-navigation.css";
+---
+<section id="notes-navigator" aria-label="笔记筛选" hidden>
+  <div class="notes-filter-group" role="group" aria-labelledby="notes-category-label">
+    <span id="notes-category-label" class="notes-filter-label">分类</span>
+    <div id="notes-categories" class="notes-filter-options"></div>
+  </div>
+  <div class="notes-filter-group" role="group" aria-labelledby="notes-tag-label">
+    <span id="notes-tag-label" class="notes-filter-label">标签</span>
+    <div class="notes-tag-content">
+      <div id="notes-tags" class="notes-filter-options"></div>
+      <button id="notes-tags-toggle" class="notes-tags-toggle" type="button" aria-expanded="false" aria-controls="notes-tags" hidden>展开全部标签</button>
+    </div>
+  </div>
+</section>
+<script>
+  import { initNotesNavigation } from "../../scripts/notes-navigation";
+  initNotesNavigation();
+</script>

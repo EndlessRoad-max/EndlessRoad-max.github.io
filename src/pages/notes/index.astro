@@ -1,20 +1,24 @@
 ---
 import SiteLayout from "../../layouts/SiteLayout.astro";
 import NoteRow from "../../components/portfolio/NoteRow.astro";
-import GalaxyNavigator from "../../components/portfolio/GalaxyNavigator.astro";
+import NotesNavigator from "../../components/portfolio/NotesNavigator.astro";
 import { publishedNotes } from "../../utils/portfolio";
+import { url } from "../../utils/url-utils";
 const notes = await publishedNotes();
 ---
 <SiteLayout title="笔记">
   <header class="page-heading"><p class="page-kicker">写下来，才有迹可循</p><h1>笔记本<span class="heading-dot">.</span></h1><p>学习、实践，以及还没有想明白的问题。</p></header>
   <div class="notes-layout">
-    <GalaxyNavigator />
+    <NotesNavigator />
     <section aria-label="笔记列表">
-      <div class="galaxy-results"><p id="notes-count" class="result-count" aria-live="polite">共 {notes.length} 篇笔记</p><button id="clear-filters" hidden>清除筛选</button></div>
+      <div class="notes-results">
+        <div class="notes-results-summary"><p id="notes-count" class="result-count" role="status" aria-live="polite">共 {notes.length} 篇笔记</p><button id="clear-filters" type="button" hidden>清除筛选</button></div>
+        <a class="text-link" href={url("/search/")}>搜索笔记正文</a>
+      </div>
       <div id="note-list">{notes.map(post => <div data-note data-category={post.data.category || "未分类"} data-tags={JSON.stringify(post.data.tags)}><NoteRow post={post} /></div>)}</div>
       <p id="notes-empty" class="empty-state" hidden={notes.length > 0}>还没有符合条件的笔记，试试其他分类或标签。</p>
       <nav id="notes-pagination" class="pagination" aria-label="笔记分页" hidden><button id="prev-page">上一页</button><span id="page-label" aria-live="polite"></span><button id="next-page">下一页</button></nav>
-      <noscript><p>当前展示全部笔记。启用 JavaScript 可探索星系、筛选和分页。</p></noscript>
+      <noscript><p>当前展示全部笔记。启用 JavaScript 可按分类、标签筛选和分页。</p></noscript>
     </section>
   </div>
 </SiteLayout>

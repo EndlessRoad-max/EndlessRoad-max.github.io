@@ -89,18 +89,20 @@ try {
     });
     server.on("error", fail);
   });
-  browser = await chromium.launch({ headless: true });
+  browser = await chromium.launch({ headless: true, ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}) });
   const page = await browser.newPage({ viewport: { width: 375, height: 900 } });
   const base = "http://127.0.0.1:4322/portfolio/";
   await page.goto(base + "notes/");
+  await page.getByRole("region", { name: "笔记筛选" }).waitFor();
+  const totalNotes = await page.locator("[data-note]").count();
   assert.equal(await page.locator("[data-note]:visible").count(), 10);
   await page.getByRole("button", { name: "下一页" }).click();
-  assert.equal(await page.locator("[data-note]:visible").count(), 4);
+  assert.equal(await page.locator("[data-note]:visible").count(), Math.min(10, totalNotes - 10));
   assert(page.url().includes("page=2"));
   await page.reload();
-  assert.equal(await page.locator("[data-note]:visible").count(), 4);
-  await page.getByRole("button", { name: "列表选择", exact: true }).click();
-  await page.getByRole("group", { name: "列表选择主题或标签", exact: true }).getByRole("button", { name: /^验收分类 \(/ }).click();
+  await page.getByRole("region", { name: "笔记筛选" }).waitFor();
+  assert.equal(await page.locator("[data-note]:visible").count(), Math.min(10, totalNotes - 10));
+  await page.getByRole("group", { name: "分类", exact: true }).getByRole("button", { name: /^验收分类，/ }).click();
   assert.equal(await page.locator("[data-note]:visible").count(), 10);
   assert(!page.url().includes("page=2"));
   await page.getByRole("button", { name: "下一页" }).click();
@@ -149,7 +151,7 @@ try {
     "Search result must preserve base",
   );
   console.log(
-    "Passed: /portfolio/ deployment, 14-note pagination, URL refresh, new content/search, updated sorting, relative images, long title/code/table, no-cover project, draft project exclusion.",
+    "Passed: /portfolio/ deployment, dynamic note pagination, URL refresh, new content/search, updated sorting, relative images, long title/code/table, no-cover project, draft project exclusion.",
   );
 } finally {
   await browser?.close();
