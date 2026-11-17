@@ -1,0 +1,21 @@
+---
+import "../styles/reveal-translation.css";
+---
+
+<div class="reveal-paper" data-reading-mode="both"><slot /></div>
+
+<script>
+  for (const paper of document.querySelectorAll<HTMLElement>(".reveal-paper")) {
+    const buttons = paper.querySelectorAll<HTMLButtonElement>("button[data-mode]");
+    for (const button of buttons) {
+      button.addEventListener("click", () => {
+        paper.dataset.readingMode = button.dataset.mode;
+        for (const candidate of buttons) {
+          const selected = candidate === button;
+          candidate.classList.toggle("on", selected);
+          candidate.setAttribute("aria-pressed", String(selected));
+        }
+      });
+    }
+  }
+</script>

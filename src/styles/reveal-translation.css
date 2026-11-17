@@ -1,0 +1,95 @@
+/* Scoped to this paper; the site owns navigation, headings and theme. */
+.custom-md .reveal-paper {
+  --ink: var(--text);
+  --ink2: var(--text);
+  --ink3: var(--muted);
+  --accent: var(--text);
+  --card: var(--surface);
+  --abg: var(--tint);
+  --wbg: var(--tint);
+  --gbg: var(--tint);
+  min-width: 0;
+}
+.reveal-paper .reveal-title {
+  margin: 32px 0;
+  padding: 24px 0;
+  border-block: 1px solid var(--line);
+}
+.reveal-paper .kicker, .reveal-paper .meta { color: var(--muted); font-size: 13px; }
+.custom-md .reveal-paper .paper-title {
+  font: 600 24px/1.5 Georgia, "Times New Roman", serif;
+  margin: 16px 0 10px;
+}
+.reveal-paper .h1zh { font-size: 19px; margin-bottom: 16px; }
+.reveal-paper .tools { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
+.reveal-paper .tools button {
+  color: var(--text); background: var(--surface); border: 1px solid var(--line);
+  border-radius: 6px; padding: 8px 14px; font-size: 13px; min-height: 44px;
+}
+.reveal-paper .tools button.on { color: var(--surface); background: var(--text); border-color: var(--text); }
+.reveal-paper .p { margin-bottom: 26px; padding-left: 16px; border-left: 2px solid var(--line); }
+.custom-md .reveal-paper .en { font: 15px/1.85 Georgia, "Times New Roman", serif; color: var(--muted); margin: 0 0 10px; }
+.custom-md .reveal-paper .zh { font-size: 16px; line-height: 1.95; color: var(--text); margin: 0; }
+.reveal-paper[data-reading-mode="zh-only"] .en,
+.reveal-paper[data-reading-mode="zh-only"] .ten,
+.reveal-paper[data-reading-mode="en-only"] .zh { display: none; }
+.reveal-paper .ri { font-weight: 650; }
+.reveal-paper .box, .reveal-paper .note, .reveal-paper .pipe {
+  border: 1px solid var(--line); background: var(--tint); border-radius: 8px;
+  padding: 18px 20px; margin: 24px 0;
+}
+.reveal-paper .lbl, .reveal-paper .ph { display: block; font-size: 13px; font-weight: 650; margin-bottom: 12px; }
+.reveal-paper .box .p { border: 0; padding: 0; margin: 0; }
+.reveal-paper .note { font-size: 14px; }
+.reveal-paper .eq {
+  display: flex; gap: 24px; align-items: center; justify-content: space-between;
+  max-width: 100%; overflow-x: auto; padding: 18px; margin: 24px 0;
+  background: var(--tint); border: 1px solid var(--line); border-radius: 6px;
+  font: 16px/1.9 Georgia, "Times New Roman", serif;
+}
+.reveal-paper .eq > :first-child { flex-shrink: 0; }
+.reveal-paper .eq .num { flex: none; margin-left: auto; color: var(--muted); }
+.reveal-paper .algo { margin: 24px 0; min-width: 0; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.reveal-paper .abar { background: var(--tint); padding: 10px 16px; font-size: 13px; }
+.custom-md .reveal-paper .algo pre {
+  margin: 0; border-radius: 0; padding: 18px; overflow-x: auto;
+  background: #181818; color: #ededed; font: 12px/1.9 Consolas, monospace;
+  white-space: pre; overflow-wrap: normal;
+}
+.reveal-paper .algo .c { color: #b0b0b0; }
+.reveal-paper .algo .k { color: #a4d3fa; }
+.reveal-paper .tbl { margin: 28px 0; }
+.reveal-paper .tcap, .reveal-paper .figcap { font-size: 13px; line-height: 1.85; }
+.reveal-paper .ten { display: block; color: var(--muted); font-family: Georgia, "Times New Roman", serif; margin-top: 6px; }
+.reveal-paper .scroll { max-width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; margin-top: 12px; }
+.custom-md .reveal-paper table { display: table; width: 100%; max-width: none; margin: 0; font-size: 13px; }
+.custom-md .reveal-paper :is(th, td) { padding: 10px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; text-align: left; line-height: 1.7; }
+.custom-md .reveal-paper th { background: var(--tint); color: var(--text); }
+.reveal-paper tr:last-child td { border-bottom: 0; }
+.reveal-paper tr.ours td { background: var(--tint); font-weight: 650; }
+.reveal-paper td.num { font-variant-numeric: tabular-nums; }
+.reveal-paper td.best { font-weight: 750; }
+.reveal-paper td.sec { text-decoration: underline; text-underline-offset: 3px; }
+.custom-md .reveal-paper .wrapcell { white-space: normal; min-width: 190px; }
+.custom-md .reveal-paper figure.fig { margin: 32px 0; }
+.reveal-paper .pic { padding: 10px; background: white; border: 1px solid var(--line); border-radius: 6px; margin-bottom: 12px; }
+.custom-md .reveal-paper .pic img { display: block; max-width: 100%; height: auto; margin: 0 auto; cursor: zoom-in; }
+.reveal-paper .figcap { color: var(--text); margin: 0; }
+.reveal-paper .prow { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.reveal-paper .node { padding: 9px 13px; border: 1px solid var(--line); background: var(--surface); border-radius: 6px; font-size: 13px; text-align: center; }
+.reveal-paper .node b { display: block; }
+.reveal-paper .node small { color: var(--muted); }
+.reveal-paper .div { border-top: 1px solid var(--line); margin: 20px 0; }
+.reveal-paper .refs { font: 13px/1.85 Georgia, "Times New Roman", serif; overflow-wrap: anywhere; }
+.custom-md .reveal-paper .refs p { padding-left: 30px; text-indent: -30px; margin: 12px 0; }
+.reveal-paper .foot { color: var(--muted); font-size: 12px; border-top: 1px solid var(--line); padding-top: 20px; margin-top: 32px; }
+.reveal-paper :is(.scroll, .eq):focus-visible { outline: 2px solid var(--text); outline-offset: 4px; }
+@media (max-width: 639px) {
+  .custom-md .reveal-paper .paper-title { font-size: 21px; }
+  .reveal-paper .p { padding-left: 12px; }
+  .reveal-paper .box, .reveal-paper .note, .reveal-paper .pipe { padding: 14px; }
+}
+@media print {
+  .reveal-paper .tools { display: none; }
+  .reveal-paper .p { break-inside: avoid; }
+}
