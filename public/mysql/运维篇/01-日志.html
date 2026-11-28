@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>1 日志 · 运维篇 · MySQL 笔记</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="layout">
+
+  <nav class="sidebar">
+    <p class="side-title">本页目录</p>
+    <a href="#s1">1. 四本账的分工</a>
+    <a href="#s2">2. 错误日志</a>
+    <a href="#s3">3. 二进制日志</a>
+    <a href="#s3c" style="padding-left:24px;font-size:12.5px;color:#8a9099">· 3.4 清理与保留</a>
+    <a href="#s4">4. 查询日志</a>
+    <a href="#s5">5. 慢查询日志</a>
+    <a href="#s6">6. 出事先翻哪本</a>
+    <a href="#s7">7. 与课程的出入</a>
+    <p class="side-title" style="margin-top:22px">当前位置</p>
+    <ul class="nav-tree">
+      <li><a href="../index.html">↑ 总目录</a>
+        <ul>
+          <li><span class="current">01 日志</span></li>
+          <li><a href="02-主从复制.html">02 主从复制</a></li>
+          <li><a href="03-分库分表.html">03 分库分表</a>
+            <ul>
+              <li><a href="03-01-MyCat实现.html">03-01 MyCat 实现</a></li>
+            </ul>
+          </li>
+          <li><a href="04-读写分离.html">04 读写分离</a></li>
+        </ul>
+      </li>
+    </ul>
+  </nav>
+
+  <main class="main">
+
+    <div class="crumb">
+      <a href="../index.html">总目录</a> /
+      运维篇 · 01 日志
+    </div>
+    <h1><span class="chapter-no">01</span>日志</h1>
+    <p class="lede">MySQL 有四种常用日志，各自回答不同的问题：<b>为什么起不来</b>（错误日志）、<b>数据是怎么变成现在这样的</b>（二进制日志）、<b>客户端到底发了什么</b>（查询日志）、<b>哪条 SQL 慢</b>（慢查询日志）。搞不清谁记什么，排障时就会在错的账本里翻半天。</p>
+
+    <div class="meta">
+      <span>运维篇 · 01 日志</span>
+      <span>更新：2026-11-25</span>
+      <span>环境：MySQL 8.0</span>
+    </div>
+
+    <section class="quick">
+      <p class="quick-head">一屏速记<span>合上笔记，这 5 条要能自己说出来</span></p>
+      <ol>
+        <li>四个日志的<b>默认开关不一样</b>：错误日志、二进制日志默认开；查询日志、慢查询日志默认关。排障第一步不是查，而是先确认这个日志到底有没有在记。</li>
+        <li>二进制日志<b>只记会改数据的语句</b>（DDL + DML），不记 SELECT。所以它<b>不能当审计日志用</b>——查不到谁读了什么。</li>
+        <li><code>binlog</code> 的文件名 = <code>log_bin_basename</code> + 6 位编号（从 000001 起），<code>log_bin_index</code> 是这些文件的清单。<b>编号只增不减</b>，PURGE 之后也不回退。</li>
+        <li>清理三种方式：<code>PURGE BINARY LOGS TO/BEFORE</code>、<code>RESET MASTER</code>（8.0.34 起弃用）、按 <code>binlog_expire_logs_seconds</code> 自动过期（默认 30 天）。<b>PURGE 前必须确认从库已经读完</b>，否则从库直接断。</li>
+        <li>慢查询日志的判定是<b>两道条件同时满足</b>：耗时 ≥ <code>long_query_time</code>（默认 10 秒）<b>且</b>扫描行数 ≥ <code>min_examined_row_limit</code>（默认 0）。只调阈值不看扫描行数，会漏掉真正该优化的 SQL。</li>
+      </ol>
+    </section>
+
+    <h2 id="s1">1. 四本账的分工</h2>
+
+    <p>先建立一张全局图。四种日志写的是<b>同一个实例的不同侧面</b>，互相不能替代：</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 680 306" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <text x="340" y="20" text-anchor="middle" font-size="11.5" fill="#8a9099">四种日志：谁在记、默认开不开、用来回答什么问题</text>
+
+        <rect x="12" y="32" width="324" height="116" rx="8" fill="#f5fbf7" stroke="#cfe8d8"/>
+        <text x="28" y="56" font-size="13" font-weight="700" fill="#1a7f4b">错误日志</text>
+        <text x="104" y="56" font-size="10" font-family="Consolas,monospace" fill="#9aa3ad">ERROR LOG</text>
+        <text x="320" y="56" text-anchor="end" font-size="10.5" font-weight="700" fill="#1a7f4b">默认 ON</text>
+        <text x="28" y="82" font-size="11.5" fill="#1f2329">记：启动、关闭、崩溃、严重错误的现场</text>
+        <text x="28" y="104" font-size="11.5" fill="#1f2329">用：起不来、莫名重启，第一眼看它</text>
+        <text x="28" y="130" font-size="10.5" fill="#8a9099">只有它记「服务器本身」的问题</text>
+
+        <rect x="344" y="32" width="324" height="116" rx="8" fill="#e6f3f6" stroke="#b9dde5"/>
+        <text x="360" y="56" font-size="13" font-weight="700" fill="#00566b">二进制日志</text>
+        <text x="436" y="56" font-size="10" font-family="Consolas,monospace" fill="#7fa6af">BINLOG</text>
+        <text x="652" y="56" text-anchor="end" font-size="10.5" font-weight="700" fill="#00566b">默认 ON（8.0）</text>
+        <text x="360" y="82" font-size="11.5" fill="#1f2329">记：所有改数据的 DDL / DML，不记 SELECT</text>
+        <text x="360" y="104" font-size="11.5" fill="#1f2329">用：时间点恢复、主从复制</text>
+        <text x="360" y="130" font-size="10.5" fill="#8a9099">唯一能「重放一遍历史」的账</text>
+
+        <rect x="12" y="160" width="324" height="116" rx="8" fill="#fbfcfd" stroke="#e4e7ec" stroke-dasharray="4 3"/>
+        <text x="28" y="184" font-size="13" font-weight="700" fill="#4e5564">查询日志</text>
+        <text x="104" y="184" font-size="10" font-family="Consolas,monospace" fill="#9aa3ad">GENERAL LOG</text>
+        <text x="320" y="184" text-anchor="end" font-size="10.5" font-weight="700" fill="#8a9099">默认 OFF</text>
+        <text x="28" y="210" font-size="11.5" fill="#1f2329">记：客户端发来的每一条语句，含 SELECT</text>
+        <text x="28" y="232" font-size="11.5" fill="#1f2329">用：查「客户端到底发了什么」</text>
+        <text x="28" y="258" font-size="10.5" fill="#8a9099">全量记录，代价最大，只适合短开</text>
+
+        <rect x="344" y="160" width="324" height="116" rx="8" fill="#fdf3e3" stroke="#f0d9b0"/>
+        <text x="360" y="184" font-size="13" font-weight="700" fill="#b06a00">慢查询日志</text>
+        <text x="436" y="184" font-size="10" font-family="Consolas,monospace" fill="#c9ab7c">SLOW LOG</text>
+        <text x="652" y="184" text-anchor="end" font-size="10.5" font-weight="700" fill="#b06a00">默认 OFF</text>
+        <text x="360" y="210" font-size="11.5" fill="#1f2329">记：超过阈值的语句，附扫描行数</text>
+        <text x="360" y="232" font-size="11.5" fill="#1f2329">用：找该优化的 SQL</text>
+        <text x="360" y="258" font-size="10.5" fill="#8a9099">记录的字段比 binlog 更适合分析</text>
+
+        <text x="340" y="296" text-anchor="middle" font-size="10.5" fill="#b06a00">四本账的记录范围不重叠——选错日志，等于在错的账本里找线索</text>
+      </svg>
+      <figcaption><b>图 1</b>四种日志的分工。虚线框是默认关闭的两个，用之前必须先开。</figcaption>
+    </figure>
+
+    <table>
+      <thead><tr><th>日志</th><th>系统变量开关</th><th>默认</th><th>默认落点</th><th>能否动态开启</th></tr></thead>
+      <tbody>
+        <tr><td>错误日志</td><td><code>log_error</code></td><td>开（无法关闭）</td><td>Linux 包：<code>/var/log/mysqld.log</code></td><td>否，静态参数</td></tr>
+        <tr><td>二进制日志</td><td><code>log_bin</code></td><td>开</td><td>数据目录 <code>binlog.000001</code></td><td>否，要重启</td></tr>
+        <tr><td>查询日志</td><td><code>general_log</code></td><td>关</td><td><code>host_name.log</code>（数据目录）</td><td>能，<code>SET GLOBAL</code></td></tr>
+        <tr><td>慢查询日志</td><td><code>slow_query_log</code></td><td>关</td><td><code>host_name-slow.log</code>（数据目录）</td><td>能，<code>SET GLOBAL</code></td></tr>
+      </tbody>
+    </table>
+
+    <div class="note warn">
+      <b>两个「关着」的日志，是新手最容易白查的原因</b>
+      <p>业务说「这条 SQL 慢得要死」，你打开慢查询日志发现是空的——不是没慢 SQL，是<b>日志根本没开</b>。同理，怀疑 ORM 拼错了语句去翻查询日志，发现文件不存在。<br>
+      所以任何一次排障，第一步都是同一句话：<code>SHOW VARIABLES LIKE '%log%';</code> 先确认账本存在，再谈内容。</p>
+    </div>
+
+    <h2 id="s2">2. 错误日志：唯一记「服务器自己」的账</h2>
+
+    <p>错误日志是四种里最特殊的一个：它不记 SQL，记的是 <b>mysqld 这个进程的状态</b>——启动参数解析、InnoDB 崩溃恢复、端口占用、磁盘写满、表损坏、连接被拒。它默认开启，而且<b>没有关闭开关</b>，只能改路径或重定向。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 680 224" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <text x="340" y="20" text-anchor="middle" font-size="11.5" fill="#8a9099">8.0 的错误日志是「组件链」：先过滤，再写出，顺序有意义</text>
+
+        <rect x="12" y="56" width="132" height="86" rx="8" fill="#e6f3f6" stroke="#b9dde5"/>
+        <text x="78" y="80" text-anchor="middle" font-size="12" font-weight="700" fill="#00566b">mysqld 事件</text>
+        <text x="78" y="104" text-anchor="middle" font-size="10.5" font-family="Consolas,monospace" fill="#4e5564">ERROR</text>
+        <text x="78" y="120" text-anchor="middle" font-size="10.5" font-family="Consolas,monospace" fill="#4e5564">WARNING</text>
+        <text x="78" y="136" text-anchor="middle" font-size="10.5" font-family="Consolas,monospace" fill="#4e5564">NOTE</text>
+
+        <path d="M146 99 L172 99" stroke="#c9cfd8" stroke-width="1.4"/>
+        <path d="M168 95 L175 99 L168 103 Z" fill="#c9cfd8"/>
+
+        <rect x="178" y="38" width="228" height="122" rx="8" fill="#ffffff" stroke="#e4e7ec"/>
+        <text x="192" y="58" font-size="10.5" font-family="Consolas,monospace" font-weight="700" fill="#00758f">log_error_services</text>
+
+        <rect x="190" y="66" width="204" height="40" rx="6" fill="#f7f9fa" stroke="#dfe3e9"/>
+        <text x="200" y="82" font-size="10.5" font-family="Consolas,monospace" fill="#4e5564">① log_filter_internal</text>
+        <text x="200" y="97" font-size="10" fill="#8a9099">按 log_error_verbosity 的级别过滤</text>
+
+        <rect x="190" y="112" width="204" height="40" rx="6" fill="#f7f9fa" stroke="#dfe3e9"/>
+        <text x="200" y="128" font-size="10.5" font-family="Consolas,monospace" fill="#4e5564">② log_sink_internal</text>
+        <text x="200" y="143" font-size="10" fill="#8a9099">写成文本，落到 log_error 指的路径</text>
+
+        <path d="M408 99 L434 99" stroke="#c9cfd8" stroke-width="1.4"/>
+        <path d="M430 95 L437 99 L430 103 Z" fill="#c9cfd8"/>
+
+        <text x="448" y="58" font-size="11.5" font-weight="700" fill="#4e5564">落点</text>
+        <text x="448" y="82" font-size="10.5" fill="#1f2329">文件：log_error 指向的路径</text>
+        <text x="448" y="104" font-size="10.5" fill="#1f2329">stderr：没配 log_error 时</text>
+        <text x="448" y="126" font-size="10.5" fill="#1f2329">JSON / syslog：换 sink 组件</text>
+        <text x="448" y="150" font-size="10" fill="#8a9099">可同时启用多个 sink</text>
+
+        <text x="340" y="196" text-anchor="middle" font-size="10.5" fill="#8a9099">想少记？调 log_error_verbosity（1 只错误 / 2 加警告 / 3 加提示，默认 2）</text>
+        <text x="340" y="212" text-anchor="middle" font-size="10.5" fill="#8a9099">想屏蔽特定错误号？log_error_suppression_list='MY-010001'</text>
+      </svg>
+      <figcaption><b>图 2</b>8.0 把错误日志做成了组件链。你平时只调第一个参数（<code>log_error</code>），真正决定「记多少」的是 <code>log_error_verbosity</code>。</figcaption>
+    </figure>
+
+    <pre><span class="label">sql</span><code><span class="c">-- 路径、级别、组件链，三个一起看</span>
+<span class="k">SHOW</span> <span class="k">VARIABLES</span> <span class="k">LIKE</span> <span class="s">'%log_error%'</span>;
+<span class="c">-- +------------------------------+---------------------------------+</span>
+<span class="c">-- | log_error                   | /var/log/mysqld.log            |</span>
+<span class="c">-- | log_error_services          | log_filter_internal;log_si…    |</span>
+<span class="c">-- | log_error_suppression_list  |                                |</span>
+<span class="c">-- | log_error_verbosity         | 2                              |</span>
+<span class="c">-- +------------------------------+---------------------------------+</span>
+
+<span class="c">-- 日志里的时间对不上系统时间？查这个</span>
+<span class="k">SELECT</span> @@log_timestamps;   <span class="c">-- 默认 UTC，写进文件的时间比北京时间早 8 小时</span>
+<span class="k">SET</span> <span class="k">PERSIST</span> log_timestamps <span class="k">=</span> <span class="s">'SYSTEM'</span>;</code></pre>
+
+    <pre><span class="label">shell</span><code><span class="c"># 路径不是固定的：先问服务器，别猜</span>
+mysql -uroot -p -N -B -e <span class="s">"SELECT @@log_error"</span>
+
+<span class="c"># 起不来的时候，只看最后 200 行，够定位 95% 的启动失败</span>
+tail -n 200 /var/log/mysqld.log
+grep -i <span class="s">"error"</span> /var/log/mysqld.log | tail -n 50
+
+<span class="c"># 轮转：先改名再 flush，否则新日志接着往同名文件里写</span>
+mv /var/log/mysqld.log /var/log/mysqld.log.20261125
+mysqladmin -uroot -p flush-logs</code></pre>
+
+    <div class="note tip">
+      <b>默认路径随安装方式变，不要背死</b>
+      <p>官方 <b>RPM / YUM</b>：<code>/var/log/mysqld.log</code>；<b>Debian / Ubuntu</b>：<code>/var/log/mysql/error.log</code>；<b>源码编译或自定义</b>：数据目录下的 <code>host_name.err</code>。<br>
+      课程里写的「默认 <code>/var/log/</code>、文件名 <code>mysqld.log</code>」是按 RPM 包讲的，换个装法就不成立。<b>永远以 <code>SELECT @@log_error</code> 为准。</b></p>
+    </div>
+
+    <div class="note plain">
+      <b>错误日志里常看到的几行，认得出来能省很多时间</b>
+      <p><code>[ERROR] [MY-010119] Aborting</code> + 上面几行 InnoDB 报错 → 崩溃恢复失败，看它前面那条真正的错。<br>
+      <code>[ERROR] [MY-010262] Can't start server: Bind on TCP/IP port. Do you already have another mysqld server running on port: 3306?</code> → 端口被占，先 <code>netstat -tlnp | grep 3306</code>。<br>
+      <code>[Warning] [MY-010055] IP address '1.2.3.4' could not be resolved</code> → 反查 DNS 超时，加 <code>skip-name-resolve</code> 能治，但改之前先确认权限表里用的是 IP 不是主机名。<br>
+      <code>[Note] [MY-010253] InnoDB: Buffer pool(s) load completed at ...</code> → 正常启动信息，不用管（但 <code>verbosity=1</code> 时它就不写了）。</p>
+    </div>
+
+    <h2 id="s3">3. 二进制日志：唯一能重放历史的那本账</h2>
+
+    <p>binlog 以<b>事件（event）</b>为单位记录「数据库发生了什么变化」。官方给它的用途只有两个：<b>主从复制</b>和<b>时间点恢复</b>。8.0 起默认开启，不用额外配。</p>
+
+    <h3>3.1 记什么、不记什么</h3>
+
+    <figure class="fig">
+      <svg viewBox="0 0 680 262" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <rect x="8" y="8" width="328" height="238" rx="10" fill="#f5fbf7" stroke="#cfe8d8"/>
+        <text x="28" y="38" font-size="13" font-weight="700" fill="#1a7f4b">✓ 记</text>
+        <text x="320" y="38" text-anchor="end" font-size="10.5" fill="#5f9c7a">凡是有可能改数据的动作</text>
+
+        <circle cx="34" cy="68" r="3.5" fill="#1a7f4b"/>
+        <text x="48" y="72" font-size="11.5" fill="#1f2329">DDL：CREATE / ALTER / DROP</text>
+        <circle cx="34" cy="100" r="3.5" fill="#1a7f4b"/>
+        <text x="48" y="104" font-size="11.5" fill="#1f2329">DML：INSERT / UPDATE / DELETE</text>
+        <circle cx="34" cy="132" r="3.5" fill="#1a7f4b"/>
+        <text x="48" y="136" font-size="11.5" fill="#1f2329">事务边界：BEGIN / COMMIT（XID）</text>
+        <circle cx="34" cy="164" r="3.5" fill="#1a7f4b"/>
+        <text x="48" y="168" font-size="11.5" fill="#1f2329">命中 0 行的 DELETE（STATEMENT 格式）</text>
+        <circle cx="34" cy="196" r="3.5" fill="#1a7f4b"/>
+        <text x="48" y="200" font-size="11.5" fill="#1f2329">每条语句的执行耗时、线程号</text>
+        <text x="48" y="226" font-size="10" fill="#8a9099">↑ 这一条让 binlog 也能拿来做粗略审计</text>
+
+        <rect x="344" y="8" width="328" height="238" rx="10" fill="#fdf7f6" stroke="#f5d3cf"/>
+        <text x="364" y="38" font-size="13" font-weight="700" fill="#c0392b">✗ 不记</text>
+        <text x="656" y="38" text-anchor="end" font-size="10.5" fill="#b97c74">查再多遍也不会有</text>
+
+        <circle cx="370" cy="68" r="3.5" fill="#c0392b"/>
+        <text x="384" y="72" font-size="11.5" fill="#1f2329">SELECT / SHOW / DESC 这类纯读</text>
+        <circle cx="370" cy="100" r="3.5" fill="#c0392b"/>
+        <text x="384" y="104" font-size="11.5" fill="#1f2329">临时表的操作</text>
+        <circle cx="370" cy="132" r="3.5" fill="#c0392b"/>
+        <text x="384" y="136" font-size="11.5" fill="#1f2329">sql_log_bin=0 期间执行的语句</text>
+        <circle cx="370" cy="164" r="3.5" fill="#c0392b"/>
+        <text x="384" y="168" font-size="11.5" fill="#1f2329">被复制过滤器排除的库</text>
+        <circle cx="370" cy="196" r="3.5" fill="#c0392b"/>
+        <text x="384" y="200" font-size="11.5" fill="#1f2329">密码原文（会改写成占位符）</text>
+        <text x="384" y="226" font-size="10" fill="#b06a00">↑ 所以「谁查了这张表」永远查不到</text>
+      </svg>
+      <figcaption><b>图 3</b>binlog 的边界。<b>它记的是「变化」，不是「访问」</b>——这是它和查询日志最根本的区别。</figcaption>
+    </figure>
+
+    <div class="note warn">
+      <b>课程那句话要补一个例外</b>
+      <p>「不记录数据查询语句」是对的，但反过来要精确：<b>语句「可能」改数据就会记</b>。一条 <code>DELETE FROM emp WHERE id = -1</code> 一行没删，在 STATEMENT 格式下照样进 binlog（因为「可能」改）；换成 ROW 格式则不会，因为没有任何行镜像产生。<br>
+      真正决定「记不记」的是<b>有没有产生变更事件</b>，不是「这条语句有没有跑成功」。</p>
+    </div>
+
+    <h3>3.2 三个参数决定它在哪、叫什么</h3>
+
+    <figure class="fig">
+      <svg viewBox="0 0 680 252" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <rect x="12" y="36" width="300" height="186" rx="8" fill="#ffffff" stroke="#e4e7ec"/>
+        <text x="28" y="60" font-size="11.5" font-weight="700" fill="#4e5564">数据目录 /var/lib/mysql/</text>
+        <text x="28" y="78" font-size="10" fill="#8a9099">= log_bin_basename 的目录部分</text>
+
+        <rect x="24" y="88" width="276" height="30" rx="5" fill="#fdf3e3" stroke="#f0d9b0"/>
+        <text x="36" y="108" font-size="11" font-family="Consolas,monospace" fill="#b06a00">binlog.index</text>
+        <text x="288" y="108" text-anchor="end" font-size="10" fill="#8a6a2e">清单：有哪些 binlog</text>
+
+        <rect x="24" y="122" width="276" height="30" rx="5" fill="#f7f9fa" stroke="#dfe3e9"/>
+        <text x="36" y="142" font-size="11" font-family="Consolas,monospace" fill="#4e5564">binlog.000001</text>
+        <text x="288" y="142" text-anchor="end" font-size="10" fill="#8a9099">已归档</text>
+
+        <rect x="24" y="156" width="276" height="30" rx="5" fill="#f7f9fa" stroke="#dfe3e9"/>
+        <text x="36" y="176" font-size="11" font-family="Consolas,monospace" fill="#4e5564">binlog.000002</text>
+        <text x="288" y="176" text-anchor="end" font-size="10" fill="#8a9099">已归档</text>
+
+        <rect x="24" y="190" width="276" height="30" rx="5" fill="#e6f3f6" stroke="#00758f" stroke-width="1.4"/>
+        <text x="36" y="210" font-size="11" font-family="Consolas,monospace" font-weight="700" fill="#00566b">binlog.000003</text>
+        <text x="288" y="210" text-anchor="end" font-size="10" fill="#00566b">正在写</text>
+
+        <text x="340" y="60" font-size="11.5" font-weight="700" fill="#4e5564">什么时候开一个新文件</text>
+        <text x="340" y="88" font-size="11" fill="#1f2329">① 服务启动 / 重启</text>
+        <text x="340" y="112" font-size="11" fill="#1f2329">② 执行 FLUSH BINARY LOGS</text>
+        <text x="340" y="136" font-size="11" fill="#1f2329">③ 当前文件达到 max_binlog_size（默认 1G）</text>
+
+        <text x="340" y="170" font-size="10.5" fill="#b06a00">大事务不会被切开：</text>
+        <text x="340" y="188" font-size="10.5" fill="#b06a00">单个文件可能超过 1G，属正常</text>
+        <text x="340" y="214" font-size="10.5" fill="#8a9099">编号从 000001 起、只增不减</text>
+      </svg>
+      <figcaption><b>图 4</b><code>basename</code> 决定目录和前缀，<code>index</code> 是这个目录的「目录」，编号由 mysqld 自己递增。</figcaption>
+    </figure>
+
+    <table>
+      <thead><tr><th>参数</th><th>默认值（8.0）</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td><code>log_bin</code></td><td><code>ON</code></td><td>只读。关它要加 <code>skip-log-bin</code> 重启，不能在运行中 <code>SET</code></td></tr>
+        <tr><td><code>log_bin_basename</code></td><td><code>/var/lib/mysql/binlog</code></td><td>路径 + 前缀。8.0 默认前缀是 <code>binlog</code>，老版本是 <code>host_name-bin</code></td></tr>
+        <tr><td><code>log_bin_index</code></td><td><code>/var/lib/mysql/binlog.index</code></td><td>文件清单。<b>不要手工改</b>，会把它改乱</td></tr>
+        <tr><td><code>binlog_format</code></td><td><code>ROW</code></td><td>8.0.34 起标记弃用，方向是只保留 ROW</td></tr>
+        <tr><td><code>binlog_row_image</code></td><td><code>FULL</code></td><td>行格式下记前后完整镜像；改成 <code>MINIMAL</code> 会让回放/闪回工具失效</td></tr>
+        <tr><td><code>sync_binlog</code></td><td><code>1</code></td><td>每次提交都刷盘，掉电不丢事务；调到 0 会快，但崩溃可能丢</td></tr>
+        <tr><td><code>max_binlog_size</code></td><td><code>1073741824</code></td><td>单个文件上限（1G），但大事务不切分</td></tr>
+        <tr><td><code>binlog_expire_logs_seconds</code></td><td><code>2592000</code></td><td>30 天。旧的 <code>expire_logs_days</code> 已弃用，8.2 移除</td></tr>
+      </tbody>
+    </table>
+
+    <h3>3.3 三种格式：同一条 UPDATE，三种记法</h3>
+
+    <figure class="fig">
+      <svg viewBox="0 0 680 292" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <rect x="10" y="10" width="660" height="34" rx="6" fill="#1b2430"/>
+        <text x="24" y="32" font-size="11.5" font-family="Consolas,monospace" fill="#e6edf3">UPDATE emp SET salary = 9000 WHERE id = 3;</text>
+
+        <rect x="10" y="60" width="212" height="176" rx="8" fill="#fbfcfd" stroke="#e4e7ec"/>
+        <text x="24" y="84" font-size="12" font-weight="700" fill="#4e5564">STATEMENT</text>
+        <text x="208" y="84" text-anchor="end" font-size="10" fill="#8a9099">记原句</text>
+        <text x="24" y="110" font-size="10.5" fill="#1f2329">文件里就是这条 SQL</text>
+        <text x="24" y="132" font-size="10.5" fill="#1f2329">文件小、可读性好</text>
+        <text x="24" y="154" font-size="10.5" fill="#b06a00">含 NOW() / UUID() /</text>
+        <text x="24" y="170" font-size="10.5" fill="#b06a00">LIMIT 无 ORDER BY</text>
+        <text x="24" y="186" font-size="10.5" fill="#b06a00">时主从可能不一致</text>
+        <text x="24" y="216" font-size="10" fill="#8a9099">8.0.34 起整体弃用</text>
+
+        <rect x="234" y="60" width="212" height="176" rx="8" fill="#e6f3f6" stroke="#00758f" stroke-width="1.4"/>
+        <text x="248" y="84" font-size="12" font-weight="700" fill="#00566b">ROW</text>
+        <text x="432" y="84" text-anchor="end" font-size="10" font-weight="700" fill="#00566b">8.0 默认</text>
+        <text x="248" y="110" font-size="10.5" fill="#1f2329">记行的前后镜像：</text>
+        <text x="248" y="132" font-size="10.5" font-family="Consolas,monospace" fill="#4e5564">id=3 salary 8000 → 9000</text>
+        <text x="248" y="158" font-size="10.5" fill="#1f2329">主从结果必然一致</text>
+        <text x="248" y="180" font-size="10.5" fill="#b06a00">文件大得多，一次改</text>
+        <text x="248" y="196" font-size="10.5" fill="#b06a00">100 万行就有 100 万份镜像</text>
+        <text x="248" y="220" font-size="10" fill="#8a9099">默认输出是 base64，需解码</text>
+
+        <rect x="458" y="60" width="212" height="176" rx="8" fill="#fdf3e3" stroke="#f0d9b0"/>
+        <text x="472" y="84" font-size="12" font-weight="700" fill="#b06a00">MIXED</text>
+        <text x="656" y="84" text-anchor="end" font-size="10" fill="#b06a00">自动挑</text>
+        <text x="472" y="110" font-size="10.5" fill="#1f2329">默认按 STATEMENT 记</text>
+        <text x="472" y="132" font-size="10.5" fill="#1f2329">遇到不确定的函数</text>
+        <text x="472" y="148" font-size="10.5" fill="#1f2329">才转成 ROW</text>
+        <text x="472" y="176" font-size="10.5" fill="#b06a00">两种行为混在一个</text>
+        <text x="472" y="192" font-size="10.5" fill="#b06a00">文件里，排查时更难判断</text>
+        <text x="472" y="220" font-size="10" fill="#8a9099">老系统里还不少</text>
+
+        <text x="340" y="266" text-anchor="middle" font-size="10.5" fill="#8a9099">看：mysqlbinlog -v --base64-output=DECODE-ROWS　回放：绝对不要带 -v（见 7.2.3）</text>
+      </svg>
+      <figcaption><b>图 5</b>三种格式的差别不在「记什么」，而在「记成什么形状」。ROW 把一条语句拆成每一行的变化，所以文件大、但绝对一致。</figcaption>
+    </figure>
+
+    <h3 id="s3c">3.4 清理与保留</h3>
+
+    <p>binlog 会一直长。清理有三种办法，<b>顺序是从细到粗</b>，能指定范围就别用「全清」：</p>
+
+    <pre><span class="label">sql</span><code><span class="c">-- ① 先看有哪些、多大、当前写到哪个</span>
+<span class="k">SHOW</span> BINARY LOGS;          <span class="c">-- 文件名 + 大小</span>
+<span class="k">SHOW</span> MASTER STATUS;        <span class="c">-- 当前正在写的文件与位点</span>
+
+<span class="c">-- ② 删到某个文件之前（不含该文件本身）</span>
+<span class="k">PURGE</span> BINARY LOGS <span class="k">TO</span> <span class="s">'binlog.000010'</span>;
+
+<span class="c">-- ③ 删到某个时间之前</span>
+<span class="k">PURGE</span> BINARY LOGS <span class="k">BEFORE</span> <span class="s">'2026-11-01 00:00:00'</span>;
+
+<span class="c">-- ④ 只切一个新文件，不删任何东西（备份前、改配置后常用）</span>
+FLUSH BINARY LOGS;
+
+<span class="c">-- ⑤ 全清：删掉所有 binlog，编号回到 000001，同时清空 GTID 历史</span>
+<span class="k">RESET</span> MASTER;                     <span class="c">-- 8.0.34 起弃用</span>
+<span class="k">RESET</span> BINARY LOGS <span class="k">AND</span> GTIDS;      <span class="c">-- 8.4 的写法，含义相同</span></code></pre>
+
+    <pre><span class="label">shell</span><code><span class="c"># 自动过期：默认 30 天，改小到 7 天</span>
+mysql -uroot -p -e <span class="s">"SET PERSIST binlog_expire_logs_seconds = 604800"</span>
+mysql -uroot -p -e <span class="s">"SHOW VARIABLES LIKE 'binlog_expire%'"</span>
+<span class="c"># binlog_expire_logs_seconds   604800</span>
+<span class="c"># expire_logs_days             0        ← 已弃用，别再配这个</span></code></pre>
+
+    <div class="note danger">
+      <b>PURGE 不检查从库进度，这是最容易搞出事故的一步</b>
+      <p><code>PURGE BINARY LOGS</code> 只问「这个文件还有没有在被写」，<b>不问从库读没读完</b>。主库上删掉的文件，从库的 IO 线程还要去拉，报 <code>ERROR 1236 (HY000): Could not find first log file name in binary log index file</code>，复制当场断。<br>
+      正确顺序：先在<b>每个从库</b>执行 <code>SHOW REPLICA STATUS\G</code>，记下 <code>Source_Log_File</code>，<b>只 PURGE 到那个文件之前</b>；有从库已经停了很久，就别 PURGE，先修从库。<br>
+      另外两个细节：<code>RESET MASTER</code> 在从库还在跑的时候行为是「未定义」的，官方明确不支持；自动过期也不是到点就删，<b>只在启动和 flush 日志时才会真正清理</b>。</p>
+    </div>
+
+    <div class="note tip">
+      <b>保留多久才够</b>
+      <p>两条硬约束取大者：<b>① 备份周期 × 2</b>（每天备份就要留 48～72 小时，否则备份之间的窗口没法恢复）；<b>② 从库最长可能的停机时间</b>（从库挂 3 天，你就得留 3 天以上的 binlog，不然只能重建）。<br>
+      这两条一算就知道「默认 30 天」对生产是够的，对磁盘小的小机器则太奢侈——按容量反推，别照抄。</p>
+    </div>
+
+    <h2 id="s4">4. 查询日志：唯一记「读」的账</h2>
+
+    <p>查询日志记<b>客户端发来的每一条语句</b>，包括 SELECT，还包括连接与断开。它和 binlog 恰好互补：binlog 只有「变化」，查询日志只有「请求」。默认关闭。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 680 214" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <text x="340" y="20" text-anchor="middle" font-size="11.5" fill="#8a9099">开一个日志要两步：先开开关，再选落点——只开开关不一定有文件</text>
+
+        <rect x="10" y="44" width="148" height="58" rx="7" fill="#e6f3f6" stroke="#b9dde5"/>
+        <text x="84" y="68" text-anchor="middle" font-size="11" font-family="Consolas,monospace" fill="#00566b">general_log = 1</text>
+        <text x="84" y="88" text-anchor="middle" font-size="10" fill="#8a9099">总开关</text>
+
+        <path d="M162 73 L188 73" stroke="#c9cfd8" stroke-width="1.4"/>
+        <path d="M184 69 L191 73 L184 77 Z" fill="#c9cfd8"/>
+
+        <rect x="194" y="36" width="196" height="74" rx="7" fill="#fdf3e3" stroke="#f0d9b0"/>
+        <text x="292" y="60" text-anchor="middle" font-size="11" font-family="Consolas,monospace" fill="#b06a00">log_output</text>
+        <text x="292" y="80" text-anchor="middle" font-size="10" fill="#8a6a2e">FILE / TABLE / FILE,TABLE / NONE</text>
+        <text x="292" y="98" text-anchor="middle" font-size="10" fill="#8a9099">FILE 和慢日志共用这个设置</text>
+
+        <path d="M394 73 L420 73" stroke="#c9cfd8" stroke-width="1.4"/>
+        <path d="M416 69 L423 73 L416 77 Z" fill="#c9cfd8"/>
+
+        <rect x="426" y="36" width="242" height="34" rx="6" fill="#f7f9fa" stroke="#dfe3e9"/>
+        <text x="438" y="58" font-size="10.5" font-family="Consolas,monospace" fill="#4e5564">host_name.log</text>
+        <text x="656" y="58" text-anchor="end" font-size="10" fill="#8a9099">文件</text>
+
+        <rect x="426" y="76" width="242" height="34" rx="6" fill="#f7f9fa" stroke="#dfe3e9"/>
+        <text x="438" y="98" font-size="10.5" font-family="Consolas,monospace" fill="#4e5564">mysql.general_log</text>
+        <text x="656" y="98" text-anchor="end" font-size="10" fill="#8a9099">表（CSV 引擎）</text>
+
+        <text x="340" y="148" text-anchor="middle" font-size="10.5" fill="#b06a00">代价：每个连接、每条语句都写一次盘。线上长期开着，磁盘和 IO 都扛不住</text>
+        <text x="340" y="172" text-anchor="middle" font-size="10.5" fill="#8a9099">它记「收到的语句」，不记执行结果——语句失败也照样记一条</text>
+        <text x="340" y="196" text-anchor="middle" font-size="10.5" fill="#8a9099">顺序是「收到」的顺序，可能和「执行」顺序不同</text>
+      </svg>
+      <figcaption><b>图 6</b>开关和落点是两个独立的旋钮。<code>log_output=NONE</code> 时，开关开着也什么都不写。</figcaption>
+    </figure>
+
+    <pre><span class="label">sql</span><code><span class="c">-- 临时开，排完就关（不需要重启）</span>
+<span class="k">SET</span> <span class="k">GLOBAL</span> general_log <span class="k">=</span> <span class="s">'ON'</span>;
+<span class="k">SET</span> <span class="k">GLOBAL</span> log_output <span class="k">=</span> <span class="s">'FILE'</span>;
+<span class="k">SHOW</span> <span class="k">VARIABLES</span> <span class="k">LIKE</span> <span class="s">'general_log%'</span>;
+
+<span class="c">-- 别忘了关</span>
+<span class="k">SET</span> <span class="k">GLOBAL</span> general_log <span class="k">=</span> <span class="s">'OFF'</span>;
+
+<span class="c">-- 只想排除自己这个会话（比如你在里面查日志，别把自己的查询也记进去）</span>
+<span class="k">SET</span> sql_log_off <span class="k">=</span> <span class="k">ON</span>;</code></pre>
+
+    <div class="note warn">
+      <b>用它的正确姿势：短开、带时间窗、用完就关</b>
+      <p>查询日志的价值是「还原客户端到底发了什么」——ORM 拼错表名、连接池把事务拆成两条、某个 SDK 偷偷发了一条全表扫。<b>这类问题用别的手段都看不到。</b><br>
+      但它不是监控手段：一个 500 QPS 的库，一天能写出几十 GB。真要长时间留，用 <code>log_output=TABLE</code> 加定期清理，或者干脆上审计插件（<code>audit_log</code> / <code>general_log</code> 的替代品），别拿它当常态。</p>
+    </div>
+
+    <h2 id="s5">5. 慢查询日志：判的是「两道条件」</h2>
+
+    <p>慢查询日志的判定条件最容易记错。官方定义是<b>同时满足</b>两条：「执行时间 ≥ <code>long_query_time</code>」<b>并且</b>「扫描行数 ≥ <code>min_examined_row_limit</code>」。默认 <code>long_query_time=10</code>、<code>min_examined_row_limit=0</code>，日志默认关闭。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 680 300" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <text x="340" y="20" text-anchor="middle" font-size="11.5" fill="#8a9099">一条语句要过四道闸，才写进慢日志</text>
+
+        <rect x="60" y="36" width="560" height="44" rx="7" fill="#f7f9fa" stroke="#dfe3e9"/>
+        <text x="76" y="55" font-size="11.5" font-weight="700" fill="#4e5564">① 语句类型</text>
+        <text x="76" y="72" font-size="10.5" fill="#8a9099">管理语句（ALTER / ANALYZE / OPTIMIZE…）默认不记，要记得开 log_slow_admin_statements</text>
+
+        <rect x="90" y="88" width="500" height="44" rx="7" fill="#f7f9fa" stroke="#dfe3e9"/>
+        <text x="106" y="107" font-size="11.5" font-weight="700" fill="#4e5564">② 耗时</text>
+        <text x="106" y="124" font-size="10.5" fill="#8a9099">≥ long_query_time（默认 10 秒，可到微秒）；或开了 log_queries_not_using_indexes 且没走索引</text>
+
+        <rect x="120" y="140" width="440" height="44" rx="7" fill="#f7f9fa" stroke="#dfe3e9"/>
+        <text x="136" y="159" font-size="11.5" font-weight="700" fill="#4e5564">③ 扫描行数</text>
+        <text x="136" y="176" font-size="10.5" fill="#8a9099">≥ min_examined_row_limit（默认 0，等于不挡）</text>
+
+        <rect x="150" y="192" width="380" height="44" rx="7" fill="#fdf3e3" stroke="#f0d9b0"/>
+        <text x="166" y="211" font-size="11.5" font-weight="700" fill="#b06a00">④ 限流</text>
+        <text x="166" y="228" font-size="10.5" fill="#8a6a2e">未被 log_throttle_queries_not_using_indexes 抑制</text>
+
+        <path d="M340 236 L340 250" stroke="#c9cfd8" stroke-width="1.4"/>
+        <path d="M336 246 L340 253 L344 246 Z" fill="#c9cfd8"/>
+
+        <text x="340" y="274" text-anchor="middle" font-size="11.5" font-weight="700" fill="#00566b">写入 slow_query_log_file（默认 host_name-slow.log）</text>
+        <text x="340" y="292" text-anchor="middle" font-size="10" fill="#8a9099">任何一道没过，这条语句就不出现——所以「慢日志里没有」不等于「不慢」</text>
+      </svg>
+      <figcaption><b>图 7</b>四道闸。<b>第 ③ 道默认是 0</b>，意味着只要超时就会记；但如果你把它调成 1000，快速返回的小结果集反而会被漏掉。</figcaption>
+    </figure>
+
+    <pre><span class="label">ini</span><code><span class="c"># /etc/my.cnf · [mysqld] 段</span>
+slow_query_log            = 1
+slow_query_log_file       = /var/lib/mysql/slow.log
+long_query_time           = 1          <span class="c"># 单位秒，可写 0.5</span>
+min_examined_row_limit    = 0
+
+<span class="c"># 两个「扩大收集面」的开关，按需开</span>
+log_slow_admin_statements      = 1     <span class="c"># 慢 DDL 也记（默认关）</span>
+log_queries_not_using_indexes  = 1     <span class="c"># 没走索引的也记（默认关，易刷屏）</span>
+
+<span class="c"># 8.0.14+：多输出一批字段，定位更准</span>
+log_slow_extra            = ON</code></pre>
+
+    <pre><span class="label">shell</span><code><span class="c"># 不改文件也能开：动态参数，立刻生效</span>
+mysql -uroot -p -e <span class="s">"SET GLOBAL slow_query_log=1; SET GLOBAL long_query_time=1"</span>
+
+<span class="c"># 验证到底开没开</span>
+mysql -uroot -p -e <span class="s">"SHOW VARIABLES LIKE 'slow_query%'"</span>
+mysql -uroot -p -e <span class="s">"SHOW VARIABLES LIKE 'long_query_time'"</span>
+
+<span class="c"># 汇总，而不是一条条翻：-s t 按总耗时排序，-t 10 取前 10</span>
+mysqldumpslow -s t -t 10 /var/lib/mysql/slow.log</code></pre>
+
+    <p>慢日志的每条记录长这样，<b>真正有用的是 <code>Rows_examined</code> 和 <code>Rows_sent</code> 的比值</b>：</p>
+
+    <pre class="log"><span class="h"># Time: 2026-11-25T19:02:11.123456+08:00</span>
+<span class="h"># User@Host: root[root] @ localhost []  Id:  12</span>
+<span class="h"># Query_time: 12.345678  Lock_time: 0.000123  Rows_sent: 3  Rows_examined: 2000000</span>
+<span class="m">SET timestamp=1795604531;</span>
+<span class="q">SELECT * FROM emp WHERE name LIKE '%张%';</span></pre>
+
+    <div class="note tip">
+      <b>怎么读这一行</b>
+      <p><code>Rows_examined: 2000000</code> + <code>Rows_sent: 3</code> = 扫了 200 万行只返回 3 行，<b>典型的没走索引</b>（<code>LIKE '%张%'</code> 前面带通配符，索引用不上）。<br>
+      <code>Query_time</code> 里<b>不含等锁的时间</b>（官方明确：初始锁的获取时间不计入执行时间），所以「慢」和「卡在锁上」要看 <code>Lock_time</code> 或 <code>performance_schema</code>，别看这一个数就下结论。<br>
+      另外 <code># Time</code> 那行受 <code>log_timestamps</code> 影响，默认 UTC——和你系统时间差 8 小时，别以为记错了。</p>
+    </div>
+
+    <div class="note danger">
+      <b>改了 <code>long_query_time</code> 却没生效：这是最经典的坑</b>
+      <p><code>long_query_time</code> 是 <b>global + session 两级</b>变量。你在已连着的会话里 <code>SET GLOBAL long_query_time = 1</code>，<b>当前连接仍是旧值（10 秒）</b>，只有新建立的连接才用 1 秒。<br>
+      所以在同一个窗口里「设置完马上跑一条 0.5 秒的 SQL，没进慢日志」，不是功能坏了，是<b>你没重连</b>。验证要在新会话里做，或者干脆 <code>SET SESSION long_query_time = 1;</code> 给当前会话单独设。</p>
+    </div>
+
+    <table>
+      <thead><tr><th>参数</th><th>默认值</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td><code>slow_query_log</code></td><td><code>OFF</code></td><td>总开关，动态可改</td></tr>
+        <tr><td><code>slow_query_log_file</code></td><td><code>host_name-slow.log</code></td><td>相对路径落在数据目录；建议改绝对路径并换盘</td></tr>
+        <tr><td><code>long_query_time</code></td><td><code>10</code></td><td>最小 0，精度到微秒；global 与 session 两级</td></tr>
+        <tr><td><code>min_examined_row_limit</code></td><td><code>0</code></td><td>扫描行数下限；调大会漏掉「快但扫全表」的小查询</td></tr>
+        <tr><td><code>log_slow_admin_statements</code></td><td><code>OFF</code></td><td>慢 DDL 也记</td></tr>
+        <tr><td><code>log_queries_not_using_indexes</code></td><td><code>OFF</code></td><td>没走索引就记，<b>不看耗时</b>；开着极易刷屏</td></tr>
+        <tr><td><code>log_throttle_queries_not_using_indexes</code></td><td><code>0</code></td><td>每分钟最多记多少条未用索引的语句，0 = 不限</td></tr>
+        <tr><td><code>log_output</code></td><td><code>FILE</code></td><td>与查询日志共用；<code>TABLE</code> 时写 <code>mysql.slow_log</code></td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="s6">6. 出事了，先翻哪本</h2>
+
+    <p>把上面四本账按「症状」重排一遍，才真正用得上：</p>
+
+    <table>
+      <colgroup><col style="width:24%"><col style="width:13%"><col style="width:63%"></colgroup>
+      <thead><tr><th>症状</th><th>先看</th><th>具体动作</th></tr></thead>
+      <tbody>
+        <tr><td>服务起不来 / 启动几秒就退出</td><td>错误日志</td><td>先拿到路径：<code>mysql -e "SELECT @@log_error" -N -B</code>（连不上就按装法猜），再 <code>tail -n 200 该文件</code>，往上翻找<b>第一条</b> <code>[ERROR]</code></td></tr>
+        <tr><td>连不上，报 2002 / 2003 / 1130</td><td>错误日志</td><td>先看端口是否在监听（<code>ss -lntp | grep 3306</code>），再看日志里有没有 <code>Aborted connection</code></td></tr>
+        <tr><td>数据被误删 / 误改，要回滚</td><td>二进制日志</td><td><code>mysqlbinlog --start-datetime=…  binlog.0000NN</code> 定位，再按位点回放到临时库</td></tr>
+        <tr><td>主从断了 / 延迟越来越大</td><td>二进制日志</td><td><code>SHOW REPLICA STATUS\G</code> 看 <code>Last_IO_Error</code>，对照主库 <code>SHOW BINARY LOGS</code> 判断是不是被 PURGE 了</td></tr>
+        <tr><td>某几条 SQL 偶发很慢</td><td>慢查询日志</td><td><code>mysqldumpslow -s t -t 10</code>；重点看 <code>Rows_examined / Rows_sent</code></td></tr>
+        <tr><td>「代码里明明没这句 SQL」</td><td>查询日志</td><td>短开 <code>general_log</code>，过滤出该连接（<code>Connect</code> 行有线程号）看它到底发了什么</td></tr>
+        <tr><td>磁盘突然满了</td><td>二进制日志</td><td><code>SHOW BINARY LOGS</code> 看总量；<code>du -sh /var/lib/mysql</code> 对照；别第一反应删 binlog，先确认从库</td></tr>
+        <tr><td>要查「谁读了这张表」</td><td><b>都不行</b></td><td>binlog 不记 SELECT；查询日志默认关且不长期留。要么开审计插件，要么开查询日志短窗口抓，要么上数据库审计产品</td></tr>
+      </tbody>
+    </table>
+
+    <div class="note plain">
+      <b>一句话记法</b>
+      <p><b>「起不来」看错误日志，「改坏了」看 binlog，「慢」看慢日志，「没发过这句」看查询日志。</b>四句话对应四个场景，排障时先认清场景，再决定翻哪本。</p>
+    </div>
+
+    <h2 id="s7">7. 与课程里的说法有出入的几处</h2>
+
+    <p>课程录的是 8.0 早期环境，下面这几处按 8.0 现在的行为改过来了（也都标了版本）：</p>
+
+    <table>
+      <colgroup><col style="width:34%"><col style="width:66%"></colgroup>
+      <thead><tr><th>课程里的说法</th><th>8.0 的实际行为</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>「上述所有参数配置完成后，<b>都需要重启</b> MySQL 服务器才生效」</td>
+          <td>只有 <code>log_bin</code>、<code>log_error</code> 这类<b>静态参数</b>必须重启。<code>general_log</code>、<code>slow_query_log</code>、<code>long_query_time</code>、<code>log_queries_not_using_indexes</code>、<code>binlog_expire_logs_seconds</code> 都能 <code>SET GLOBAL</code> 立刻生效，<code>SET PERSIST</code> 还能同时写进配置、重启后保留</td>
+        </tr>
+        <tr>
+          <td><code>-o</code>「忽略掉日志中的前 n <b>行</b>命令」</td>
+          <td>跳的是前 N 个 <b>事件（event）</b>，不是行。一个事件可能对应一大段输出，按「行」理解会算错</td>
+        </tr>
+        <tr>
+          <td>清理用 <code>RESET MASTER</code>、<code>PURGE MASTER LOGS</code></td>
+          <td><code>PURGE MASTER LOGS</code> 是 <code>PURGE BINARY LOGS</code> 的旧名（还能用）；<code>RESET MASTER</code> 在 <b>8.0.34 起标记弃用</b>，8.4 换成 <code>RESET BINARY LOGS AND GTIDS</code></td>
+        </tr>
+        <tr>
+          <td>错误日志默认 <code>/var/log/mysqld.log</code></td>
+          <td>只有 RPM/YUM 安装是这样。Debian/Ubuntu 是 <code>/var/log/mysql/error.log</code>，源码编译是数据目录下 <code>host_name.err</code>。以 <code>SELECT @@log_error</code> 为准</td>
+        </tr>
+        <tr>
+          <td>binlog 默认保留 30 天，配 <code>expire_logs_days</code></td>
+          <td>天数这个参数在 <b>8.0.3 就弃用</b>（8.2 已移除）。现在是 <code>binlog_expire_logs_seconds=2592000</code>，单位秒，可以配到精细</td>
+        </tr>
+        <tr>
+          <td><code>binlog_format</code> 三种随便选</td>
+          <td>8.0 默认 <code>ROW</code>；<b>8.0.34 起整个参数标记弃用</b>，方向是只保留 ROW。新搭的库就别再纠结 STATEMENT 了</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="note tip">
+      <b>还有两个课程没提、但配置时一定会撞上的</b>
+      <p><code>log_timestamps</code>：错误日志、查询日志、慢日志的<b>文件里</b>时间戳都用它，默认 <code>UTC</code>。所以你看到的时间比北京时间早 8 小时，不是日志坏了，改 <code>SET PERSIST log_timestamps='SYSTEM'</code> 就好。<br>
+      <code>FLUSH LOGS</code> 与 <code>FLUSH BINARY LOGS</code> 不是一回事：前者刷所有日志（含错误日志、慢日志、binlog），后者只切 binlog。备份脚本里想切 binlog，用后者更精确。</p>
+    </div>
+
+    <section class="quiz">
+      <p class="quiz-head">自测三问<span>先自己答一遍，再点开对答案</span></p>
+      <details>
+        <summary><span class="qno">Q1</span><span class="ask">你在当前会话里执行 <code>SET GLOBAL long_query_time = 0.1</code>，然后马上跑一条 0.5 秒的 SQL，慢日志里没有。功能坏了吗？</span><span class="caret" aria-hidden="true"></span></summary>
+        <div class="ans"><p>没坏。<code>long_query_time</code> 是 <b>global + session 两级</b>，<code>SET GLOBAL</code> 只改全局默认值，<b>已经建立的连接继续用自己的旧值（10 秒）</b>。要么断开重连，要么在当前会话补一条 <code>SET SESSION long_query_time = 0.1;</code>。</p></div>
+      </details>
+      <details>
+        <summary><span class="qno">Q2</span><span class="ask">主库磁盘告警，执行了 <code>PURGE BINARY LOGS BEFORE NOW()</code>，十分钟后从库复制中断，报 <code>ERROR 1236</code>。为什么？</span><span class="caret" aria-hidden="true"></span></summary>
+        <div class="ans"><p><code>PURGE</code> 只看「文件还在不在被写」，<b>不检查任何从库的读取进度</b>。从库的 IO 线程还没读到就被删了，只能从备份重建。<br>正确做法：先在<b>每个从库</b><code>SHOW REPLICA STATUS\G</code> 记下 <code>Source_Log_File</code>，只 PURGE 到那个文件之前；有从库长期停着，就别 PURGE。</p></div>
+      </details>
+      <details>
+        <summary><span class="qno">Q3</span><span class="ask">用 <code>mysqlbinlog binlog.000003</code> 只看到一堆 <code>BINLOG 'xxx'</code> 的 base64，看不到 SQL。怎么解？而回放时又该注意什么？</span><span class="caret" aria-hidden="true"></span></summary>
+        <div class="ans"><p>8.0 默认 <code>binlog_format=ROW</code>，行事件本来就不以 SQL 形式输出。看的时候加 <code>-v --base64-output=DECODE-ROWS</code>，才会把行变更重构成可读的伪 SQL。<br><b>回放时绝对不能带 <code>-v</code></b>：带 <code>-v</code> 输出的行变更全是 <code>###</code> 开头的注释，喂给 <code>mysql</code> 会被当注释丢掉，看起来执行成功、数据一行没变。看和回放永远是两条命令。</p></div>
+      </details>
+    </section>
+    <div class="footer">
+      <a href="../index.html">← 总目录</a> · <a href="../进阶篇/07-MySQL管理.html">07 MySQL 管理</a> · <a href="../进阶篇/07-04-mysqlbinlog.html">7.2.3 mysqlbinlog</a> · <a href="02-主从复制.html">02 主从复制 →</a>
+    </div>
+
+  </main>
+</div>
+</body>
+</html>

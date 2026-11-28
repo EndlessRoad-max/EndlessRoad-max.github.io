@@ -1,0 +1,70 @@
+/* 进阶篇 04 系列（视图 / 存储过程 / 触发器）共用的小样式。
+   只补全站样式表没覆盖的三样：代码块复制按钮、验收行、判断标签。 */
+
+.view-page .main { max-width: 880px; }
+.view-page .lede { max-width: 74ch; }
+.view-page .h2, .view-page h2 { scroll-margin-top: 24px; }
+.view-page h3[id] { scroll-margin-top: 24px; }
+
+/* 代码块 + 复制按钮 */
+.view-page .command { position: relative; }
+.view-page .command pre { padding-top: 34px; }
+.view-page .copy {
+  position: absolute; z-index: 1; top: 7px; right: 9px;
+  border: 1px solid #536478; background: #263344; color: #e6edf3;
+  border-radius: 4px; font: inherit; font-size: 11px;
+  padding: 2px 9px; cursor: pointer;
+}
+.view-page .copy:hover { background: #32445a; }
+
+/* 验收行：跑完这一步「应该看到什么」 */
+.view-page .check {
+  border-left: 2px solid #549a70;
+  padding-left: 12px;
+  color: var(--text-2);
+  font-size: 13.6px;
+  line-height: 1.8;
+}
+
+/* 判断标签：对 / 半步对 / 要改 */
+.view-page .verdict {
+  display: inline-block;
+  font-size: 11.5px; font-weight: 700;
+  padding: 1px 7px; margin-left: 6px;
+  border-radius: 4px; vertical-align: 2px;
+}
+.view-page .verdict.ok   { color: #216a43; background: #ecf6ef; }
+.view-page .verdict.part { color: #8a6535; background: #fdf3e3; }
+.view-page .verdict.no   { color: #9a3b32; background: #fdecea; }
+
+/* 表格：默认 nowrap 的 td code 在这里必须能换行，否则窄屏撑破卡片 */
+.view-page table { table-layout: fixed; }
+.view-page table.t-auto { table-layout: auto; }
+.view-page td code, .view-page th code {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.view-page .steps > li > b { font-size: 15px; }
+
+/* 图：SVG 是按 680 宽画的，窄屏整张缩下去字会变成 5px。
+   小屏改成横向滚动 + 最小宽度，宁可滑一下，也别让人看不清。 */
+.view-page .fig-scroll { overflow-x: auto; }
+.view-page .fig-hint { display: none; font-size: 11.5px; color: var(--muted); margin-left: 4px; }
+@media (max-width: 640px) {
+  .view-page .fig-scroll svg { min-width: 600px; }
+  .view-page .fig-hint { display: inline; }
+}
+
+@media (max-width: 600px) {
+  .view-page figure.fig { margin-inline: -4px; }
+  .view-page th, .view-page td { padding: 8px 9px; font-size: 12.5px; }
+  .view-page .steps > li { padding-left: 28px; }
+  .view-page .verdict { margin-left: 0; }
+}
+
+@media print {
+  .view-page .sidebar, .view-page .copy { display: none !important; }
+  .view-page .layout { display: block; }
+  .view-page .main { max-width: none; }
+  .view-page pre { white-space: pre-wrap; }
+}

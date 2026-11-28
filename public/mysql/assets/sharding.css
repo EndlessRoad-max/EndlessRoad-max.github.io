@@ -1,0 +1,178 @@
+/* 分库分表专题：复用 replication.css 的操作类（steps / where / check / pre / page-links），
+   这里只补两类东西：课程插图的自适应，以及两张用 HTML 画的示意图。 */
+
+/* 课程插图：原图最大 858px，容器内宽约 868px，不放大、不裁切 */
+.sharding figure.fig img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+  border-radius: 4px;
+}
+
+/* 图注里的第二行说明，比正文轻 */
+.sharding figure.fig.narrow img { max-width: min(440px, 100%); }
+.sharding figure.fig.mid img { max-width: min(600px, 100%); }
+.sharding figcaption em { font-style: normal; color: var(--muted); }
+
+/* 概念页的对照表：四列等宽，名字列稍宽 */
+.sharding table.t-split { table-layout: fixed; }
+.t-split th:first-child, .t-split td:first-child { width: 16%; }
+.t-split th:nth-child(2), .t-split td:nth-child(2) { width: 12%; }
+.t-split th:nth-child(3), .t-split td:nth-child(3) { width: 39%; }
+.t-split td { font-size: 13.2px; line-height: 1.7; vertical-align: top; }
+.t-split td b { color: var(--text); }
+
+/* ============================================================
+   表 → 表：垂直分表 / 水平分表的示意图
+   左边原表，中间一句「按什么拆」，右边拆出来的表
+   ============================================================ */
+.splitdemo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 132px minmax(0, 1.15fr);
+  align-items: stretch;
+  gap: 0;
+  margin: 6px 0 2px;
+  font-size: 12.6px;
+}
+.splitdemo .sd-box {
+  border: 1px solid #cfdae1;
+  border-radius: 6px;
+  background: #fff;
+  padding: 9px 11px 10px;
+}
+.splitdemo .sd-box b {
+  display: block;
+  font-size: 12.8px;
+  color: #00758f;
+  font-family: Consolas, "Courier New", monospace;
+  letter-spacing: .01em;
+}
+.splitdemo .sd-box span {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  line-height: 1.6;
+  font-size: 11.6px;
+}
+.splitdemo .sd-src { background: #fbfcfd; display: flex; flex-direction: column; justify-content: center; }
+.splitdemo .sd-out { display: grid; gap: 8px; }
+.splitdemo .sd-out .sd-box b { color: #277448; }
+.splitdemo .sd-out .sd-box.ext { border-style: dashed; }
+.splitdemo .sd-out .sd-box.ext b { color: #9a6b12; }
+
+.splitdemo .sd-mid {
+  position: relative;
+  min-height: 46px;
+}
+/* 一条完整的虚线，不被打断 */
+.splitdemo .sd-mid::before {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 14px;
+  top: 50%;
+  border-top: 1px dashed #93a6b1;
+}
+.splitdemo .sd-mid::after {
+  content: "";
+  position: absolute;
+  right: 8px;
+  top: calc(50% - 4px);
+  border: 4px solid transparent;
+  border-left: 6px solid #93a6b1;
+  border-right: 0;
+}
+/* 说明文字挂在线下方，不压线 */
+.splitdemo .sd-mid span {
+  position: absolute;
+  top: calc(50% + 5px);
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10.8px;
+  color: var(--muted);
+  white-space: nowrap;
+  background: #fff;
+  padding: 0 3px;
+}
+
+/* ============================================================
+   范围分片的一条轴：前三段有节点，最后一段没有节点
+   ============================================================ */
+.rangeaxis {
+  display: flex;
+  margin: 12px 0 4px;
+  font-size: 12.4px;
+}
+.rangeaxis .ra-seg {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 9px 6px 10px;
+  text-align: center;
+  background: #f3f9fb;
+  border: 1px solid #cfe3ea;
+  border-right: 0;
+  line-height: 1.5;
+}
+.rangeaxis .ra-seg:first-child { border-radius: 6px 0 0 6px; }
+.rangeaxis .ra-seg.s2 { background: #fdf8ee; border-color: #eddfbc; }
+.rangeaxis .ra-seg.s3 { background: #f3faf6; border-color: #cfe8d8; }
+.rangeaxis .ra-seg:last-of-type { border-right: 1px solid #cfe8d8; border-radius: 0 6px 6px 0; }
+.rangeaxis .ra-seg b {
+  display: block;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 13px;
+  color: #00758f;
+}
+.rangeaxis .ra-seg.s2 b { color: #b07522; }
+.rangeaxis .ra-seg.s3 b { color: #277448; }
+.rangeaxis .ra-seg span { display: block; margin-top: 2px; color: var(--text-2); font-size: 11.8px; }
+.rangeaxis .ra-seg em {
+  display: block;
+  margin-top: 3px;
+  font-style: normal;
+  font-size: 11px;
+  color: var(--muted);
+}
+/* 第四段：没有节点 */
+.rangeaxis .ra-seg.none {
+  flex: .78 1 0;
+  margin-left: 9px;
+  background: #fdecea;
+  border: 1px dashed #e2a49e;
+  border-radius: 6px;
+}
+.rangeaxis .ra-seg.none b { color: #b3352b; }
+.rangeaxis .ra-seg.none span { color: #8d3b34; }
+
+@media (max-width: 760px) {
+  .splitdemo { grid-template-columns: 1fr; gap: 10px; }
+  .splitdemo .sd-mid { min-height: 34px; }
+  .splitdemo .sd-mid span { top: 50%; left: calc(50% + 8px); transform: translateY(-50%); }
+  .splitdemo .sd-mid::before { left: 50%; right: auto; top: 0; bottom: 0; border-top: 0; border-left: 1px dashed #93a6b1; }
+  .splitdemo .sd-mid::after {
+    right: auto;
+    left: calc(50% - 3px);
+    top: auto;
+    bottom: 2px;
+    border: 4px solid transparent;
+    border-top: 6px solid #93a6b1;
+    border-bottom: 0;
+  }
+  /* 4 列表格在手机上：第一列要能放下 4 个汉字 */
+  .sharding table.t-split { font-size: 12.2px; }
+  .t-split th:first-child, .t-split td:first-child { width: 23%; }
+  .t-split th:nth-child(2), .t-split td:nth-child(2) { width: 13%; }
+  .t-split th:nth-child(3), .t-split td:nth-child(3) { width: 32%; }
+  .t-split td { padding: 9px 8px; }
+  .rangeaxis { flex-wrap: wrap; gap: 8px; }
+  .rangeaxis .ra-seg { flex: 1 1 44%; border-right: 1px solid #cfe3ea; border-radius: 6px; }
+  .rangeaxis .ra-seg.s2, .rangeaxis .ra-seg.s3 { border-radius: 6px; }
+  .rangeaxis .ra-seg.none { flex: 1 1 100%; margin-left: 0; }
+}
+
+@media print {
+  .sharding figure.fig img { max-width: 100%; }
+  .rangeaxis .ra-seg.none { border-style: solid; }
+}

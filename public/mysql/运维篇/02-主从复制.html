@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>02 主从复制：原理、搭建与测试 · 运维篇 · MySQL 笔记</title>
+<link rel="stylesheet" href="../assets/style.css"><link rel="stylesheet" href="../assets/replication.css">
+<script src="../assets/replication.js" defer></script>
+</head>
+<body class="replication"><div class="layout">
+
+<nav class="sidebar" aria-label="本页目录">
+  <p class="side-title">本页目录</p>
+  <a href="#what">1. 是什么，有什么用</a>
+  <a href="#how">2. 原理：三步</a>
+  <a href="#prep">3. 两台机器先准备好</a>
+  <a href="#source">4. 主库：四步</a>
+  <a href="#replica">5. 从库：五步</a>
+  <a href="#test">6. 测试：主库写，从库查</a>
+  <a href="#stuck">7. 卡住了，先看这三处</a>
+  <a href="#ext">扩展页</a>
+  <a href="#quiz">自测三问</a>
+  <p class="side-title" style="margin-top:22px">当前位置</p>
+  <ul class="nav-tree">
+    <li><a href="../index.html" class="root">↑ 总目录</a>
+      <ul>
+        <li><a href="01-日志.html">01 日志</a></li>
+        <li><span class="current">02 主从复制</span>
+          <ul>
+            <li><a href="02-01-GTID复制.html" class="leaf">02-01 GTID 复制</a></li>
+            <li><a href="02-02-成熟部署与故障切换.html" class="leaf">02-02 成熟部署与切换</a></li>
+            <li><a href="02-03-网络与协议.html" class="leaf">02-03 网络与协议细节</a></li>
+            <li><a href="02-04-已有数据与排错.html" class="leaf">02-04 已有数据与排错</a></li>
+          </ul>
+        </li>
+        <li><a href="03-分库分表.html">03 分库分表</a>
+          <ul>
+            <li><a href="03-01-MyCat实现.html">03-01 MyCat 实现</a></li>
+          </ul>
+        </li>
+        <li><a href="04-读写分离.html">04 读写分离</a></li>
+      </ul>
+    </li>
+  </ul>
+</nav>
+
+<main class="main">
+<div class="crumb"><a href="../index.html">总目录</a> / 运维篇 / 02 主从复制</div>
+<h1><span class="chapter-no">02</span>主从复制</h1>
+<p class="lede">主库改了什么，从库跟着改一遍。这一页按课程顺序走完：<b>两台机器 → 主库四步 → 从库五步 → 主库写、从库查</b>。原理只讲三步，每一步都写清「应该看到什么」。</p>
+<div class="meta"><span>课程：黑马程序员 MySQL</span><span>环境：MySQL 8.0.32 起</span><span>示例：主库 192.168.200.200 / 从库 192.168.200.201</span></div>
+
+<section class="quick">
+  <p class="quick-head">一屏速记<span>合上笔记，这 4 条要能自己说出来</span></p>
+  <ol>
+    <li><b>三个动作：</b>主库把变更写进 <code>binlog</code> → 从库取回来写成 <code>relay log</code> → 从库重放。管这三段的分别是 Dump 线程、receiver、applier。</li>
+    <li><b>两个配置：</b>两边 <code>server-id</code> 不同（8.0 默认都是 1），主库 <code>read-only=0</code>、从库 <code>read-only=1</code>。</li>
+    <li><b>一个起点：</b>位点复制要「文件名 + 位置」。<b>主库已有数据时，必须用快照里的坐标启动</b>，否则历史数据永远不过来，而且不报错。</li>
+    <li><b>一个验收：</b>两个 <code>Running</code> 都是 <code>Yes</code> 只说明管道通了；还要「主库写、从库查到」才算真的同步。</li>
+  </ol>
+</section>
+
+<h2 id="what">1. 是什么，有什么用</h2>
+<p>主库执行过的 DDL 和 DML，通过二进制日志传到从库，从库把同样的操作<b>再执行一遍</b>（也叫重做），两边数据就保持一致。一台主库可以同时挂多台从库；从库也能再当别人的主库，串成链式复制。</p>
+
+<div class="grid3 compact-cards">
+  <div class="card"><b>快速切换</b><p>主库出问题，用追得上的从库顶上去。</p></div>
+  <div class="card"><b>读写分离</b><p>查询分摊到从库，降低主库访问压力。</p></div>
+  <div class="card"><b>从库备份</b><p>备份在从库上做，备份期间不影响主库服务。</p></div>
+</div>
+
+<div class="note warn"><b>这三件事不会因为「复制通了」自动发生</b>
+<p>请求得有人路由到从库，主库挂了得有人判断并改指向，误删会被原样复制过去——所以<b>副本不能当备份</b>。复制只负责把变更搬过去。</p>
+</div>
+
+<h2 id="how">2. 原理：三步</h2>
+<p>核心只有二进制日志。三个动作对应三个线程，中间落在两个文件上：</p>
+
+<figure class="fig">
+  <img src="../assets/replication/principle-master-slave.png" width="788" height="374" alt="主库把数据变更写进 binlog；从库的 IOthread 读取 binlog 并写入 Relay log；SQLthread 读取 Relay log 后 replay 到从库数据。">
+  <figcaption><b>图 1</b>课程里的原理图：主库 <b>data change</b> 写进 binlog，从库的 IOthread <b>read</b> 过来、<b>write</b> 成 relay log，SQLthread 再 <b>read</b> 出来 <b>replay</b> 到本机数据。<b>写进 relay log ≠ 数据已改</b>，中间还隔着一次重放。</figcaption>
+</figure>
+
+<ol class="steps">
+<li><b>主库把变更记录进 binlog</b>
+<p>事务提交时，DDL 和 DML 记进二进制日志文件。查询语句不记。</p></li>
+<li><b>从库连上主库，把 binlog 读回来写成 relay log</b>
+<p>从库主动连主库（主库不会主动推），按给定的起点往后取事件，落到自己的<b>中继日志</b>。</p></li>
+<li><b>从库重放 relay log</b>
+<p>把中继日志里的事件重新执行一遍，改变本机数据。到这一步，数据才真正一致。</p></li>
+</ol>
+
+<p>图里的 <b>IOthread / SQLthread</b> 是课件叫法；8.0 文档把它们改名为 <code>receiver</code> / <code>applier</code>，状态字段里也写作「I/O 线程」「SQL 线程」。名字换了，干的活没变。</p>
+
+<table>
+  <thead><tr><th style="width:26%">角色</th><th style="width:14%">在哪台</th><th>干什么</th></tr></thead>
+  <tbody>
+    <tr><td>Binlog Dump</td><td>主库</td><td>每个从库连接配一个。只有它读主库磁盘上的 binlog，按从库给的起点往后发。</td></tr>
+    <tr><td>receiver</td><td>从库</td><td>叫 I/O 线程。连主库、收事件、写 relay log，写完就返回。</td></tr>
+    <tr><td>applier</td><td>从库</td><td>叫 SQL 线程。读 relay log 应用变更；并行时由 coordinator 分给多个 worker。</td></tr>
+  </tbody>
+</table>
+
+<div class="note tip"><b>「收到了」和「查得到了」是两个时刻</b>
+<p>receiver 可以一直领先，applier 跟不上时数据就压在 relay log 里。所以看状态永远是两条线：接收进度、应用进度。</p>
+</div>
+
+<h2 id="prep">3. 两台机器先准备好</h2>
+<p>两台机器、两个 IP，装同一个小版本的 8.0。角色先定死，后面所有命令都按这张表来：</p>
+
+<table class="t-host">
+  <thead><tr><th style="width:18%">角色</th><th style="width:32%">IP</th><th>开工前的状态</th></tr></thead>
+  <tbody>
+    <tr><td><b>主库</b> master</td><td><code>192.168.200.200</code></td><td>装好 MySQL 8.0，本机能 <code>mysql -uroot -p</code> 登录。</td></tr>
+    <tr><td><b>从库</b> slave</td><td><code>192.168.200.201</code></td><td>同上。<b>不要有</b>要同步的同名库——已有数据的情况见 <a href="02-04-已有数据与排错.html">02-04</a>。</td></tr>
+  </tbody>
+</table>
+
+<p>复制走的是 3306 端口，先把这个口放开。能改防火墙就精确放行（推荐），图省事也可以直接关掉：</p>
+<pre data-copy><code># 放行 3306（推荐，两台都执行）
+firewall-cmd --zone=public \
+  --add-port=3306/tcp --permanent
+firewall-cmd --reload
+
+# 或者直接关掉防火墙（课程演示里这么干）
+systemctl stop firewalld
+systemctl disable firewalld</code></pre>
+
+<p class="check">在<b>从库</b>上手工连一次主库：<code>mysql -h 192.168.200.200 -P 3306 -uroot -p -e "SELECT 1"</code>。能出结果，说明网络、端口、监听地址这三类问题已经排掉了——比等到配完看见 <code>Replica_IO_Running: No</code> 再猜省事得多。</p>
+
+<div class="note plain"><b>两台的时间要对得上</b>
+<p>复制本身不依赖时钟，但日志里的事件时间戳来自主库，排查延迟和问题时两边差几个小时会看错。装完顺手 <code>timedatectl set-timezone Asia/Shanghai</code>，两台都设成同一个时区。</p>
+</div>
+
+<h2 id="source">4. 主库：四步</h2>
+<p>下面命令用管理员账号执行，复制权限单独建一个账号给从库用。</p>
+
+<ol class="steps">
+<li id="s1"><b>改配置：钉住 server-id 和读写状态</b><span class="where">主库 · 配置文件 /etc/my.cnf</span>
+<pre data-copy><code>[mysqld]
+# 集群内唯一，取值 1 ~ 2^32-1
+server-id = 1
+# 0 = 可读写（主库的正常状态）
+read-only = 0
+
+# 可选：只同步部分库时才放开
+# binlog-do-db = db01</code></pre>
+<p>课程里只改这两行，因为 <b>8.0 默认已经开着 binlog</b>（<code>log_bin=ON</code>，文件在数据目录下、名字默认 <code>binlog</code>）。要换目录或名字再加 <code>log-bin</code>；想显式钉住格式加 <code>binlog-format=ROW</code>（8.0 默认就是 ROW）。</p>
+<p><code>binlog-do-db</code> 只认「当前默认库」，跨库写会漏——不确定就别开，做全量复制。细节见 <a href="04-读写分离.html#cnf">04 第 4 节</a>。</p>
+<p class="check">改完 <code>grep -n "server-id\|read-only" /etc/my.cnf</code>：确认只有一份，别在文件末尾又追加一段 <code>[mysqld]</code>。同名配置后者覆盖前者，改了不生效多半是这个原因。</p></li>
+
+<li><b>重启并核对</b><span class="where">主库 · Linux 终端</span>
+<pre data-copy><code>systemctl restart mysqld</code></pre>
+<span class="where">主库 · mysql 客户端</span>
+<pre data-copy><code>SELECT @@server_id, @@log_bin, @@binlog_format, @@read_only;</code></pre>
+<p class="check">期望 <code>1 / 1 / ROW / 0</code>。这四个值在 8.0 里本来就是默认值——<b>这一步的真正作用是把它们钉死</b>，免得哪天被改过还不知道。值是旧的，说明改的不是服务真正读的那份配置文件；起不来先看 <code>systemctl status mysqld</code> 和错误日志。</p></li>
+
+<li id="s3"><b>建复制账号，并且先连一次</b><span class="where">主库 · mysql 客户端</span>
+<pre data-copy><code>CREATE USER 'itcast'@'%' IDENTIFIED BY 'Root@123456';
+GRANT REPLICATION SLAVE ON *.* TO 'itcast'@'%';</code></pre>
+<p>课程写的是 <code>IDENTIFIED WITH mysql_native_password</code>。8.0 还能这么写，但 8.4 起该插件默认不可用，所以这里用默认插件。<code>'%'</code> 是图省事；知道从库 IP 就写死 <code>'itcast'@'192.168.200.201'</code>。权限只给 <code>REPLICATION SLAVE</code>，别顺手给 <code>ALL</code>。</p>
+<span class="where replica">从库机器 · Linux 终端</span>
+<pre data-copy><code>mysql --host=192.168.200.200 --port=3306 \
+  --user=itcast --password -e "SELECT 1"</code></pre>
+<p class="check">能登录、有结果，说明账号、密码、来源地址、认证插件这四类问题已经排掉了。这一步故意放在启动复制之前。（如果按 <a href="02-02-成熟部署与故障切换.html#tls">02-02</a> 给账号加了 <code>REQUIRE SSL</code>，连接时要补 <code>--ssl-mode=REQUIRED</code>。）</p></li>
+
+<li id="s4"><b>记下起点坐标</b><span class="where">主库 · mysql 客户端</span>
+<pre data-copy><code>SHOW MASTER STATUS;</code></pre>
+<p>抄下 <code>File</code> 和 <code>Position</code> 两列：<b>File</b> 是当前正在写的日志文件，<b>Position</b> 是下一条事件的位置。下一节要原样填进从库。</p>
+<p class="check">返回空：<code>log_bin</code> 没开，回第 1 步。8.4 里这条改名 <code>SHOW BINARY LOG STATUS</code>。</p>
+<p><b>这个坐标只包含它之后的变更。</b>主库已经有业务数据的话，别用这里的值，走 <a href="02-04-已有数据与排错.html">02-04</a> 的快照坐标。</p></li>
+</ol>
+
+<h2 id="replica">5. 从库：五步</h2>
+
+<ol class="steps">
+<li><b>改配置：server-id 换成 2，设只读</b><span class="where replica">从库 · 配置文件 /etc/my.cnf</span>
+<pre data-copy><code>[mysqld]
+# 和主库必须不同
+server-id = 2
+# 1 = 只读
+read-only = 1
+
+# 可选：连管理员也挡在外面
+# super_read_only = 1</code></pre>
+<p><code>read-only</code> 挡的是普通账号的写，<b>不挡 applier</b>——重放照常进行，这两件事不冲突。<code>super_read_only</code> 连有 <code>SUPER</code> 的管理员一起挡，同样不挡 applier。</p></li>
+
+<li><b>重启并核对身份</b><span class="where replica">从库 · Linux 终端</span>
+<pre data-copy><code>systemctl restart mysqld</code></pre>
+<span class="where replica">从库 · mysql 客户端</span>
+<pre data-copy><code>SELECT @@server_id, @@read_only, @@super_read_only, @@server_uuid;</code></pre>
+<p class="check">期望 <code>2 / 1 / 0</code>（开了 <code>super_read_only</code> 则最后是 <code>1</code>）。两台 <code>server_uuid</code> <b>必须不同</b>：直接拷数据目录会连 <code>auto.cnf</code> 一起拷过去，uuid 就重复了。</p></li>
+
+<li id="r3"><b>指向主库，说明从哪开始</b><span class="where replica">从库 · mysql 客户端</span>
+<pre data-copy><code>-- 下面五个值都换成你自己的
+CHANGE REPLICATION SOURCE TO
+  SOURCE_HOST = '192.168.200.200',
+  SOURCE_PORT = 3306,
+  SOURCE_USER = 'itcast',
+  SOURCE_PASSWORD = 'Root@123456',
+  SOURCE_LOG_FILE = 'binlog.000003',
+  SOURCE_LOG_POS = 156;</code></pre>
+<p>账号建在<b>主库</b>上，端口填<b>主库</b>的 3306。<code>SOURCE_LOG_FILE</code> / <code>SOURCE_LOG_POS</code> 就是上一节抄的那两个值，示例里的数字不是你的。</p>
+<p>8.0.23 起用 <code>SOURCE_*</code>，之前是 <code>MASTER_*</code>（<code>CHANGE MASTER TO ... MASTER_HOST</code>），8.4 已删除。两套名字一一对应：</p>
+<table>
+  <thead><tr><th style="width:34%">8.0.23 之后</th><th style="width:34%">8.0.23 之前</th><th>含义</th></tr></thead>
+  <tbody>
+    <tr><td><code>SOURCE_HOST</code></td><td><code>MASTER_HOST</code></td><td>主库 IP</td></tr>
+    <tr><td><code>SOURCE_USER</code></td><td><code>MASTER_USER</code></td><td>连主库的账号</td></tr>
+    <tr><td><code>SOURCE_PASSWORD</code></td><td><code>MASTER_PASSWORD</code></td><td>连主库的密码</td></tr>
+    <tr><td><code>SOURCE_LOG_FILE</code></td><td><code>MASTER_LOG_FILE</code></td><td>binlog 文件名</td></tr>
+    <tr><td><code>SOURCE_LOG_POS</code></td><td><code>MASTER_LOG_POS</code></td><td>binlog 位置</td></tr>
+  </tbody>
+</table>
+<p class="check">成功就是 <code>Query OK, 0 rows affected</code>。报语法错先看版本：8.0.23 之前不认识 <code>SOURCE_*</code>。</p></li>
+
+<li id="r4"><b>启动复制</b><span class="where replica">从库 · mysql 客户端</span>
+<pre data-copy><code>START REPLICA;</code></pre>
+<p><code>Query OK</code> 只说明线程起来了，成不成还得看下一步。8.0.22 之前叫 <code>START SLAVE</code>；只想单独启重放线程用 <code>START REPLICA SQL_THREAD</code>。</p></li>
+
+<li><b>看状态：两个 Yes</b><span class="where replica">从库 · mysql 客户端</span>
+<pre data-copy><code>SHOW REPLICA STATUS\G</code></pre>
+<pre class="log"><code>Replica_IO_Running: Yes
+Replica_SQL_Running: Yes
+Last_IO_Error:
+Last_SQL_Error:
+Auto_Position: 0</code></pre>
+<p class="check">两个 <code>Yes</code>、两个错误字段为空、<code>Auto_Position=0</code>（位点复制的正常值）。<code>Replica_IO_State</code> 显示 <code>Waiting for source to send event</code> 是正常的空闲态，不是卡住。这只是<b>管道通了</b>，数据对不对还看下一节。</p>
+<p>输出为空 <code>Empty set</code>：连错实例了，或者 <code>CHANGE REPLICATION SOURCE</code> 没执行成功。</p></li>
+</ol>
+
+<h2 id="test">6. 测试：主库写，从库查</h2>
+<p>按课程的数据来。在<b>主库</b>执行：</p>
+<pre data-copy><code>CREATE DATABASE db01;
+USE db01;
+
+CREATE TABLE tb_user(
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  name VARCHAR(50) NOT NULL,
+  sex CHAR(1)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT INTO tb_user(id,name,sex) VALUES
+  (NULL,'Tom','1'), (NULL,'Trigger','0'), (NULL,'Dawn','1');</code></pre>
+<p>到<b>从库</b>查验：</p>
+<pre data-copy><code>SELECT * FROM db01.tb_user;</code></pre>
+<p class="check">能看到三行。再在主库改一次：<code>UPDATE db01.tb_user SET name='Tom-2' WHERE id=1;</code>，回从库重查应变成 <code>Tom-2</code>——<b>新增和修改各验一次</b>，只验 insert 会漏掉行变更的问题。</p>
+<p>两个客户端窗口切来切去容易搞混，先确认自己连的是哪台：</p>
+<pre data-copy><code>SELECT @@server_id, @@hostname;</code></pre>
+<p class="check"><code>server_id</code> 是 1 就是主库、2 就是从库。查不到东西时先看这一行，比翻连接配置快。</p>
+<p>最后在从库试一条写入，应当被只读挡住（通常是 1290）：</p>
+<pre data-copy><code>INSERT INTO db01.tb_user(id,name,sex) VALUES (99,'oops','1');</code></pre>
+<p class="check">报 <code>ERROR 1290 ... --read-only option</code> 才算只读生效。如果插进去了，先修只读，再查这条脏数据会不会被复制回主库。</p>
+
+<h2 id="stuck">7. 卡住了，先看这三处</h2>
+<p>在<b>从库</b>执行 <code>SHOW REPLICA STATUS\G</code>，按顺序看三个字段，多数问题当场就能定位：</p>
+<table>
+  <thead><tr><th style="width:32%">看到什么</th><th>先查什么</th></tr></thead>
+  <tbody>
+    <tr><td><code>Replica_IO_Running: No</code> / <code>Connecting</code></td><td>读 <code>Last_IO_Error</code>。连接超时或拒绝查地址、端口、防火墙；<code>1045</code> 查账号来源与密码；SSL 报错查 TLS 配置。最快的办法是把第 4 节第 3 步的手工连接重跑一次。</td></tr>
+    <tr><td><code>Replica_SQL_Running: No</code></td><td>读 <code>Last_SQL_Error</code>。<code>1062</code> 多为重复键、<code>1032</code> 多为找不到行——先查从库是不是被误写、初始数据是不是缺了，<b>别直接跳过事务</b>。</td></tr>
+    <tr><td>两个 <code>Yes</code>，但查不到新数据</td><td>确认事务已提交、连的是从库、在新事务里重查；再看是不是主库已有历史数据没导（见 02-04）。<b>别拿 <code>Seconds_Behind_Source=0</code> 当追平证据。</b></td></tr>
+  </tbody>
+</table>
+<p>日志已被清理、报 1236、uuid 相同、疑似延迟——这些按链路往下查的完整表格在 <a href="02-04-已有数据与排错.html#trace">02-04</a>。</p>
+
+<h2 id="ext">扩展页</h2>
+<p>本页只保证「搭通并验证」。下面四块是搭通之后会遇到的：</p>
+<div class="page-links">
+  <a href="02-03-网络与协议.html"><b>02-03 · 网络与协议细节</b><small>分层数据流、连接时序、TLS 与认证、事件包结构、三种「完成」的区别。</small></a>
+  <a href="02-04-已有数据与排错.html"><b>02-04 · 已有数据与排错</b><small>带坐标的快照、按链路排查表、延迟怎么判、worker 错误怎么看。</small></a>
+  <a href="02-01-GTID复制.html"><b>02-01 · GTID 复制</b><small>换主库不用找位点；四步打开 GTID；已有数据怎么初始化。</small></a>
+  <a href="02-02-成熟部署与故障切换.html"><b>02-02 · 成熟部署与故障切换</b><small>半同步、TLS 验身份、计划内切换八步、宕机处置与验收清单。</small></a>
+</div>
+
+<section class="quiz" id="quiz">
+  <p class="quiz-head">自测三问<span>先自己答，再展开对照</span></p>
+  <details><summary><span class="qno">Q1</span><span class="ask">主库已有 3 万条数据，直接 <code>SHOW MASTER STATUS</code> 拿坐标就 <code>START REPLICA</code>，会怎样？</span><span class="caret" aria-hidden="true"></span></summary>
+  <div class="ans"><p>通道是通的，之后的新写入也能过去，但那 3 万条历史数据<b>永远不会出现，而且不报错</b>。<br>要用 <code>mysqldump --single-transaction --source-data=2</code> 拿一份带坐标的快照，导入从库后用<b>快照里的坐标</b>启动。见 02-04。</p></div></details>
+  <details><summary><span class="qno">Q2</span><span class="ask">从库 <code>server-id</code> 忘了改，还是默认的 1，会报什么错？</span><span class="caret" aria-hidden="true"></span></summary>
+  <div class="ans"><p>多数情况<b>不报错，但数据不同步</b>——从库会丢弃 <code>server_id</code> 与自己相同的事件，相当于收到就扔。这类问题最难查，因为它安静。<br>所以从库第一步就把 <code>server-id</code> 定成 2，并用 <code>SELECT @@server_id</code> 核对。</p></div></details>
+  <details><summary><span class="qno">Q3</span><span class="ask">两个 <code>Running</code> 都是 <code>Yes</code>、延迟显示 0，业务在从库却读到旧值。先查什么？</span><span class="caret" aria-hidden="true"></span></summary>
+  <div class="ans"><p>先别信延迟。比 <code>Read_Source_Log_Pos</code> 和 <code>Exec_Source_Log_Pos</code>：两个 <code>Yes</code> 只说明线程活着，applier 可能还在追。<br>再看读的是不是从库（<code>SELECT @@server_id</code>）、是不是在旧事务快照里读；最后才怀疑复制过滤和初始数据缺口。</p></div></details>
+</section>
+
+<h2 id="sources">资料</h2>
+<p class="refs">官方文档：<a href="https://dev.mysql.com/doc/refman/8.0/en/replication-howto.html">搭建复制</a> · <a href="https://dev.mysql.com/doc/refman/8.0/en/replication-implementation.html">复制实现</a> · <a href="https://dev.mysql.com/doc/refman/8.0/en/replication-threads.html">复制线程</a> · <a href="https://dev.mysql.com/doc/refman/8.0/en/show-replica-status.html">SHOW REPLICA STATUS</a></p>
+<p class="source">核对日期 2026-11-27。本页顺序按课程「概述 → 原理 → 准备服务器 → 主库配置 → 从库配置 → 测试」编排；命令按 MySQL 8.0 官方文档与课程内容整理，<b>没有在两台真实实例上逐条执行</b>，在自己环境里第一次跑时以每步的验收输出为准。</p>
+
+<div class="footer"><a href="01-日志.html">← 01 日志</a> · <a href="../index.html">总目录</a> · <a href="02-01-GTID复制.html">02-01 GTID 复制 →</a></div>
+</main>
+</div></body></html>

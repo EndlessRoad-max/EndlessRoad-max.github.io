@@ -1,0 +1,19 @@
+/* Shared site navigation inside standalone HTML notes. */
+.site-note-nav {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem 1.25rem;
+  margin: 0 0 1.5rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--line, #e4e7ec);
+  font: 400 0.875rem/1.6 -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+}
+.site-note-nav a { color: var(--text-2, #4e5564); text-decoration: none; }
+.site-note-nav a:first-child { font-weight: 650; margin-right: auto; }
+.site-note-nav a:hover { color: var(--brand, #00758f); text-decoration: underline; }
+.site-note-nav a:focus-visible { outline: 2px solid var(--brand, #00758f); outline-offset: 4px; }
+main[data-pagefind-body] { overflow-wrap: anywhere; }
+.site-note-table { max-width: 100%; overflow-x: auto; margin: 1rem 0; }
+.site-note-table > table { margin: 0; }
+.site-note-table:focus-visible { outline: 2px solid var(--brand, #00758f); outline-offset: 2px; }

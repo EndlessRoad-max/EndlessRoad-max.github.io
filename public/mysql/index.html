@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MySQL 学习笔记 · 总目录</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="layout">
+
+  <nav class="sidebar">
+    <p class="side-title">笔记目录</p>
+    <a href="#overview">总览</a>
+    <a href="#ref">常备 · 查用</a>
+    <a href="#basic">基础篇</a>
+    <a href="#advanced">进阶篇</a>
+    <a href="#ops">运维篇</a>
+    <a href="#convention">笔记约定</a>
+  </nav>
+
+  <main class="main">
+
+    <div class="crumb">黑马程序员 · MySQL 数据库入门到精通</div>
+    <h1>MySQL 学习笔记</h1>
+    <p class="lede">按课程篇章组织的个人笔记。每章一个 HTML 文件，随学习进度追加更新；代码示例统一使用 <code>itcast</code> / <code>itheimadb</code> 课程示例库。</p>
+
+    <div class="meta">
+      <span>最近更新：2026-11-26</span>
+      <span>已完成：5 / 17 章</span>
+      <span>环境：MySQL 8.0</span>
+    </div>
+
+    <h2 id="overview">总览</h2>
+    <div class="grid3">
+      <a class="tile" href="#basic">
+        <div class="t-kicker">Part 01</div>
+        <h3>基础篇</h3>
+        <p>SQL 语句、函数、约束、多表查询、事务。把表建起来、把数据查出来。</p>
+        <div class="prog-row"><div class="prog"><i style="width:0%"></i></div><span>0 / 6 章</span></div>
+      </a>
+      <a class="tile" href="#advanced">
+        <div class="t-kicker">Part 02</div>
+        <h3>进阶篇</h3>
+        <p>存储引擎、索引、SQL 优化、视图与存储过程、锁、InnoDB 架构。</p>
+        <div class="prog-row"><div class="prog"><i style="width:29%"></i></div><span>2 / 7 章</span></div>
+      </a>
+      <a class="tile" href="#ops">
+        <div class="t-kicker">Part 03</div>
+        <h3>运维篇</h3>
+        <p>日志体系、主从复制、分库分表、读写分离。从单机走向集群。</p>
+        <div class="prog-row"><div class="prog"><i style="width:100%"></i></div><span>4 / 4 章</span></div>
+      </a>
+    </div>
+
+    <h2 id="ref">常备 · 查用</h2>
+    <p>知识点散在各章页面里，但真正要用的时候只有两件事：<b>出错时查表，动手时看流程</b>。这两页不按章节走，按「你现在卡在哪」走。</p>
+    <div class="grid2">
+      <a class="tile" href="踩坑总表.html">
+        <div class="t-kicker">Reference</div>
+        <h3>踩坑总表</h3>
+        <p>20 条报错按「卡在哪一层」归成四组：连不上 → 被拒 → 执行失败 → 结果不对。含 4 条不报错却会出事的静默坑。</p>
+      </a>
+      <a class="tile" href="任务剧本.html">
+        <div class="t-kicker">Playbook</div>
+        <h3>任务剧本</h3>
+        <p>三条端到端流程：每天备份、恢复到某一秒、换机器迁移。每步都给能直接粘的命令，并标出不能跳的那一步。</p>
+      </a>
+    </div>
+
+    <h2 id="basic">基础篇</h2>
+    <div class="prog-row"><div class="prog"><i style="width:0%"></i></div><span>0 / 6</span></div>
+    <div class="card">
+      <ul class="chap-list">
+        <li><span class="n">01</span><span class="todo">MySQL 概述：数据库概念、安装配置、数据模型</span><span class="tag">待更新</span></li>
+        <li><span class="n">02</span><span class="todo">SQL：通用语法、DDL、DML、DQL、DCL</span><span class="tag">待更新</span></li>
+        <li><span class="n">03</span><span class="todo">函数：字符串、数值、日期、流程控制</span><span class="tag">待更新</span></li>
+        <li><span class="n">04</span><span class="todo">约束：主键、唯一、非空、默认、检查、外键</span><span class="tag">待更新</span></li>
+        <li><span class="n">05</span><span class="todo">多表查询：多表关系、连接查询、子查询</span><span class="tag">待更新</span></li>
+        <li><span class="n">06</span><span class="todo">事务：ACID、并发问题、隔离级别</span><span class="tag">待更新</span></li>
+      </ul>
+    </div>
+
+    <h2 id="advanced">进阶篇</h2>
+    <div class="prog-row"><div class="prog"><i style="width:29%"></i></div><span>2 / 7</span></div>
+    <div class="card">
+      <ul class="chap-list">
+        <li><span class="n">01</span><span class="todo">存储引擎：体系结构、InnoDB / MyISAM / Memory</span><span class="tag">待更新</span></li>
+        <li><span class="n">02</span><span class="todo">索引：B+Tree 结构、分类、语法、使用规则</span><span class="tag">待更新</span></li>
+        <li><span class="n">03</span><span class="todo">SQL 优化：插入、主键、排序、分组、分页、计数</span><span class="tag">待更新</span></li>
+        <li><span class="n">04</span><a href="进阶篇/04-01-视图.html">视图：只存 SQL 不存数据、能不能改、检查选项、三个用途</a><span class="tag done">已更新</span></li>
+        <li><span class="n">05</span><span class="todo">锁：全局锁、表级锁、行级锁</span><span class="tag">待更新</span></li>
+        <li><span class="n">06</span><span class="todo">InnoDB 引擎：逻辑结构、内存架构、MVCC</span><span class="tag">待更新</span></li>
+        <li class="fold">
+          <details>
+            <summary>
+              <span class="n">07</span>
+              <a class="fold-title" href="进阶篇/07-MySQL管理.html">MySQL 管理：系统库、常用客户端工具</a>
+              <span class="fold-count">7 个子页</span>
+              <span class="tag done">已更新</span>
+              <span class="chev" aria-hidden="true"></span>
+            </summary>
+            <ul class="fold-body">
+              <li><span class="n">7.1</span><a href="进阶篇/07-01-系统数据库.html">系统数据库：37 张系统表、元数据与运行时</a><span class="tag done">已更新</span></li>
+              <li><span class="n">7.2.1</span><a href="进阶篇/07-02-mysql.html">mysql 客户端：连接参数、-e 批处理与输出格式</a><span class="tag done">已更新</span></li>
+              <li><span class="n">7.2.2</span><a href="进阶篇/07-03-mysqladmin.html">mysqladmin：状态、探活、刷日志与停机</a><span class="tag done">已更新</span></li>
+              <li><span class="n">7.2.3</span><a href="进阶篇/07-04-mysqlbinlog.html">mysqlbinlog：binlog 解析、ROW 格式与时间点恢复</a><span class="tag done">已更新</span></li>
+              <li><span class="n">7.2.4</span><a href="进阶篇/07-05-mysqlshow.html">mysqlshow：对象查找、--count 的代价与权限过滤</a><span class="tag done">已更新</span></li>
+              <li><span class="n">7.2.5</span><a href="进阶篇/07-06-mysqldump.html">mysqldump：备份粒度与常用选项</a><span class="tag done">已更新</span></li>
+              <li><span class="n">7.2.6</span><a href="进阶篇/07-07-mysqlimport.html">mysqlimport / source：文本数据与 SQL 脚本导入</a><span class="tag done">已更新</span></li>
+            </ul>
+          </details>
+        </li>
+      </ul>
+    </div>
+
+    <h2 id="ops">运维篇</h2>
+    <div class="prog-row"><div class="prog"><i style="width:100%"></i></div><span>4 / 4</span></div>
+    <div class="card">
+      <ul class="chap-list">
+        <li><span class="n">01</span><a href="运维篇/01-日志.html">日志：错误日志、二进制日志、查询日志、慢查询日志</a><span class="tag done">已更新</span></li>
+        <li class="fold">
+          <details>
+            <summary>
+              <span class="n">02</span>
+              <a class="fold-title" href="运维篇/02-主从复制.html">主从复制：三步原理、两台准备、主库四步、从库五步、测试验收</a>
+              <span class="fold-count">4 个扩展页</span>
+              <span class="tag done">已更新</span>
+              <span class="chev" aria-hidden="true"></span>
+            </summary>
+            <ul class="fold-body">
+              <li><span class="n">02-01</span><a href="运维篇/02-01-GTID复制.html">GTID 复制：换主库后怎样接上</a><span class="tag done">已更新</span></li>
+              <li><span class="n">02-02</span><a href="运维篇/02-02-成熟部署与故障切换.html">成熟部署与故障切换：半同步、TLS、切换八步</a><span class="tag done">已更新</span></li>
+              <li><span class="n">02-03</span><a href="运维篇/02-03-网络与协议.html">网络与协议细节：分层数据流、连接时序、事件包</a><span class="tag done">已更新</span></li>
+              <li><span class="n">02-04</span><a href="运维篇/02-04-已有数据与排错.html">已有数据与排错：带坐标的快照、链路排查、延迟判定</a><span class="tag done">已更新</span></li>
+            </ul>
+          </details>
+        </li>
+        <li class="fold">
+          <details>
+            <summary>
+              <span class="n">03</span>
+              <a class="fold-title" href="运维篇/03-分库分表.html">分库分表：四种拆法、拆完的四个新问题、分片键怎么选</a>
+              <span class="fold-count">1 个扩展页</span>
+              <span class="tag done">已更新</span>
+              <span class="chev" aria-hidden="true"></span>
+            </summary>
+            <ul class="fold-body">
+              <li><span class="n">03-01</span><a href="运维篇/03-01-MyCat实现.html">MyCat 实现：逻辑与物理、三份配置、分片规则、八个坑</a><span class="tag done">已更新</span></li>
+            </ul>
+          </details>
+        </li>
+        <li><span class="n">04</span><a href="运维篇/04-读写分离.html">读写分离：一主一从改三处、双主双从与自动切换</a><span class="tag done">已更新</span></li>
+      </ul>
+    </div>
+
+    <h2 id="convention">笔记约定</h2>
+    <div class="note tip">
+      <b>记法约定</b>
+      <p>每个章节文件放在对应篇章目录下，命名 <code>01-xxx.html</code>；同一章的知识点按课程小节顺序排列，不复述视频原话，只保留"能复用的结论 + 能跑的 SQL"。</p>
+      <p>每页固定三段：开头<b>一屏速记</b>（5 条以内，合上笔记能复述）→ 中间<b>图解 + 可跑命令</b>（讲清为什么）→ 结尾<b>自测三问</b>（折叠答案，先答再看）。速记负责复习，正文负责理解，自测负责记住。</p>
+    </div>
+    <div class="note warn">
+      <b>版本注意</b>
+      <p>课程部分章节录制于 MySQL 5.7 环境，涉及 <code>utf8mb4</code>、窗口函数、<code>CHECK</code> 约束生效等差异时，笔记按 8.0 行为标注。</p>
+    </div>
+
+    <div class="footer">
+      黑马程序员《MySQL 数据库入门到精通》配套个人笔记 · 本地离线可用
+    </div>
+
+  </main>
+</div>
+</body>
+</html>

@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>7.2.3 mysqlbinlog · MySQL 笔记</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="layout">
+
+  <nav class="sidebar">
+    <p class="side-title">本页目录</p>
+    <ul class="nav-tree">
+      <li><a class="leaf" href="#s1">1. 它读文件，不连数据库</a></li>
+      <li><a class="leaf" href="#s2">2. 语法：位置参数是文件</a></li>
+      <li><a class="leaf" href="#s3">3. 截图六个选项逐个校正</a></li>
+      <li><a class="leaf" href="#s4">4. 为什么默认是 base64</a></li>
+      <li><a class="leaf" href="#s5">5. 三种形态，只有一种能回放</a></li>
+      <li><a class="leaf" href="#s6">6. 时间点恢复（PITR）</a></li>
+      <li><a class="leaf" href="#s7">7. 两个前提：版本与权限</a></li>
+      <li><a class="leaf" href="#s8">8. 报错对照</a></li>
+    </ul>
+
+    <p class="side-title" style="margin-top:22px">当前位置</p>
+    <ul class="nav-tree">
+      <li><a href="../index.html">↑ 总目录</a>
+        <ul>
+          <li><a class="group" href="07-MySQL管理.html">07 MySQL 管理</a>
+            <ul>
+              <li><a class="leaf" href="07-01-系统数据库.html">7.1 系统数据库</a></li>
+              <li><a class="leaf" href="07-02-mysql.html">7.2.1 mysql</a></li>
+              <li><a class="leaf" href="07-03-mysqladmin.html">7.2.2 mysqladmin</a></li>
+              <li><span class="current">7.2.3 mysqlbinlog</span></li>
+              <li><a class="leaf" href="07-05-mysqlshow.html">7.2.4 mysqlshow</a></li>
+              <li><a class="leaf" href="07-06-mysqldump.html">7.2.5 mysqldump</a></li>
+              <li><a class="leaf" href="07-07-mysqlimport.html">7.2.6 mysqlimport</a></li>
+            </ul>
+          </li>
+        </ul>
+      </li>
+    </ul>
+  </nav>
+
+  <main class="main">
+
+    <div class="crumb"><a href="../index.html">总目录</a> / <a href="07-MySQL管理.html">07 MySQL 管理</a> / 7.2.3</div>
+    <h1><span class="chapter-no">7.2.3</span>mysqlbinlog</h1>
+    <p class="lede">截图第一句说得很准：binlog 是<strong>二进制格式</strong>保存的，想看成文本就要用它。但它和前面三个工具不是一类东西——<code>mysql</code>、<code>mysqladmin</code> 是「连上服务器干活」，<code>mysqlbinlog</code> 默认是「<strong>读本地的一堆字节</strong>」，连密码都不用给。理解这一点，后面那些奇怪现象（默认输出一堆 base64、<code>-v</code> 不加就看不见 SQL、输出不能直接回放）才串得起来。</p>
+
+    <div class="meta">
+      <span>进阶篇 · 7.2.3</span>
+      <span>更新：2026-11-25</span>
+      <span>环境：MySQL 8.0（默认 binlog_format=ROW）</span>
+    </div>
+
+    <section class="quick">
+      <p class="quick-head">一屏速记<span>合上笔记，这 5 条要能自己说出来</span></p>
+      <ol>
+        <li>它读的是<b>磁盘上的 binlog 文件</b>，默认不连数据库；要远程拉才加 <code>-R --read-from-remote-server</code>。</li>
+        <li>8.0 默认 <code>binlog_format=ROW</code>，行变更被记成二进制镜像，所以<b>默认输出一堆 base64</b>；要可读就加 <code>-v --base64-output=DECODE-ROWS</code>。</li>
+        <li>回放前确认 <code>binlog_row_image=FULL</code>：设成 MINIMAL 就只记被改的列，回放出来的行不完整。</li>
+        <li><code>--start-datetime</code> / <code>--stop-datetime</code> 用的是<b>运行 mysqlbinlog 这台机器的本地时区</b>，不是数据库服务器的时区。</li>
+        <li>时间点恢复的公式：<b>最近一次全备 + 从备份点回放到误操作前一秒的 binlog</b>；回放需要 <code>BINLOG_ADMIN</code> 权限。</li>
+      </ol>
+    </section>
+
+    <h2 id="s1">1. 它读文件，不连数据库</h2>
+
+    <p>binlog 文件本身是自描述的：文件头有 magic number，每个事件前有 19 字节的公共头（时间戳、类型、server_id、长度、下一个事件的位置）。所以 <code>mysqlbinlog</code> 完全可以离线解析，<strong>不需要 mysqld 在跑，也不需要账号密码</strong>——只需要对这个文件有读权限。</p>
+
+    <p>只有两种情况下它才需要连服务器：加了 <code>--read-from-remote-server</code>（<code>-R</code>），或者文件被加密了（本地解不开，只能让服务器解密后传过来）。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 680 226" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <text x="340" y="20" text-anchor="middle" font-size="11.5" fill="#8a9099">同一份字节，两条读法；区别只在「谁去打开文件」</text>
+
+        <rect x="24" y="36" width="306" height="130" rx="8" fill="#f4fafb" stroke="#b9dde5"/>
+        <text x="40" y="54" font-size="11.5" font-weight="700" fill="#00758f">① 本地文件（课程里的用法）</text>
+
+        <rect x="38" y="64" width="86" height="32" rx="5" fill="#ffffff" stroke="#00758f"/>
+        <text x="81" y="85" text-anchor="middle" font-size="9" font-family="Consolas,monospace" fill="#00566b">binlog.000001</text>
+
+        <path d="M126 80 L138 80" stroke="#00758f" stroke-width="1.2"/>
+        <path d="M133 76.5 L139 80 L133 83.5 Z" fill="#00758f"/>
+
+        <rect x="142" y="64" width="90" height="32" rx="5" fill="#e6f3f6" stroke="#00758f"/>
+        <text x="187" y="85" text-anchor="middle" font-size="9" font-family="Consolas,monospace" fill="#00566b">mysqlbinlog</text>
+
+        <path d="M234 80 L246 80" stroke="#00758f" stroke-width="1.2"/>
+        <path d="M241 76.5 L247 80 L241 83.5 Z" fill="#00758f"/>
+
+        <rect x="250" y="64" width="66" height="32" rx="5" fill="#ffffff" stroke="#00758f"/>
+        <text x="283" y="85" text-anchor="middle" font-size="9" fill="#00566b">SQL 文本</text>
+
+        <text x="40" y="118" font-size="9.5" fill="#4e5564">只做格式转换，不连库、不解密、不改内容</text>
+        <text x="40" y="140" font-size="9.5" fill="#1a7f4b">✓ 不用账号密码，只受文件系统权限约束</text>
+
+        <rect x="350" y="36" width="306" height="130" rx="8" fill="#fbfcfd" stroke="#e4e7ec"/>
+        <text x="366" y="54" font-size="11.5" font-weight="700" fill="#4e5564">② 远程读取 <tspan font-family="Consolas,monospace">-R</tspan></text>
+
+        <rect x="364" y="64" width="86" height="32" rx="5" fill="#ffffff" stroke="#c9cfd8"/>
+        <text x="407" y="85" text-anchor="middle" font-size="9" fill="#4e5564">远程 mysqld</text>
+
+        <path d="M452 80 L464 80" stroke="#8a9099" stroke-width="1.2"/>
+        <path d="M459 76.5 L465 80 L459 83.5 Z" fill="#8a9099"/>
+
+        <rect x="468" y="64" width="96" height="32" rx="5" fill="#ffffff" stroke="#c9cfd8"/>
+        <text x="516" y="85" text-anchor="middle" font-size="9" font-family="Consolas,monospace" fill="#4e5564">mysqlbinlog -R</text>
+
+        <path d="M566 80 L578 80" stroke="#8a9099" stroke-width="1.2"/>
+        <path d="M573 76.5 L579 80 L573 83.5 Z" fill="#8a9099"/>
+
+        <rect x="582" y="64" width="58" height="32" rx="5" fill="#ffffff" stroke="#c9cfd8"/>
+        <text x="611" y="85" text-anchor="middle" font-size="9" fill="#4e5564">文本</text>
+
+        <text x="366" y="118" font-size="9.5" fill="#4e5564">走复制协议，边传边解析</text>
+        <text x="366" y="140" font-size="9.5" fill="#b06a00">需 REPLICATION SLAVE + CLIENT</text>
+
+        <text x="28" y="188" font-size="10.5" fill="#4e5564">文件在 <tspan font-family="Consolas,monospace" fill="#00758f">datadir</tspan> 下，名字由 <tspan font-family="Consolas,monospace" fill="#00758f">log_bin_basename</tspan> 决定，通常是 <tspan font-family="Consolas,monospace">mysql-bin.000001</tspan> 这种</text>
+        <text x="28" y="208" font-size="10.5" fill="#8a9099">用 <tspan font-family="Consolas,monospace">SHOW BINARY LOGS;</tspan> 看有哪些文件、各多大；relay log 格式相同，也能用它读</text>
+      </svg>
+      <figcaption><b>图 1</b>左：读本地文件，全程不碰服务器。右：<code>-R</code> 走复制协议，权限和网络都要过一遍。</figcaption>
+    </figure>
+
+    <pre><span class="label">sql</span><code><span class="c">-- 先搞清楚去哪找文件、有哪些文件</span>
+<span class="k">SHOW</span> <span class="k">VARIABLES</span> <span class="k">LIKE</span> <span class="s">'log_bin%'</span>;      <span class="c">-- log_bin_basename 就是路径前缀</span>
+<span class="k">SHOW</span> <span class="k">BINARY</span> <span class="k">LOGS</span>;                    <span class="c">-- 当前还有哪些 binlog，多大，是否加密</span>
+<span class="k">SHOW</span> <span class="k">MASTER</span> <span class="k">STATUS</span>;                   <span class="c">-- 现在写到哪个文件、哪个位点（8.4 改用 SHOW BINARY LOG STATUS）</span></code></pre>
+
+    <h2 id="s2">2. 语法：位置参数是文件</h2>
+
+    <p>截图给的语法是 <code>mysqlbinlog [options] log-files1 log-files2 ...</code>。和前面几个工具比，最大的结构差异在这里：<strong>位置参数是文件，而且可以有多个</strong>，按给定顺序依次读，效果等于把它们首尾拼成一条时间线。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 680 220" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <text x="340" y="20" text-anchor="middle" font-size="11.5" fill="#8a9099">选项在前，文件在后；文件可以并列好几个</text>
+
+        <rect x="24" y="36" width="118" height="36" rx="6" fill="#00758f"/>
+        <text x="83" y="59" text-anchor="middle" font-size="12" font-family="Consolas,monospace" fill="#ffffff">mysqlbinlog</text>
+
+        <rect x="152" y="36" width="112" height="36" rx="6" fill="#fbfcfd" stroke="#c9cfd8" stroke-dasharray="4 3"/>
+        <text x="208" y="59" text-anchor="middle" font-size="12" font-family="Consolas,monospace" fill="#4e5564">[options]</text>
+
+        <rect x="274" y="36" width="110" height="36" rx="6" fill="#fdf3e3" stroke="#f29111"/>
+        <text x="329" y="59" text-anchor="middle" font-size="11" font-family="Consolas,monospace" fill="#8a6535">log-file1</text>
+
+        <rect x="394" y="36" width="262" height="36" rx="6" fill="#fffaf3" stroke="#f0d9b0" stroke-dasharray="4 3"/>
+        <text x="408" y="59" font-size="11" font-family="Consolas,monospace" fill="#a9781f">log-file2 ... 后面的文件（可选）</text>
+
+        <text x="83" y="90" text-anchor="middle" font-size="9.5" fill="#8a9099">工具</text>
+        <text x="208" y="90" text-anchor="middle" font-size="9.5" fill="#8a9099">连接或解析参数</text>
+        <text x="329" y="90" text-anchor="middle" font-size="9.5" fill="#b06a00">起点文件</text>
+        <text x="525" y="90" text-anchor="middle" font-size="9.5" fill="#b06a00">按顺序接着读</text>
+
+        <line x1="24" y1="104" x2="656" y2="104" stroke="#e4e7ec" stroke-width="1"/>
+
+        <text x="24" y="128" font-size="10.5" fill="#4e5564">顺序就是时间顺序。写成 <tspan font-family="Consolas,monospace" fill="#00758f">binlog.000003 binlog.000004</tspan>，等于从 3 号文件读到 4 号文件末尾</text>
+        <text x="24" y="150" font-size="10.5" fill="#4e5564">连接参数 <tspan font-family="Consolas,monospace">-h -P -u -p -S</tspan> 只在 <tspan font-family="Consolas,monospace">-R</tspan> 或读加密 binlog 时才需要；读本地文件时给了也没用</text>
+        <text x="24" y="172" font-size="10.5" fill="#a93226">多个文件时：<tspan font-family="Consolas,monospace">--start-position</tspan> 只作用于<strong>第一个</strong>文件，<tspan font-family="Consolas,monospace">--stop-position</tspan> 只作用于<strong>最后一个</strong></text>
+        <text x="24" y="194" font-size="10.5" fill="#b06a00"><tspan font-family="Consolas,monospace">--no-defaults</tspan> 必须放在<strong>第一个</strong>参数，否则 my.cnf 里 <tspan font-family="Consolas,monospace">[client]</tspan> 段会让它报 unknown variable</text>
+      </svg>
+      <figcaption><b>图 2</b>命令结构。要注意的是最后两条：位置参数的作用范围，以及 <code>--no-defaults</code> 的位置。</figcaption>
+    </figure>
+
+    <h2 id="s3">3. 截图六个选项逐个校正</h2>
+
+    <p>截图那六行里有三行写得不够准，照抄会在关键时候卡住。逐条对一遍：</p>
+
+    <table>
+      <thead>
+        <tr><th>选项</th><th>截图说法</th><th>实际行为</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>-d</code> / <code>--database=name</code></td>
+          <td>指定数据库名称，只列出指定的数据库相关操作</td>
+          <td><strong>要看格式</strong>。STATEMENT 格式下按「当前默认库」判断，<code>USE</code> 过才算；<strong>ROW 格式下按「改的是哪个库的表」判断</strong>，与 <code>USE</code> 无关。另外它过滤不掉 <code>Rows_query</code> 事件——开了 <code>binlog_rows_query_log_events</code> 时，别的库的原始 SQL 还会漏出来</td>
+        </tr>
+        <tr>
+          <td><code>-o</code> / <code>--offset=#</code></td>
+          <td>忽略日志中的前 n <strong>行命令</strong></td>
+          <td>跳过的前 N 个<strong>事件（event）</strong>。不是 N 行文本，也不是字节偏移。想看「从某处开始」应该用 <code>--start-position</code>，<code>-o</code> 基本只用于调试</td>
+        </tr>
+        <tr>
+          <td><code>-r</code> / <code>--result-file=name</code></td>
+          <td>把文本格式日志输出到指定文件</td>
+          <td>对。补充一点：<strong>Windows 上应该用它而不是 <code>&gt;</code> 重定向</strong>——重定向会把 <code>\n</code> 转成 <code>\r\n</code>，回放时报语法错</td>
+        </tr>
+        <tr>
+          <td><code>-s</code> / <code>--short-form</code></td>
+          <td>显示简单格式，省略一些信息</td>
+          <td>它省略的不只是「一些信息」，而是<strong>所有行事件</strong>。ROW 格式下加 <code>-s</code>，输出几乎是空的。官方标注「仅供测试，不要用于生产」，且已弃用</td>
+        </tr>
+        <tr>
+          <td><code>--start-datetime</code> / <code>--stop-datetime</code></td>
+          <td>指定日期时间内的所有日志</td>
+          <td>对，但<strong>取的是运行 mysqlbinlog 那台机器的本地时区</strong>。在 UTC 的跳板机上按北京时间写参数，会整整错 8 小时</td>
+        </tr>
+        <tr>
+          <td><code>--start-position</code> / <code>--stop-position</code></td>
+          <td>指定位置间隔内的所有日志</td>
+          <td>对。位置是<strong>文件内的字节偏移</strong>，不是事件序号；而且 <code>--stop-position</code> <strong>不包含</strong>从该位置开始的事件</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>截图之外，真正每天会用到的是下面这几个：</p>
+
+    <table>
+      <thead>
+        <tr><th>选项</th><th>作用</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>-v</code> / <code>--verbose</code></td><td>把行事件重建成带注释的伪 SQL。<strong>给两次（<code>-vv</code>）</strong>额外输出列类型和元数据注释</td></tr>
+        <tr><td><code>--base64-output=DECODE-ROWS</code></td><td>配合 <code>-v</code>，把 <code>BINLOG '...'</code> 那坨 base64 换成伪 SQL。只适合看，不能回放</td></tr>
+        <tr><td><code>--skip-gtids</code></td><td>输出里去掉 GTID 赋值。回放到已有 GTID 的实例时几乎是必加项</td></tr>
+        <tr><td><code>-R</code> / <code>--read-from-remote-server</code></td><td>不读本地文件，从服务器拉</td></tr>
+        <tr><td><code>--raw</code></td><td>配合 <code>-R</code>，把远端 binlog 原样落成本地文件（做 binlog 备份用）</td></tr>
+        <tr><td><code>--stop-never</code></td><td>配合 <code>-R</code>，连上不退出，像从库一样持续追</td></tr>
+        <tr><td><code>--verify-binlog-checksum</code></td><td>校验文件完整性，坏了会报错。恢复前先跑一遍</td></tr>
+        <tr><td><code>--include-gtids</code> / <code>--exclude-gtids</code></td><td>按 GTID 集合筛选，比按位置精确</td></tr>
+        <tr><td><code>-D</code> / <code>--disable-log-bin</code></td><td>输出里加上 <code>SET sql_log_bin=0</code>，防止回放时又写进本机 binlog，造成循环</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="s4">4. 为什么默认是一堆 base64</h2>
+
+    <p>这是新手最容易以为「工具坏了」的地方。<strong>MySQL 8.0 的 <code>binlog_format</code> 默认是 <code>ROW</code></strong>：binlog 里存的不是 SQL 语句，而是「哪张表的哪一行，从什么值变成什么值」。这种数据用二进制编码，直接打印出来就是一段 base64。</p>
+
+    <p>所以不加参数直接跑，看到的是 <code>BINLOG 'FyY2Zg8B...'</code> 这样的块。<strong>它不是乱码，是完整的行变更数据，只是给程序看的。</strong>要变成人眼能读的伪 SQL，加 <code>-v</code>：</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 680 282" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <text x="340" y="20" text-anchor="middle" font-size="11.5" fill="#8a9099">同一段行变更，上面是给机器回放用的，下面是给人看的</text>
+
+        <rect x="24" y="34" width="632" height="98" rx="7" fill="#fbfcfd" stroke="#dfe3e9" stroke-dasharray="4 3"/>
+        <text x="40" y="56" font-size="9" font-family="Consolas,monospace" fill="#8a9099"># at 3410</text>
+        <text x="40" y="74" font-size="9.5" font-family="Consolas,monospace" fill="#4e5564">BINLOG '</text>
+        <text x="40" y="92" font-size="9.5" font-family="Consolas,monospace" fill="#4e5564">FyY2Zg8BAAAAegAAAH0AAAABAAoAitWVYhMAFAAAAAEAAgABAAEAAgAB</text>
+        <text x="40" y="110" font-size="9.5" font-family="Consolas,monospace" fill="#4e5564">Jw8BAAAAAAEAAgAAAAEAAQACAAAAAQACAAIAAAABAAIAAgAAAAEA</text>
+        <text x="40" y="128" font-size="9.5" font-family="Consolas,monospace" fill="#4e5564">AgACAAAAAQACAAIAAAABAAIAAgAAAI0='</text>
+
+        <text x="470" y="74" font-size="9.5" fill="#b06a00">↑ 整块就是 Write_rows 事件</text>
+        <text x="470" y="92" font-size="9.5" fill="#8a9099">删掉它，回放就少了这条插入</text>
+
+        <path d="M340 136 L340 154" stroke="#00758f" stroke-width="1.4"/>
+        <path d="M335.5 148 L340 155 L344.5 148 Z" fill="#00758f"/>
+        <text x="352" y="150" font-size="10" font-family="Consolas,monospace" fill="#00566b">-v --base64-output=DECODE-ROWS</text>
+
+        <rect x="24" y="160" width="632" height="96" rx="7" fill="#f4fafb" stroke="#b9dde5"/>
+        <text x="40" y="182" font-size="9.5" font-family="Consolas,monospace" fill="#00566b">### INSERT INTO `itcast`.`emp`</text>
+        <text x="40" y="200" font-size="9.5" font-family="Consolas,monospace" fill="#00566b">### SET</text>
+        <text x="40" y="218" font-size="9" font-family="Consolas,monospace" fill="#4e5564">###   @1=1 /* INT meta=0 nullable=0 is_null=0 */</text>
+        <text x="40" y="236" font-size="9" font-family="Consolas,monospace" fill="#4e5564">###   @2='张无忌' /* VARSTRING(60) meta=60 nullable=1 */</text>
+        <text x="470" y="200" font-size="9.5" fill="#00758f">@1 @2 是列序号</text>
+        <text x="470" y="218" font-size="9.5" fill="#8a9099">不是列名，要对表结构</text>
+
+        <text x="28" y="274" font-size="10.5" fill="#4e5564">看到 base64 不是工具坏了：8.0 默认 <tspan font-family="Consolas,monospace">binlog_format=ROW</tspan>，行变更本来就不以 SQL 形式存储</text>
+      </svg>
+      <figcaption><b>图 3</b>上：默认输出。下：加 <code>-v</code> 后重建的伪 SQL。<code>###</code> 开头说明它<strong>是注释，不是可执行语句</strong>。</figcaption>
+    </figure>
+
+    <p>读输出时会遇到几种固定事件，认清它们能省很多猜测：</p>
+
+    <table>
+      <thead>
+        <tr><th>输出里看到</th><th>含义</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>Format_desc</code></td><td>每个 binlog 文件的第一个事件，记录服务器版本和 binlog 版本（目前是 4）</td></tr>
+        <tr><td><code>Previous_gtids</code> / <code>Anonymous_Gtid</code></td><td>GTID 相关。<code>Anonymous_Gtid</code> 说明这条事务没分配 GTID</td></tr>
+        <tr><td><code>Query</code>（<code>BEGIN</code> / <code>COMMIT</code> / DDL）</td><td>DDL 和事务边界一定以 <code>Query</code> 事件出现，<strong>DDL 在 ROW 格式下也是明文 SQL</strong></td></tr>
+        <tr><td><code>Table_map</code></td><td>把 <code>table_id</code> 映射到「库.表」。行事件只带 id，不带表名</td></tr>
+        <tr><td><code>Write_rows</code> / <code>Update_rows</code> / <code>Delete_rows</code></td><td>增、改、删。这就是被 base64 包住的那部分</td></tr>
+        <tr><td><code>Xid</code></td><td>事务提交，对应 InnoDB 的 transaction id</td></tr>
+      </tbody>
+    </table>
+
+    <div class="note tip">
+      <b>找误操作时有个现成技巧</b>
+      <p>DDL 是明文，所以 <code>DROP TABLE</code>、<code>TRUNCATE</code>、<code>ALTER</code> 这类操作<strong>不用加 <code>-v</code> 也能 grep 到</strong>。真正需要解码的是 DML（误 UPDATE / 误 DELETE），那种才要 <code>-v --base64-output=DECODE-ROWS</code>。</p>
+    </div>
+
+    <h2 id="s5">5. 三种形态，只有一种能回放</h2>
+
+    <p>这一点最容易出事。<strong><code>-v</code> 生成的伪 SQL 每一行都以 <code>###</code> 开头，在导入 mysql 时是注释</strong>——也就是说，把带 <code>DECODE-ROWS</code> 的输出管道给 <code>mysql</code>，行变更会<strong>静默地全部丢掉</strong>：表结构恢复了、DDL 执行了，数据却一条没回来，而且没有任何报错。</p>
+
+    <p>官方对此的原话是：如果打算把输出重新执行，<strong>自动显示 BINLOG 语句是唯一安全的行为</strong>。其余取值只建议用于调试和阅读。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 680 268" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <text x="340" y="20" text-anchor="middle" font-size="11.5" fill="#8a9099">同一份 binlog，三种输出；右侧一栏决定你能拿它干什么</text>
+
+        <rect x="24" y="32" width="250" height="26" rx="4" fill="#f2f4f7"/>
+        <text x="36" y="50" font-size="9.5" font-weight="700" fill="#4e5564">命令</text>
+        <rect x="282" y="32" width="230" height="26" rx="4" fill="#f2f4f7"/>
+        <text x="294" y="50" font-size="9.5" font-weight="700" fill="#4e5564">看到什么</text>
+        <rect x="520" y="32" width="136" height="26" rx="4" fill="#f2f4f7"/>
+        <text x="532" y="50" font-size="9.5" font-weight="700" fill="#4e5564">能否回放</text>
+
+        <rect x="24" y="64" width="250" height="46" rx="4" fill="#ffffff" stroke="#e4e7ec"/>
+        <text x="36" y="84" font-size="9" font-family="Consolas,monospace" fill="#1f2329">mysqlbinlog binlog.000001</text>
+        <text x="36" y="100" font-size="9" fill="#8a9099">（什么都不加）</text>
+        <rect x="282" y="64" width="230" height="46" rx="4" fill="#ffffff" stroke="#e4e7ec"/>
+        <text x="294" y="84" font-size="9" font-family="Consolas,monospace" fill="#4e5564">BINLOG 'base64…'</text>
+        <text x="294" y="100" font-size="9" fill="#8a9099">可执行语句</text>
+        <rect x="520" y="64" width="136" height="46" rx="4" fill="#eaf7f0" stroke="#a8d8bf"/>
+        <text x="588" y="92" text-anchor="middle" font-size="11" font-weight="700" fill="#1a7f4b">✓ 能</text>
+
+        <rect x="24" y="118" width="250" height="46" rx="4" fill="#fdf8ef" stroke="#f0d9b0"/>
+        <text x="36" y="138" font-size="8.5" font-family="Consolas,monospace" fill="#8a6535">… -v --base64-output=DECODE-ROWS</text>
+        <text x="36" y="154" font-size="9" fill="#8a9099">给人看</text>
+        <rect x="282" y="118" width="230" height="46" rx="4" fill="#fdf8ef" stroke="#f0d9b0"/>
+        <text x="294" y="138" font-size="9" font-family="Consolas,monospace" fill="#8a6535">### INSERT INTO …</text>
+        <text x="294" y="154" font-size="9" fill="#a93226">全是注释，不可执行</text>
+        <rect x="520" y="118" width="136" height="46" rx="4" fill="#fdecea" stroke="#f5c6c2"/>
+        <text x="588" y="146" text-anchor="middle" font-size="11" font-weight="700" fill="#a93226">✗ 不能</text>
+
+        <rect x="24" y="172" width="250" height="46" rx="4" fill="#ffffff" stroke="#e4e7ec"/>
+        <text x="36" y="192" font-size="9" font-family="Consolas,monospace" fill="#1f2329">… -v -v</text>
+        <text x="36" y="208" font-size="9" fill="#8a9099">要列类型和元数据</text>
+        <rect x="282" y="172" width="230" height="46" rx="4" fill="#ffffff" stroke="#e4e7ec"/>
+        <text x="294" y="192" font-size="9" font-family="Consolas,monospace" fill="#4e5564">同上 + meta 注释</text>
+        <text x="294" y="208" font-size="9" fill="#8a9099">能看出 @1 是什么类型</text>
+        <rect x="520" y="172" width="136" height="46" rx="4" fill="#fdecea" stroke="#f5c6c2"/>
+        <text x="588" y="200" text-anchor="middle" font-size="11" font-weight="700" fill="#a93226">✗ 仅阅读</text>
+
+        <text x="24" y="242" font-size="10.5" fill="#a93226">回放用的输出里，每一行以 <tspan font-family="Consolas,monospace">###</tspan> 开头就说明数据被注释掉了 —— 管道给 mysql 等于什么都没做，还不报错</text>
+        <text x="24" y="260" font-size="10.5" fill="#8a9099">两个用途分开跑：<tspan font-family="Consolas,monospace">-v</tspan> 看内容，不加参数直接回放</text>
+      </svg>
+      <figcaption><b>图 4</b>「看」和「回放」是两条命令。混用不会报错，只会静默丢数据。</figcaption>
+    </figure>
+
+    <h2 id="s6">6. 时间点恢复（PITR）</h2>
+
+    <p>这是 mysqlbinlog 存在的根本原因：全备只能恢复到备份那一刻，<strong>备份之后、出事之前的数据只能靠 binlog 补回来</strong>。流程固定为三步——恢复全备、找到边界位置、回放区间。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 680 268" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <text x="340" y="20" text-anchor="middle" font-size="11.5" fill="#8a9099">全备之后的所有写入都在 binlog 里，包括那条误操作</text>
+
+        <rect x="110" y="92" width="290" height="18" rx="9" fill="#e6f3f6" stroke="#00758f" stroke-width="1.2"/>
+        <text x="255" y="105" text-anchor="middle" font-size="9.5" fill="#00566b">要回放的区间</text>
+
+        <line x1="40" y1="101" x2="648" y2="101" stroke="#dfe3e9" stroke-width="1.2"/>
+
+        <circle cx="110" cy="101" r="6" fill="#00758f"/>
+        <text x="110" y="76" text-anchor="middle" font-size="10.5" font-weight="700" fill="#00566b">03:00 全备完成</text>
+        <text x="110" y="62" text-anchor="middle" font-size="9" fill="#8a9099">mysqldump / XtraBackup</text>
+
+        <circle cx="400" cy="101" r="6" fill="#c0392b"/>
+        <text x="400" y="76" text-anchor="middle" font-size="10.5" font-weight="700" fill="#a93226">14:32:07 误执行 DROP</text>
+        <text x="400" y="62" text-anchor="middle" font-size="9" fill="#8a9099">这条事件在 binlog 里</text>
+
+        <circle cx="580" cy="101" r="6" fill="#b9bfc8"/>
+        <text x="580" y="76" text-anchor="middle" font-size="10.5" fill="#8a9099">现在</text>
+
+        <path d="M110 130 L110 144" stroke="#00758f" stroke-width="1.2"/>
+        <text x="110" y="160" text-anchor="middle" font-size="9" font-family="Consolas,monospace" fill="#00566b">--start-position</text>
+        <text x="110" y="174" text-anchor="middle" font-size="9" fill="#8a9099">取全备里记录的位点</text>
+
+        <path d="M400 130 L400 144" stroke="#c0392b" stroke-width="1.2"/>
+        <text x="400" y="160" text-anchor="middle" font-size="9" font-family="Consolas,monospace" fill="#a93226">--stop-position</text>
+        <text x="400" y="174" text-anchor="middle" font-size="9" fill="#8a9099">取 DROP 事件的 # at 值</text>
+
+        <text x="24" y="204" font-size="10.5" fill="#4e5564">两个位置都来自「读一遍输出、找到 <tspan font-family="Consolas,monospace"># at N</tspan> 那行」，不是猜出来的</text>
+        <text x="24" y="226" font-size="10.5" fill="#b06a00"><tspan font-family="Consolas,monospace">--stop-position</tspan> 是排他的：从该位置开始的事件<strong>不会</strong>被输出，正好把 DROP 挡在外面</text>
+        <text x="24" y="248" font-size="10.5" fill="#a93226">永远别在生产实例上回放：输出是纯 SQL，它不知道自己在哪台机器上执行</text>
+      </svg>
+      <figcaption><b>图 5</b>PITR 的三个锚点。区间左端来自全备，右端来自误操作事件的起始偏移。</figcaption>
+    </figure>
+
+    <p>完整的一次操作，按顺序敲：</p>
+
+    <pre><span class="label">shell</span><code><span class="c"># 0) 先确认文件没坏，再往下走</span>
+mysqlbinlog --verify-binlog-checksum /var/lib/mysql/mysql-bin.000007 &gt; /dev/null
+
+<span class="c"># 1) 找误操作的边界：DDL 是明文，不用加 -v 也能 grep 到</span>
+mysqlbinlog --no-defaults /var/lib/mysql/mysql-bin.000007 | grep -n -B4 -A2 "DROP TABLE"
+
+<span class="c"># 2) 找全备记录的位点（mysqldump 的文件头里有这一行）</span>
+grep -m1 "CHANGE MASTER\|CHANGE REPLICATION SOURCE" full_20261125.sql
+
+<span class="c"># 3) 恢复全备</span>
+mysql -uroot -p &lt; full_20261125.sql
+
+<span class="c"># 4) 回放：区间左端取全备位点，右端取 DROP 的 # at，跳过 GTID</span>
+mysqlbinlog --start-position=193 --stop-position=47537478 --skip-gtids \
+  /var/lib/mysql/mysql-bin.000007 | mysql -uroot -p
+
+<span class="c"># 5) 只是想看内容，别管道给 mysql</span>
+mysqlbinlog -v --base64-output=DECODE-ROWS /var/lib/mysql/mysql-bin.000007 &gt; look.sql</code></pre>
+
+    <div class="note warn">
+      <b>回放前必查的三件事</b>
+      <p>1. <strong>目标实例是不是同一个</strong>。回放要在隔离实例或已恢复的空库上做，往生产库上打一遍等于把历史重演一次。<br>
+      2. <strong>GTID 会不会撞</strong>。目标实例 <code>gtid_mode=ON</code> 且已执行过这些事务时会报 <code>ERROR 1837</code>，加 <code>--skip-gtids</code> 让它们按匿名事务执行。<br>
+      3. <strong><code>binlog_row_image</code> 是不是 FULL</strong>（默认就是）。如果被改成 <code>MINIMAL</code>，DELETE 事件里只有主键，<strong>被删掉的整行内容根本没记录</strong>，这时候谁也恢复不出来。</p>
+    </div>
+
+    <h2 id="s7">7. 两个前提：版本与权限</h2>
+
+    <p><strong>版本不能比服务器旧。</strong>binlog 格式会随版本演进，老工具读不了新事件。三个具体的分界线：</p>
+
+    <table>
+      <thead>
+        <tr><th>服务端版本</th><th>新特性</th><th>老 mysqlbinlog 的后果</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>8.0.14+</td><td>binlog 加密（<code>binlog_encryption=ON</code>）</td><td>报 <code>ERROR: Reading encrypted log files directly is not supported.</code>，只能改用 <code>-R</code> 让服务器解密</td></tr>
+        <tr><td>8.0.20+</td><td>事务压缩（<code>binlog_transaction_compression=ON</code>）</td><td>读不出压缩载荷，表现为「新写的事务全都看不见」；需要 8.0.20 及以上的 mysqlbinlog 自动解压</td></tr>
+        <tr><td>8.0.26+</td><td>复制术语改 SOURCE / REPLICA</td><td>不影响读文件，但 <code>SHOW MASTER STATUS</code> 之类的命令名变了</td></tr>
+      </tbody>
+    </table>
+
+    <p><strong>权限只在 <code>-R</code> 时才需要</strong>，而且要两个：</p>
+
+    <ul>
+      <li><code>REPLICATION CLIENT</code> —— 用来 <code>SHOW BINARY LOGS</code>，否则连「有哪些文件」都问不出来</li>
+      <li><code>REPLICATION SLAVE</code> —— 用来建立 dump 连接拉事件流。只给一个都会卡在中间</li>
+    </ul>
+
+    <p>还有一个更隐蔽的权限：<strong>把输出管道给 <code>mysql</code> 回放时，执行 <code>BINLOG '...'</code> 语句需要 <code>BINLOG_ADMIN</code></strong>（旧版是 <code>SUPER</code>），或者 <code>REPLICATION_APPLIER</code> 加上每条事件的执行权限。用普通账号回放会报权限错误，而此时数据可能已经部分导入了。</p>
+
+    <h2 id="s8">8. 报错对照</h2>
+
+    <table>
+      <thead>
+        <tr><th>现象</th><th>原因</th><th>怎么办</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>unknown variable 'default-character-set=utf8mb4'</code></td>
+          <td>它只认 <code>[client]</code> 段里的<strong>部分</strong>选项，不是所有 mysql 客户端选项都吃</td>
+          <td>把 <code>--no-defaults</code> 放最前面；或把该项从 <code>[client]</code> 挪到 <code>[mysql]</code></td>
+        </tr>
+        <tr>
+          <td><code>ERROR: Reading encrypted log files directly is not supported.</code></td>
+          <td>binlog 开了加密，本地文件是密文</td>
+          <td>改 <code>-R --host=… --user=… --ssl-mode=REQUIRED</code>，让服务器解密后传</td>
+        </tr>
+        <tr>
+          <td>输出里只有几行 base64，看不到 SQL</td>
+          <td>8.0 默认 ROW 格式，这是正常现象</td>
+          <td>加 <code>-v --base64-output=DECODE-ROWS</code>（只用于看）</td>
+        </tr>
+        <tr>
+          <td>加了 <code>-s</code> 之后输出几乎空了</td>
+          <td><code>--short-form</code> 会丢掉所有行事件</td>
+          <td>别用它。正式参数是 <code>-v</code> / <code>-vv</code></td>
+        </tr>
+        <tr>
+          <td><code>ERROR 1045 Access denied</code>（用 <code>-R</code> 时）</td>
+          <td>缺 <code>REPLICATION SLAVE</code> 或 <code>REPLICATION CLIENT</code></td>
+          <td><code>GRANT REPLICATION CLIENT, REPLICATION SLAVE ON *.* TO …</code></td>
+        </tr>
+        <tr>
+          <td><code>ERROR 1837 … GTID_NEXT cannot be ANONYMOUS</code></td>
+          <td>回放流里的 GTID 与目标实例已执行集合冲突</td>
+          <td>加 <code>--skip-gtids</code>；或在隔离实例上先清空 GTID 历史</td>
+        </tr>
+        <tr>
+          <td><code>ERROR 1062 Duplicate entry</code></td>
+          <td>起点位点比备份更早，已存在的数据被重复插入</td>
+          <td>核对全备里记录的位点，别用「差不多」的数字。<strong>不要加 <code>--force</code> 硬推过去</strong></td>
+        </tr>
+        <tr>
+          <td><code>Could not find first log file name in binary log index file</code></td>
+          <td>指定的文件已被 purge，或 <code>.index</code> 与实际文件不一致</td>
+          <td>先 <code>SHOW BINARY LOGS</code> 看还剩哪些；已删的只能从备份里找</td>
+        </tr>
+        <tr>
+          <td>回放没报错，但数据没回来</td>
+          <td>输出带了 <code>--base64-output=DECODE-ROWS</code>，行变更全是注释</td>
+          <td>重跑，去掉这个参数</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="note tip">
+      <b>这一页要带走的三句</b>
+      <p>1. 它默认<strong>只读本地文件</strong>，不需要账号；只有 <code>-R</code>（或文件加密）才连服务器、才要 <code>REPLICATION</code> 权限。<br>
+      2. 8.0 默认 ROW 格式，<strong>看到 base64 是正常的</strong>，<code>-v --base64-output=DECODE-ROWS</code> 是为了看，不是为了回放。<br>
+      3. 回放的输出<strong>不能带 DECODE-ROWS</strong>，否则数据被注释掉、静默丢失；配合 <code>--stop-position</code> + <code>--skip-gtids</code> 才是可用的 PITR。</p>
+    </div>
+
+    <section class="quiz">
+      <p class="quiz-head">自测三问<span>先自己答一遍，再点开对答案</span></p>
+      <details>
+        <summary><span class="qno">Q1</span><span class="ask">8.0 上直接 <code>mysqlbinlog binlog.000003</code>，满屏 base64 看不懂，怎么变成人话？</span><span class="caret" aria-hidden="true"></span></summary>
+        <div class="ans"><p>默认 ROW 格式把行变更存成二进制镜像，所以先按 base64 输出。加 <code>-v</code> 会额外解码成 <code>###</code> 注释形式，再配 <code>--base64-output=DECODE-ROWS</code>，就能逐行看到「改了哪张表、哪一列、旧值和新值」。</p></div>
+      </details>
+      <details>
+        <summary><span class="qno">Q2</span><span class="ask">在 A 机器上按 09:00~09:10 过滤，切出来的内容和预期对不上，最可能是什么原因？</span><span class="caret" aria-hidden="true"></span></summary>
+        <div class="ans"><p><code>--start-datetime</code> 按<b>执行 mysqlbinlog 那台机器的本地时区</b>解释时间。机器时区和业务记录的时区不一致，窗口就整体偏移了；先对齐时区，或改用 <code>--start-position</code> 精确定位。</p></div>
+      </details>
+      <details>
+        <summary><span class="qno">Q3</span><span class="ask">回放时抛 <code>ERROR 1837 ... GTID_NEXT</code>，怎么处理？</span><span class="caret" aria-hidden="true"></span></summary>
+        <div class="ans"><p>目标实例上已经有这些 GTID，回放时撞上了。恢复场景加 <code>--skip-gtids</code>，让 binlog 剥掉 GTID 再执行；注意这只适合「单机把数据救回来」，搭主从时不能这么绕。</p></div>
+      </details>
+    </section>
+    <div class="footer">
+      <a href="07-03-mysqladmin.html">← 7.2.2 mysqladmin</a> · <a href="07-05-mysqlshow.html">7.2.4 mysqlshow →</a> · <a href="07-MySQL管理.html">MySQL 管理</a> · <a href="../index.html">总目录</a>
+    </div>
+
+  </main>
+</div>
+</body>
+</html>

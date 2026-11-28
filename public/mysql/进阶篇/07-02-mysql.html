@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>7.2.1 mysql 客户端 · MySQL 笔记</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="layout">
+
+  <nav class="sidebar">
+    <p class="side-title">本页目录</p>
+    <ul class="nav-tree">
+      <li><a class="leaf" href="#s1">1. 它不是 MySQL 服务</a></li>
+      <li><a class="leaf" href="#s2">2. 语法：一条命令四件事</a></li>
+      <li><a class="leaf" href="#s3">3. -p 的三种写法</a></li>
+      <li><a class="leaf" href="#s4">4. localhost 不是 127.0.0.1</a></li>
+      <li><a class="leaf" href="#s5">5. -e 与输出格式</a></li>
+      <li><a class="leaf" href="#s6">6. 进去之后的命令</a></li>
+      <li><a class="leaf" href="#s7">7. 连不上怎么查</a></li>
+    </ul>
+
+    <p class="side-title" style="margin-top:22px">当前位置</p>
+    <ul class="nav-tree">
+      <li><a href="../index.html">↑ 总目录</a>
+        <ul>
+          <li><a class="group" href="07-MySQL管理.html">07 MySQL 管理</a>
+            <ul>
+              <li><a class="leaf" href="07-01-系统数据库.html">7.1 系统数据库</a></li>
+              <li><span class="current">7.2.1 mysql</span></li>
+              <li><a class="leaf" href="07-03-mysqladmin.html">7.2.2 mysqladmin</a></li>
+              <li><a class="leaf" href="07-04-mysqlbinlog.html">7.2.3 mysqlbinlog</a></li>
+              <li><a class="leaf" href="07-05-mysqlshow.html">7.2.4 mysqlshow</a></li>
+              <li><a class="leaf" href="07-06-mysqldump.html">7.2.5 mysqldump</a></li>
+              <li><a class="leaf" href="07-07-mysqlimport.html">7.2.6 mysqlimport</a></li>
+            </ul>
+          </li>
+        </ul>
+      </li>
+    </ul>
+  </nav>
+
+  <main class="main">
+
+    <div class="crumb"><a href="../index.html">总目录</a> / <a href="07-MySQL管理.html">07 MySQL 管理</a> / 7.2.1</div>
+    <h1><span class="chapter-no">7.2.1</span>mysql 客户端</h1>
+    <p class="lede">课程里第一句就说清楚了：这里的 <code>mysql</code> 不是 MySQL 服务，是客户端工具。这句话值得单独拎出来讲，因为接下来所有命令都建立在这个前提上——你敲的每一条，都是发给另一个进程的请求。</p>
+
+    <div class="meta">
+      <span>进阶篇 · 7.2.1</span>
+      <span>更新：2026-11-25</span>
+      <span>环境：MySQL 8.0</span>
+    </div>
+
+    <section class="quick">
+      <p class="quick-head">一屏速记<span>合上笔记，这 5 条要能自己说出来</span></p>
+      <ol>
+        <li><code>mysql</code> 是<b>客户端</b>，服务端是 <code>mysqld</code>。客户端只做三件事：连上去、把 SQL 发过去、把结果排版。</li>
+        <li><code>-p</code> 和密码之间<b>不能有空格</b>：写 <code>-p123456</code>。写成 <code>-p 123456</code> 会让它以为你没给密码，而 123456 被当成库名，报 <code>ERROR 1049</code>。</li>
+        <li><code>-h localhost</code> 走 Unix socket（Windows 走命名管道 / 共享内存），<code>-h 127.0.0.1</code> 走 TCP。在权限表里这是<b>两条独立记录</b>，<code>'root'@'localhost'</code> 连不上 127.0.0.1。</li>
+        <li><code>-e "SQL"</code> 执行完立即退出，是脚本的入口；再配 <code>-N</code>（去表头）+ <code>-B</code>（制表符分隔、无边框），输出才能被 <code>while read</code> 消费。</li>
+        <li><code>mysql_config_editor</code> 生成的 <code>.mylogin.cnf</code> 是 <b>obfuscated 混淆，不是加密</b>，能还原出明文密码，别当保险箱用。</li>
+      </ol>
+    </section>
+
+    <h2 id="s1">1. 它不是 MySQL 服务</h2>
+
+    <p>装完 MySQL 会得到好几个可执行文件，名字都带 mysql，但角色完全不同。分不清就会犯两类错：以为关了客户端服务就停了，或者以为客户端卡住是数据库挂了。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 680 250" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <text x="340" y="22" text-anchor="middle" font-size="11.5" fill="#8a9099">两个客户端，一个服务端；数据只在服务端手里</text>
+
+        <rect x="240" y="40" width="200" height="80" rx="8" fill="#e6f3f6" stroke="#00758f" stroke-width="1.5"/>
+        <text x="340" y="66" text-anchor="middle" font-size="14" font-weight="700" font-family="Consolas,monospace" fill="#00566b">mysqld</text>
+        <text x="340" y="86" text-anchor="middle" font-size="11" fill="#4e5564">服务端进程</text>
+        <text x="340" y="105" text-anchor="middle" font-size="9.5" fill="#8a9099">监听 3306，数据在它手里</text>
+
+        <path d="M124 148 C124 118, 200 116, 288 116" fill="none" stroke="#00758f" stroke-width="1.3"/>
+        <path d="M282 111.5 L289 116 L282 120.5 Z" fill="#00758f"/>
+        <text x="176" y="140" text-anchor="middle" font-size="9.5" fill="#00758f">连接</text>
+
+        <path d="M556 148 C556 118, 480 116, 392 116" fill="none" stroke="#00758f" stroke-width="1.3"/>
+        <path d="M398 111.5 L391 116 L398 120.5 Z" fill="#00758f"/>
+        <text x="504" y="140" text-anchor="middle" font-size="9.5" fill="#00758f">连接</text>
+
+        <rect x="24" y="152" width="200" height="66" rx="8" fill="#ffffff" stroke="#00758f" stroke-width="1.5"/>
+        <text x="124" y="176" text-anchor="middle" font-size="13" font-weight="700" font-family="Consolas,monospace" fill="#00758f">mysql</text>
+        <text x="124" y="195" text-anchor="middle" font-size="10.5" fill="#4e5564">命令行客户端</text>
+        <text x="124" y="211" text-anchor="middle" font-size="9.5" fill="#8a9099">你敲 SQL 的地方</text>
+
+        <rect x="456" y="152" width="200" height="66" rx="8" fill="#f7f9fa" stroke="#e4e7ec"/>
+        <text x="556" y="176" text-anchor="middle" font-size="13" font-weight="700" font-family="Consolas,monospace" fill="#4e5564">mysqladmin</text>
+        <text x="556" y="195" text-anchor="middle" font-size="10.5" fill="#4e5564">管理客户端</text>
+        <text x="556" y="211" text-anchor="middle" font-size="9.5" fill="#8a9099">改密码 / 关服务 / 看状态</text>
+
+        <text x="28" y="238" font-size="10.5" fill="#8a9099">关掉客户端窗口不会影响服务；反过来，服务没起，客户端一定连不上</text>
+      </svg>
+      <figcaption><b>图 1</b><code>mysqld</code> 是服务，<code>mysql</code> 和 <code>mysqladmin</code> 都是客户端。三个名字只差一个字母，但一个是进程，另两个是工具。</figcaption>
+    </figure>
+
+    <div class="note plain">
+      <b>怎么确认自己在跟谁打交道</b>
+      <p><code>SELECT VERSION();</code> 查的是<strong>服务端</strong>版本；<code>mysql --version</code> 查的是<strong>客户端</strong>版本。两者可以不同——客户端 8.0 连 5.7 服务端是允许的，反过来会受限。</p>
+    </div>
+
+    <h2 id="s2">2. 语法：一条命令四件事</h2>
+
+    <p>截图里的语法是 <code>mysql [options] [database]</code>。方括号表示可选，<code>[database]</code> 是位置参数——<strong>不带前缀的那个词，就是登录后默认进入的库</strong>，等价于 <code>-D db01</code>。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 680 220" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <text x="340" y="20" text-anchor="middle" font-size="11.5" fill="#8a9099">四件事：用哪个程序、连哪台机器、以谁的身份、进哪个库</text>
+
+        <rect x="24" y="34" width="66" height="34" rx="5" fill="#00758f"/>
+        <text x="57" y="56" text-anchor="middle" font-size="12" font-family="Consolas,monospace" fill="#ffffff">mysql</text>
+
+        <rect x="106" y="34" width="112" height="34" rx="5" fill="#eef1f4"/>
+        <text x="162" y="56" text-anchor="middle" font-size="11.5" font-family="Consolas,monospace" fill="#4e5564">-h 127.0.0.1</text>
+
+        <rect x="234" y="34" width="76" height="34" rx="5" fill="#eef1f4"/>
+        <text x="272" y="56" text-anchor="middle" font-size="11.5" font-family="Consolas,monospace" fill="#4e5564">-P 3306</text>
+
+        <rect x="326" y="34" width="64" height="34" rx="5" fill="#fdf3e3"/>
+        <text x="358" y="56" text-anchor="middle" font-size="11.5" font-family="Consolas,monospace" fill="#8a6535">-u root</text>
+
+        <rect x="406" y="34" width="30" height="34" rx="5" fill="#fdf3e3"/>
+        <text x="421" y="56" text-anchor="middle" font-size="11.5" font-family="Consolas,monospace" fill="#8a6535">-p</text>
+
+        <rect x="452" y="34" width="56" height="34" rx="5" fill="#e6f3f6"/>
+        <text x="480" y="56" text-anchor="middle" font-size="11.5" font-family="Consolas,monospace" fill="#00566b">db01</text>
+
+        <text x="57" y="88" text-anchor="middle" font-size="9.5" fill="#8a9099">程序</text>
+        <text x="162" y="88" text-anchor="middle" font-size="9.5" fill="#8a9099">主机</text>
+        <text x="272" y="88" text-anchor="middle" font-size="9.5" fill="#8a9099">端口</text>
+        <text x="358" y="88" text-anchor="middle" font-size="9.5" fill="#8a9099">用户名</text>
+        <text x="421" y="88" text-anchor="middle" font-size="9.5" fill="#8a9099">密码</text>
+        <text x="480" y="92" text-anchor="middle" font-size="9.5" fill="#c0392b">位置参数</text>
+
+        <path d="M106 102 L106 112 L318 112 L318 102" fill="none" stroke="#4e5564" stroke-width="1"/>
+        <text x="212" y="132" text-anchor="middle" font-size="10.5" fill="#4e5564">连到哪台机器</text>
+
+        <path d="M326 102 L326 112 L440 112 L440 102" fill="none" stroke="#b06a00" stroke-width="1"/>
+        <text x="383" y="132" text-anchor="middle" font-size="10.5" fill="#b06a00">以谁的身份</text>
+
+        <path d="M452 102 L452 112 L508 112 L508 102" fill="none" stroke="#00758f" stroke-width="1"/>
+        <text x="480" y="132" text-anchor="middle" font-size="10.5" fill="#00758f">进哪个库</text>
+
+        <text x="28" y="170" font-size="10.5" fill="#4e5564">主机不写，默认 localhost；端口不写，默认 3306；用户名不写，默认当前系统登录名</text>
+        <text x="28" y="190" font-size="10.5" fill="#4e5564">库是位置参数，写在哪都行，不需要 <tspan font-family="Consolas,monospace">-D</tspan> 前缀</text>
+      </svg>
+      <figcaption><b>图 2</b>命令拆开看。前四段决定「连到哪、以谁的身份」，最后一段决定「登录后站在哪个库里」。</figcaption>
+    </figure>
+
+    <table>
+      <thead>
+        <tr><th>选项</th><th>长选项</th><th>作用</th><th>不写时</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>-u</code></td><td><code>--user=name</code></td><td>指定用户名</td><td>用当前系统登录名</td></tr>
+        <tr><td><code>-p</code></td><td><code>--password[=name]</code></td><td>指定密码</td><td>提示输入</td></tr>
+        <tr><td><code>-h</code></td><td><code>--host=name</code></td><td>服务器 IP 或域名</td><td><code>localhost</code></td></tr>
+        <tr><td><code>-P</code></td><td><code>--port=#</code></td><td>连接端口（<strong>大写</strong>）</td><td>3306</td></tr>
+        <tr><td><code>-e</code></td><td><code>--execute=name</code></td><td>执行 SQL 后退出</td><td>进交互界面</td></tr>
+        <tr><td><code>-D</code></td><td><code>--database=name</code></td><td>指定默认库，等价于位置参数</td><td>无默认库</td></tr>
+        <tr><td><code>-S</code></td><td><code>--socket=path</code></td><td>指定 socket 文件</td><td>按安装路径找默认值</td></tr>
+        <tr><td><code>-A</code></td><td><code>--no-auto-rehash</code></td><td>登录时不预读表名做补全</td><td>预读，大库会很慢</td></tr>
+        <tr><td><code>-U</code></td><td><code>--safe-updates</code></td><td>拒绝不带键条件的 <code>UPDATE</code>/<code>DELETE</code></td><td>允许，危险</td></tr>
+      </tbody>
+    </table>
+
+    <div class="note warn">
+      <b><code>-P</code> 和 <code>-p</code> 是两个完全不同的东西</b>
+      <p>大写 <code>-P</code> 是<strong>端口</strong>，小写 <code>-p</code> 是<strong>密码</strong>。远程连非 3306 端口时写成 <code>-p 3306</code>，结果不是连不上，而是「把 3306 当密码，再把下一个词当库名」——报错信息和真正的原因完全对不上。</p>
+    </div>
+
+    <h2 id="s3">3. <code>-p</code> 的三种写法，只有一种不出事</h2>
+
+    <p>这是初学者最常见的翻车点，而且它的报错方式极具误导性：你会看到 <code>Unknown database</code>，而不是「密码错误」。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 680 270" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <text x="340" y="20" text-anchor="middle" font-size="11.5" fill="#8a9099">同样想输密码 123456，三种写法的下场完全不同</text>
+
+        <rect x="24" y="34" width="632" height="58" rx="8" fill="#eef7f1" stroke="#b7ddc4"/>
+        <text x="40" y="56" font-size="11.5" font-family="Consolas,monospace" fill="#1a7f4b">mysql -uroot -p123456</text>
+        <text x="40" y="78" font-size="10.5" fill="#4e5564">紧贴写。密码生效，直接登录进去</text>
+        <text x="620" y="70" text-anchor="end" font-size="12" font-weight="700" fill="#1a7f4b">能连，但不安全</text>
+
+        <rect x="24" y="102" width="632" height="58" rx="8" fill="#fdecea" stroke="#f5c6c2"/>
+        <text x="40" y="124" font-size="11.5" font-family="Consolas,monospace" fill="#c0392b">mysql -uroot -p 123456</text>
+        <text x="40" y="146" font-size="10.5" fill="#4e5564">中间有空格：<tspan font-weight="700">-p 后面的 123456 变成了库名</tspan>，然后才提示你输密码</text>
+        <text x="620" y="138" text-anchor="end" font-size="12" font-weight="700" fill="#c0392b">ERROR 1049</text>
+
+        <rect x="24" y="170" width="632" height="58" rx="8" fill="#f4fafb" stroke="#b9dde5"/>
+        <text x="40" y="192" font-size="11.5" font-family="Consolas,monospace" fill="#00758f">mysql -uroot -p</text>
+        <text x="40" y="214" font-size="10.5" fill="#4e5564">只写 <tspan font-family="Consolas,monospace">-p</tspan>，回车后交互输入，屏幕上不回显</text>
+        <text x="620" y="206" text-anchor="end" font-size="12" font-weight="700" fill="#00758f">推荐写法</text>
+
+        <text x="28" y="258" font-size="10.5" fill="#b06a00">报错长这样：ERROR 1049 (42000): Unknown database '123456' —— 看到这个先检查 -p 后面是不是多了个空格</text>
+      </svg>
+      <figcaption><b>图 3</b>三种写法。第二行最坑：<code>-p</code> 在没有紧跟值时不算「给了密码」，而它后面那个词会被当成第一个位置参数。</figcaption>
+    </figure>
+
+    <div class="note danger">
+      <b>更阴的情况：那个「密码」恰好是真实存在的库名</b>
+      <p>如果你敲的是 <code>mysql -uroot -p itcast</code>，而 <code>itcast</code> 这个库真的存在，就不会报 1049——它会提示你输密码，然后<strong>正常登录进 <code>itcast</code> 库</strong>。你完全察觉不到自己少打了一个空格，直到某天在别的机器上同样的命令突然报错。</p>
+      <p>规律：<code>-p</code> 只在紧贴字符时才算「带值」。空一格，它就退化成一个「请提示我输密码」的开关。</p>
+    </div>
+
+    <p>那 <code>-p123456</code> 能不能用？能，但不该用。明文密码会留在三个地方：<code>~/.bash_history</code>、<code>ps aux</code> 的进程列表、以及脚本文件本身。MySQL 从 5.6 起会直接警告：</p>
+
+    <pre><span class="label">shell</span><code>mysql: [Warning] Using a password on the command line interface can be insecure.</code></pre>
+
+    <p>官方给的替代方案是 <code>mysql_config_editor</code>，把连接信息写进混淆过的 <code>.mylogin.cnf</code>，之后只用一个名字登录：</p>
+
+    <pre><span class="label">shell</span><code><span class="c"># 存一组连接信息（只需执行一次，会提示输入密码）</span>
+mysql_config_editor set --login-path=local \
+  --host=127.0.0.1 --port=3306 --user=root --password
+
+<span class="c"># 看存了哪些（密码显示为 *****）</span>
+mysql_config_editor print --all
+
+<span class="c"># 之后这样登录，命令行里不再出现密码</span>
+mysql --login-path=local db01
+
+<span class="c"># 备份脚本里同样能用</span>
+mysqldump --login-path=local itcast &gt; itcast.sql</code></pre>
+
+    <div class="note plain">
+      <b>别把它当保险箱</b>
+      <p>官方用词是 <strong>obfuscated（混淆）</strong>，不是加密。文件位置：Linux/macOS 在当前用户家目录，Windows 在 <code>%APPDATA%\MySQL</code>。它的真实价值是<strong>把密码从命令行、脚本和历史记录里移走</strong>，而不是「即使文件泄露也安全」。</p>
+    </div>
+
+    <h2 id="s4">4. <code>-h localhost</code> 不是 <code>-h 127.0.0.1</code></h2>
+
+    <p>这两个看起来一样，实际上走的是两条完全不同的路。MySQL 里 <code>localhost</code> 不是一个 IP，是一个暗号：<strong>走本地 socket 文件</strong>。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 680 262" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <text x="340" y="20" text-anchor="middle" font-size="11.5" fill="#8a9099">同一个服务端，两种通道，服务器记下的来源不一样</text>
+
+        <rect x="24" y="42" width="146" height="42" rx="6" fill="#e6f3f6" stroke="#00758f"/>
+        <text x="97" y="68" text-anchor="middle" font-size="10.5" font-family="Consolas,monospace" fill="#00566b">-h localhost</text>
+
+        <path d="M174 63 L206 63" stroke="#00758f" stroke-width="1.3"/>
+        <path d="M200 58.5 L207 63 L200 67.5 Z" fill="#00758f"/>
+
+        <rect x="210" y="42" width="196" height="42" rx="6" fill="#f7f9fa" stroke="#e4e7ec"/>
+        <text x="308" y="60" text-anchor="middle" font-size="10" fill="#4e5564">Unix socket 文件</text>
+        <text x="308" y="76" text-anchor="middle" font-size="8.5" font-family="Consolas,monospace" fill="#8a9099">/var/run/mysqld/mysqld.sock</text>
+
+        <path d="M410 63 L442 63" stroke="#00758f" stroke-width="1.3"/>
+        <path d="M436 58.5 L443 63 L436 67.5 Z" fill="#00758f"/>
+
+        <rect x="446" y="42" width="210" height="42" rx="6" fill="#eef7f1" stroke="#b7ddc4"/>
+        <text x="551" y="60" text-anchor="middle" font-size="10" fill="#1a7f4b">服务器记下来源 = localhost</text>
+        <text x="551" y="76" text-anchor="middle" font-size="9" fill="#4e5564">匹配 'user'@'localhost'</text>
+
+        <rect x="24" y="140" width="146" height="42" rx="6" fill="#fdf3e3" stroke="#f0d9b0"/>
+        <text x="97" y="166" text-anchor="middle" font-size="10.5" font-family="Consolas,monospace" fill="#8a6535">-h 127.0.0.1</text>
+
+        <path d="M174 161 L206 161" stroke="#b06a00" stroke-width="1.3"/>
+        <path d="M200 156.5 L207 161 L200 165.5 Z" fill="#b06a00"/>
+
+        <rect x="210" y="140" width="196" height="42" rx="6" fill="#f7f9fa" stroke="#e4e7ec"/>
+        <text x="308" y="158" text-anchor="middle" font-size="10" fill="#4e5564">TCP 回环，端口 3306</text>
+        <text x="308" y="174" text-anchor="middle" font-size="9" fill="#8a9099">经过网络协议栈</text>
+
+        <path d="M410 161 L442 161" stroke="#b06a00" stroke-width="1.3"/>
+        <path d="M436 156.5 L443 161 L436 165.5 Z" fill="#b06a00"/>
+
+        <rect x="446" y="140" width="210" height="42" rx="6" fill="#fdf3e3" stroke="#f0d9b0"/>
+        <text x="551" y="158" text-anchor="middle" font-size="10" fill="#8a6535">服务器记下来源 = 127.0.0.1</text>
+        <text x="551" y="174" text-anchor="middle" font-size="9" fill="#4e5564">匹配 'user'@'127.0.0.1'</text>
+
+        <text x="28" y="208" font-size="10.5" fill="#4e5564">socket 不走网络栈：不受防火墙影响，但 <tspan font-family="Consolas,monospace">-P</tspan> 端口参数对它无效</text>
+        <text x="28" y="228" font-size="10.5" fill="#c0392b">所以 'root'@'localhost' 和 'root'@'127.0.0.1' 是两条独立记录，权限各授各的</text>
+        <text x="28" y="248" font-size="10.5" fill="#8a9099">想强制走 TCP：<tspan font-family="Consolas,monospace">--protocol=TCP</tspan>（Windows 上 localhost 默认也是 TCP）</text>
+      </svg>
+      <figcaption><b>图 4</b>两条通道。<code>localhost</code> 走 socket，<code>127.0.0.1</code> 走 TCP，服务端看到的来源不同，匹配到的账号也不同。</figcaption>
+    </figure>
+
+    <div class="note warn">
+      <b>典型症状：本地能连，换成本机 IP 就连不上</b>
+      <p><code>mysql -uroot -p</code> 正常，改成 <code>mysql -h127.0.0.1 -uroot -p</code> 报 <code>ERROR 1045 Access denied</code>。原因不是密码错，是 <code>'root'@'localhost'</code> 这条记录匹配不到走 TCP 的连接。要么给 <code>'root'@'127.0.0.1'</code> 授权，要么用 <code>-S</code> 指定 socket。</p>
+      <p>用 <code>status;</code>（或 <code>\s</code>）能在交互界面里看到当前走的是哪条：<code>Connection: Localhost via UNIX socket</code> 或 <code>Connection: 127.0.0.1 via TCP/IP</code>。</p>
+    </div>
+
+    <h2 id="s5">5. <code>-e</code> 与输出格式</h2>
+
+    <p>截图里说 <code>-e</code> 适合批处理脚本，这话只说了一半。真正让它在脚本里好用的是输出格式选项——执行完就退出，但结果怎么打印，取决于你怎么控制 stdout。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 680 286" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <rect x="24" y="34" width="632" height="34" rx="6" fill="#f7f9fa" stroke="#e4e7ec"/>
+        <text x="40" y="56" font-size="11" font-family="Consolas,monospace" fill="#4e5564">mysql -uroot -p db01 -e "SELECT * FROM stu"</text>
+
+        <rect x="24" y="84" width="306" height="80" rx="8" fill="#ffffff" stroke="#e4e7ec"/>
+        <text x="40" y="106" font-size="10.5" font-weight="700" fill="#1f2329">默认（输出到终端）</text>
+        <text x="40" y="122" font-size="9.5" font-family="Consolas,monospace" fill="#4e5564">┌────┬──────┐</text>
+        <text x="40" y="136" font-size="9.5" font-family="Consolas,monospace" fill="#4e5564">│ id │ name │</text>
+        <text x="40" y="155" font-size="9.5" fill="#8a9099">带边框，给人看</text>
+
+        <rect x="350" y="84" width="306" height="80" rx="8" fill="#ffffff" stroke="#e4e7ec"/>
+        <text x="366" y="106" font-size="10.5" font-weight="700" fill="#1f2329">-B（--batch）</text>
+        <text x="366" y="126" font-size="9" font-family="Consolas,monospace" fill="#4e5564">id&#9;name</text>
+        <text x="366" y="140" font-size="9" font-family="Consolas,monospace" fill="#4e5564">1&#9;张三</text>
+        <text x="366" y="156" font-size="9.5" fill="#8a9099">tab 分隔，保留表头，可给 awk</text>
+
+        <rect x="24" y="176" width="306" height="80" rx="8" fill="#f4fafb" stroke="#b9dde5"/>
+        <text x="40" y="198" font-size="10.5" font-weight="700" fill="#00566b">-B -N（脚本首选）</text>
+        <text x="40" y="218" font-size="9" font-family="Consolas,monospace" fill="#4e5564">1&#9;张三</text>
+        <text x="40" y="232" font-size="9" font-family="Consolas,monospace" fill="#4e5564">2&#9;李四</text>
+        <text x="40" y="248" font-size="9.5" fill="#8a9099">去掉表头，纯数据；赋值、拼 SQL 用</text>
+
+        <rect x="350" y="176" width="306" height="80" rx="8" fill="#fdf3e3" stroke="#f0d9b0"/>
+        <text x="366" y="198" font-size="10.5" font-weight="700" fill="#8a6535">语句末尾加 \G</text>
+        <text x="366" y="218" font-size="9" font-family="Consolas,monospace" fill="#8a6535">id: 1</text>
+        <text x="366" y="232" font-size="9" font-family="Consolas,monospace" fill="#8a6535">name: 张三</text>
+        <text x="366" y="248" font-size="9.5" fill="#8a9099">一行一个字段；宽表、SHOW CREATE TABLE</text>
+      </svg>
+      <figcaption><b>图 5</b>同一条 SQL 的四种输出。默认会随 stdout 变化：输出到终端是表格，重定向到文件或管道时自动变成 tab 分隔。</figcaption>
+    </figure>
+
+    <pre><span class="label">shell</span><code><span class="c"># 课程示例：进库、跑一条、退出</span>
+mysql -uroot -p123456 db01 -e "select * from stu"
+
+<span class="c"># 脚本里取值：去掉表头、不要边框，结果直接进变量</span>
+CNT=$(mysql -uroot -p -N -B db01 -e "select count(*) from stu")
+
+<span class="c"># 导出 CSV（tab 换逗号）</span>
+mysql -uroot -p -N -B db01 -e "select * from stu" | tr '\t' ',' &gt; stu.csv
+
+<span class="c"># 一次跑多条语句，用分号隔开</span>
+mysql -uroot -p db01 -e "show tables; select now();"
+
+<span class="c"># 直接执行 .sql 脚本，不进交互界面</span>
+mysql -uroot -p db01 &lt; init.sql
+
+<span class="c"># 大表查询不想在客户端攒内存</span>
+mysql -uroot -p -q db01 -e "select * from big_table" &gt; big.txt</code></pre>
+
+    <div class="note tip">
+      <b>三个让它更好用的开关</b>
+      <p><strong><code>-A</code></strong>：登录时默认会预读所有库的表名做补全，几百张表的库能卡好几秒。加 <code>-A</code> 跳过。</p>
+      <p><strong><code>-U</code></strong>：<code>--safe-updates</code>，拒绝没有用到键的 <code>UPDATE</code>/<code>DELETE</code>，报 <code>ERROR 1175</code>。远程连生产库时建议默认带上。</p>
+      <p><strong><code>--default-character-set=utf8mb4</code></strong>：客户端字符集跟着系统 locale 走，Windows 上中文乱码十有八九是这里，服务端默认 <code>utf8mb4</code> 但客户端没跟上。</p>
+    </div>
+
+    <h2 id="s6">6. 进去之后的命令</h2>
+
+    <p>登录后提示符变成 <code>mysql&gt;</code>，这时的规则和 shell 不一样：<strong>语句以分号或 <code>\G</code> 结束才会执行</strong>，只敲回车不会跑。</p>
+
+    <table>
+      <thead>
+        <tr><th>命令</th><th>作用</th><th>什么时候用</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>\s</code> / <code>status</code></td><td>看当前连接信息：版本、当前库、字符集、socket 或 TCP</td><td>怀疑自己连错实例、查字符集</td></tr>
+        <tr><td><code>\G</code></td><td>把当前语句改成竖排输出</td><td>列太多导致换行错乱，<code>SHOW CREATE TABLE</code></td></tr>
+        <tr><td><code>\c</code></td><td>放弃正在输入的语句</td><td>敲错了、少了个引号卡住</td></tr>
+        <tr><td><code>\q</code> / <code>exit</code></td><td>退出客户端</td><td>—</td></tr>
+        <tr><td><code>\h</code> / <code>help</code></td><td>查看帮助，<code>help 'SELECT'</code> 查语法</td><td>忘了某个语句怎么写</td></tr>
+        <tr><td><code>source 文件</code></td><td>执行本机 SQL 文件</td><td>导入备份，见 <a href="07-07-mysqlimport.html">mysqlimport / source</a></td></tr>
+        <tr><td><code>tee 文件</code></td><td>把本次会话的输出同时写进文件</td><td>记录一次排查过程</td></tr>
+        <tr><td><code>pager less</code></td><td>结果用分页器显示</td><td>结果集很长，想翻页看</td></tr>
+      </tbody>
+    </table>
+
+    <pre><span class="label">sql</span><code><span class="c">-- 别只看表名，看连接到底走哪条路、字符集对不对</span>
+status;
+
+<span class="c">-- 一行太长看不清，换成竖排</span>
+<span class="k">SHOW CREATE TABLE</span> emp\G
+
+<span class="c">-- 查看某条语句的官方语法</span>
+<span class="k">HELP</span> <span class="s">'SELECT'</span>;</code></pre>
+
+    <h2 id="s7">7. 连不上怎么查</h2>
+
+    <p>客户端报的错其实已经把方向指出来了，只是错误码不好记。按这个表对照，能省掉大部分瞎试：</p>
+
+    <table>
+      <thead>
+        <tr><th>报错</th><th>真实含义</th><th>下一步查什么</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>ERROR 2003 Can't connect to MySQL server</code></td><td>TCP 连不上：服务没起、端口不对、防火墙拦了</td><td><code>netstat -ano | findstr 3306</code>，或 <code>mysqladmin -uroot -p status</code></td></tr>
+        <tr><td><code>ERROR 2002 Can't connect through socket</code></td><td>socket 文件不存在或路径不对（仅 Unix）</td><td><code>mysql_config --socket</code> 看服务端用的是哪个</td></tr>
+        <tr><td><code>ERROR 1045 Access denied</code></td><td>账号、密码、来源主机三者之一对不上</td><td><code>SELECT user, host FROM mysql.user</code>；注意 <code>using password: YES/NO</code></td></tr>
+        <tr><td><code>ERROR 1049 Unknown database 'xxx'</code></td><td>库名拼错，或 <code>-p</code> 后面多打了空格</td><td>先看命令里有没有 <code>-p 密码</code></td></tr>
+        <tr><td><code>ERROR 1046 No database selected</code></td><td>没指定库，语句里也没写库名</td><td>加位置参数，或先 <code>USE db01;</code></td></tr>
+        <tr><td><code>ERROR 1175 safe update mode</code></td><td>带了 <code>-U</code>，而 <code>UPDATE</code>/<code>DELETE</code> 没用到键</td><td>补 <code>WHERE 主键 = ?</code>，而不是关掉保护</td></tr>
+        <tr><td><code>ERROR 1130 Host is not allowed</code></td><td>该来源主机根本没有被任何账号允许</td><td>建账号时 <code>Host</code> 写了 <code>localhost</code>，远程自然进不来</td></tr>
+      </tbody>
+    </table>
+
+    <div class="note tip">
+      <b>这一页要带走的三句</b>
+      <p>1. <code>mysql</code> 是客户端；<code>mysqld</code> 才是服务，数据只在服务那边。<br>
+      2. <code>-p</code> 只有紧贴密码才算「带值」，空一格就把下一个词当库名——报的是 1049，不是密码错。<br>
+      3. <code>localhost</code> 走 socket，<code>127.0.0.1</code> 走 TCP，在权限表里是<strong>两个账号</strong>。</p>
+    </div>
+
+    <section class="quiz">
+      <p class="quiz-head">自测三问<span>先自己答一遍，再点开对答案</span></p>
+      <details>
+        <summary><span class="qno">Q1</span><span class="ask"><code>mysql -uroot -p 123456</code> 报 <code>ERROR 1049 (42000): Unknown database '123456'</code>，密码没错，为什么？</span><span class="caret" aria-hidden="true"></span></summary>
+        <div class="ans"><p><code>-p</code> 与密码之间多了空格。有空格时它认为你<b>没给密码</b>（转去提示输入或按空密码处理），后面的 123456 就被当成要连接的库名。正确写法是 <code>-p123456</code>。</p></div>
+      </details>
+      <details>
+        <summary><span class="qno">Q2</span><span class="ask">同一台机器上 <code>-h localhost</code> 能进，改成 <code>-h 127.0.0.1</code> 就 Access denied，为什么？</span><span class="caret" aria-hidden="true"></span></summary>
+        <div class="ans"><p>两者走的连接方式不同：localhost 走 socket，匹配 <code>'root'@'localhost'</code>；127.0.0.1 走 TCP，匹配 <code>'root'@'127.0.0.1'</code>。<b>这是账号表里的两条不同记录</b>，只建了前者就会出现这种现象。</p></div>
+      </details>
+      <details>
+        <summary><span class="qno">Q3</span><span class="ask">脚本要遍历所有库名，<code>mysql</code> 命令该怎么写、为什么这么写？</span><span class="caret" aria-hidden="true"></span></summary>
+        <div class="ans"><p><code>mysql -N -B -e "SHOW DATABASES"</code>。<code>-B</code> 进批处理模式（制表符分隔、不加边框与填充），<code>-N</code> 去掉列名行，输出才是一行一个库名，可以直接喂给 <code>while read db</code>。</p></div>
+      </details>
+    </section>
+    <div class="footer">
+      <a href="07-01-系统数据库.html">← 7.1 系统数据库</a> · <a href="07-MySQL管理.html">MySQL 管理</a> · <a href="../index.html">总目录</a>
+    </div>
+
+  </main>
+</div>
+</body>
+</html>

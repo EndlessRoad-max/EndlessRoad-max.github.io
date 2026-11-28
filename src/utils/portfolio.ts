@@ -1,5 +1,11 @@
-import { getCollection } from "astro:content";
+import { type CollectionEntry, getCollection } from "astro:content";
 import { url } from "./url-utils";
+
+export function noteUrl(post: CollectionEntry<"posts">) {
+  return url(post.data.format === "markdown" ? `/posts/${post.slug}/` : post.data.target!);
+}
+
+export const noteFormatLabels = { markdown: "Markdown", html: "HTML 专题", pdf: "PDF", file: "附件" };
 
 export async function publishedNotes() {
   return (await getCollection("posts", ({ data }) => !data.draft)).sort(

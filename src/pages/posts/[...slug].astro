@@ -8,7 +8,7 @@ import { url } from "../../utils/url-utils";
 import "../../styles/doduo-translation.css";
 import "katex/dist/katex.min.css";
 export async function getStaticPaths() {
-  return (await publishedNotes()).map(post => ({ params: { slug: post.slug }, props: { post } }));
+  return (await publishedNotes()).filter(post => post.data.format === "markdown").map(post => ({ params: { slug: post.slug }, props: { post } }));
 }
 interface Props { post: CollectionEntry<"posts">; }
 const { post } = Astro.props;

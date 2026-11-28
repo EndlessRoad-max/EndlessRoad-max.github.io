@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>03-01 MyCat 实现：三台 MySQL 拼成一个逻辑库 · 运维篇 · MySQL 笔记</title>
+<link rel="stylesheet" href="../assets/style.css"><link rel="stylesheet" href="../assets/replication.css"><link rel="stylesheet" href="../assets/sharding.css">
+<script src="../assets/replication.js" defer></script>
+</head>
+<body class="replication sharding"><div class="layout">
+
+<nav class="sidebar" aria-label="本页目录">
+  <p class="side-title">本页目录</p>
+  <a href="#where">1. 它在哪一层</a>
+  <a href="#concept">2. 逻辑与物理</a>
+  <a href="#install">3. 装起来</a>
+  <a href="#config">4. 三份配置</a>
+  <a href="#run">5. 跑通：看数据落在哪</a>
+  <a href="#rules">6. 分片规则速查</a>
+  <a href="#route">7. SQL 怎么被路由</a>
+  <a href="#traps">8. 八个坑</a>
+  <a href="#quiz">自测三问</a>
+  <p class="side-title" style="margin-top:22px">当前位置</p>
+  <ul class="nav-tree">
+    <li><a href="../index.html" class="root">↑ 总目录</a>
+      <ul>
+        <li><a href="01-日志.html">01 日志</a></li>
+        <li><a href="02-主从复制.html">02 主从复制</a></li>
+        <li><a href="03-分库分表.html">03 分库分表</a>
+          <ul>
+            <li><span class="current">03-01 MyCat 实现</span></li>
+          </ul>
+        </li>
+        <li><a href="04-读写分离.html">04 读写分离</a></li>
+      </ul>
+    </li>
+  </ul>
+</nav>
+
+<main class="main">
+<div class="crumb"><a href="../index.html">总目录</a> / 运维篇 / <a href="03-分库分表.html">03 分库分表</a> / 03-01</div>
+<h1><span class="chapter-no">03-01</span>MyCat 实现</h1>
+<p class="lede">不改一行代码，让应用以为自己在连一个库。这一页按「装 → 配 → 通 → 看落点 → 排错」走一遍：三台 MySQL 加一个 MyCat，把 <code>TB_ORDER</code> 分成三个节点，每一步都给能直接抄的配置和验收输出。</p>
+<div class="meta"><span>环境：JDK 8 + MyCat 1.6 + MySQL 8.0</span><span>主机：MyCat 192.168.200.210，分片 .210 / .213 / .214</span><span>整理：2026-11-26</span></div>
+
+<section class="quick">
+  <p class="quick-head">一屏速记<span>合上笔记，这 4 条要能自己说出来</span></p>
+  <ol>
+    <li><b>MyCat 是代理，不是数据库。</b>应用连它的 <code>8066</code>，它模拟 MySQL 协议，背后按分片规则把 SQL 发到不同的库。管理端口是 <code>9066</code>。</li>
+    <li><b>三份配置管三件事：</b><code>schema.xml</code> 逻辑表对应哪些物理节点，<code>rule.xml</code> 按什么规则分，<code>server.xml</code> 谁能连、能连哪个逻辑库。</li>
+    <li><b>分片落点由映射文件决定。</b><code>auto-sharding-long</code> 默认只写到 1500 万，<b>超出直接报错，不会自动加节点</b>。</li>
+    <li><b>不带分片键的查询会广播</b>到所有节点再合并；<code>sqlMaxLimit</code> 默认 100，所以「只查出 100 行」通常是它加的，不是数据丢了。</li>
+  </ol>
+</section>
+
+<h2 id="where">1. 它在哪一层</h2>
+<p>应用 → MyCat → 若干台 MySQL。应用只认识 MyCat 的地址和端口，背后有几台库、数据怎么分，全在 MyCat 的配置里。</p>
+
+<figure class="fig narrow">
+  <img src="../assets/sharding/09-mycat-arch.png" width="576" height="533" alt="应用连接 MyCat，MyCat 向下连接到三台 MySQL 服务器。">
+  <figcaption><b>图 1</b>课程里的三层结构：应用 → MyCat → 三个分片。应用侧看到的只是「一个 MySQL」。</figcaption>
+</figure>
+
+<p>为什么应用不用改代码：MyCat 实现了 MySQL 的<b>服务端协议</b>——握手、账号认证、<code>COM_QUERY</code> 都按 MySQL 的格式应答，所以 <code>mysql</code> 客户端、JDBC 驱动、现成的 ORM 都能直接连 <code>8066</code>。</p>
+
+<table>
+  <thead><tr><th style="width:18%">端口</th><th style="width:22%">用途</th><th>怎么用</th></tr></thead>
+  <tbody>
+    <tr><td><code>8066</code></td><td>数据端口</td><td>应用和客户端连这里，写普通 SQL。看到的是逻辑库、逻辑表。</td></tr>
+    <tr><td><code>9066</code></td><td>管理端口</td><td>运维用：看节点状态、心跳、连接数，改完配置执行 <code>reload @@config;</code>。</td></tr>
+  </tbody>
+</table>
+
+<div class="note warn"><b>它模拟协议，不等于它就是 MySQL</b>
+<p>存储过程、部分函数、跨库 JOIN、DDL 广播的行为都和原生 MySQL 有差异。把它当成「会改写 SQL 的路由器」，别当成一个完整的数据库。</p>
+</div>
+
+<h2 id="concept">2. 逻辑与物理</h2>
+<p>MyCat 的所有配置，本质就是一张<b>逻辑到物理的映射表</b>。这张图值得先看两分钟：</p>
+
+<figure class="fig">
+  <img src="../assets/sharding/11-logic-physical.png" width="767" height="358" alt="上半部分是逻辑结构：schema 下面挂 tableA 和 tableB，每张表挂多个 dataNode；下半部分是物理结构，每个 dataNode 对应一台 MySQL 的 IP 和端口。">
+  <figcaption><b>图 2</b>上半是逻辑结构（应用看到的名字），下半是物理结构（真实的 MySQL 实例）。中间的 <code>dataNode</code> 就是那根线。</figcaption>
+</figure>
+
+<table>
+  <thead><tr><th style="width:20%">名词</th><th style="width:26%">在哪配</th><th>是什么</th></tr></thead>
+  <tbody>
+    <tr><td><b>逻辑库 schema</b></td><td><code>schema.xml</code> / <code>server.xml</code></td><td>应用看到的库名，比如 <code>DB01</code>。物理上可能对应三个 <code>db01</code>。</td></tr>
+    <tr><td><b>逻辑表 table</b></td><td><code>schema.xml</code></td><td>应用看到的表名，比如 <code>TB_ORDER</code>。它背后可能是三张同名表。</td></tr>
+    <tr><td><b>分片规则 rule</b></td><td><code>rule.xml</code></td><td>一行数据该去哪个节点。逻辑表通过 <code>rule="..."</code> 引用它。</td></tr>
+    <tr><td><b>分片节点 dataNode</b></td><td><code>schema.xml</code></td><td>「某个 dataHost 上的某个物理库」，比如 <code>dhost1</code> 上的 <code>db01</code>。</td></tr>
+    <tr><td><b>节点主机 dataHost</b></td><td><code>schema.xml</code></td><td>一台物理 MySQL：连接串、账号、连接池、读写/切换策略。</td></tr>
+  </tbody>
+</table>
+
+<div class="note tip"><b>记住这一句就够了</b>
+<p><b>逻辑名给应用看，物理库才是数据。</b>改物理库的地址、加一个分片，都只改配置，应用侧一行代码不动——这正是用中间件的理由。</p>
+</div>
+
+<h2 id="install">3. 装起来</h2>
+<p>四台机器（210 同时当 MyCat 和第一个分片）：</p>
+
+<figure class="fig">
+  <img src="../assets/sharding/13-env.png" width="802" height="672" alt="192.168.200.210 装 MyCat 和 MySQL，192.168.200.213 和 214 各装 MySQL，三台都建 db01 库。">
+  <figcaption><b>图 3</b>课程环境：MyCat 在 <code>.210</code>，三台 MySQL 分别是 <code>.210</code> / <code>.213</code> / <code>.214</code>，每台都建 <code>db01</code>。</figcaption>
+</figure>
+
+<ol class="steps">
+<li><b>三台 MySQL 各建一个库</b><span class="where">三台分片 · mysql 客户端</span>
+<pre data-copy><code>CREATE DATABASE db01 DEFAULT CHARSET utf8mb4;</code></pre>
+<p class="check">三台的库名、字符集、排序规则要一致——导数据时不一致会在字符串比较上出怪问题。</p></li>
+
+<li><b>MyCat 这台装 JDK</b><span class="where">MyCat 机器 · Linux 终端</span>
+<pre data-copy><code>java -version</code></pre>
+<p class="check">输出 1.8.x。MyCat 1.6 是按 JDK 8 编译的，用 11/17 起有可能因为模块访问限制起不来。</p></li>
+
+<li><b>解压并启动</b><span class="where">MyCat 机器 · Linux 终端</span>
+<pre data-copy><code>tar -zxvf Mycat-server-1.6-RELEASE-*.tar.gz -C /usr/local/
+/usr/local/mycat/bin/mycat start</code></pre>
+<p>常用命令：<code>bin/mycat start</code> / <code>stop</code> / <code>restart</code> / <code>status</code>。启动脚本会拉起一个 JVM，日志在 <code>logs/wrapper.log</code>。</p></li>
+
+<li><b>确认端口在听</b><span class="where">MyCat 机器 · Linux 终端</span>
+<pre data-copy><code>netstat -tlnp | grep -E '8066|9066'</code></pre>
+<p class="check">两行都在。<code>8066</code> 没起来先看 <code>logs/wrapper.log</code> 的最后 50 行，多数是 JDK 版本、内存不够，或者 <code>schema.xml</code> 写坏了。</p></li>
+</ol>
+
+<div class="note danger"><b>MySQL 8.0 必须先换驱动</b>
+<p>MyCat 1.6 的 <code>lib/</code> 里自带 <code>mysql-connector-java-5.1.x</code>，它不认识 8.0 默认的 <code>caching_sha2_password</code> 认证，连过去会报认证失败或 <code>Unknown character set</code>。</p>
+<p>做法：删掉 <code>lib/</code> 下的 5.1.x jar，放入 <code>mysql-connector-java-8.0.x.jar</code>；<code>dataHost</code> 写 <code>dbDriver="jdbc"</code>；URL 带上 <code>serverTimezone</code>。改完 <code>bin/mycat restart</code>。</p>
+</div>
+
+<h2 id="config">4. 三份配置</h2>
+<p>三个文件各管一件事，改完都要 <code>reload</code> 或重启才生效。下面这份配置可以直接抄，IP、密码换成自己的。</p>
+
+<h3>4.1 schema.xml — 谁对应谁</h3>
+<pre data-copy><code>&lt;?xml version="1.0"?&gt;
+&lt;!DOCTYPE mycat:schema SYSTEM "schema.dtd"&gt;
+&lt;mycat:schema xmlns:mycat="http://io.mycat/"&gt;
+
+  &lt;schema name="DB01" checkSQLschema="true" sqlMaxLimit="100"&gt;
+    &lt;table name="TB_ORDER" dataNode="dn1,dn2,dn3"
+           rule="auto-sharding-long" primaryKey="id" /&gt;
+  &lt;/schema&gt;
+
+  &lt;dataNode name="dn1" dataHost="dhost1" database="db01" /&gt;
+  &lt;dataNode name="dn2" dataHost="dhost2" database="db01" /&gt;
+  &lt;dataNode name="dn3" dataHost="dhost3" database="db01" /&gt;
+
+  &lt;dataHost name="dhost1" maxCon="1000" minCon="10" balance="0"
+            writeType="0" dbType="mysql" dbDriver="jdbc"
+            switchType="1" slaveThreshold="100"&gt;
+    &lt;heartbeat&gt;select user()&lt;/heartbeat&gt;
+    &lt;writeHost host="master" user="root" password="Root@123456"
+               url="jdbc:mysql://192.168.200.210:3306?useSSL=false&amp;amp;serverTimezone=Asia/Shanghai" /&gt;
+  &lt;/dataHost&gt;
+
+  &lt;!-- dhost2 指向 192.168.200.213，dhost3 指向 192.168.200.214，其余同上 --&gt;
+&lt;/mycat:schema&gt;</code></pre>
+
+<p>URL 里 <code>serverTimezone</code> 不能省，否则 8.0 驱动会报时区错误；连接字符集默认跟随服务端，确有必要再加 <code>characterEncoding</code>。</p>
+<p>三个标签的常用属性，只列真会改的：</p>
+
+<table>
+  <thead><tr><th style="width:18%">标签</th><th style="width:26%">属性</th><th>作用</th></tr></thead>
+  <tbody>
+    <tr><td rowspan="4"><code>&lt;schema&gt;</code></td><td><code>name</code></td><td>逻辑库名，应用 <code>USE</code> 的就是它。</td></tr>
+    <tr><td><code>checkSQLschema</code></td><td><code>true</code> 时把 SQL 里的库名前缀去掉，避免 <code>DB01.tb</code> 被原样发给物理库。</td></tr>
+    <tr><td><code>sqlMaxLimit</code></td><td>不带 <code>LIMIT</code> 的查询自动补一个，默认 100。防止一次拉回全表把 MyCat 内存打爆。</td></tr>
+    <tr><td><code>dataNode</code></td><td>不写 <code>rule</code> 时的默认节点。</td></tr>
+    <tr><td rowspan="3"><code>&lt;table&gt;</code></td><td><code>name</code></td><td>逻辑表名，<b>大小写要和物理表一致</b>（Linux 上 MySQL 表名区分大小写）。</td></tr>
+    <tr><td><code>dataNode</code></td><td>多个节点用逗号分隔，顺序就是分片索引 0、1、2…。</td></tr>
+    <tr><td><code>rule</code></td><td>引用 <code>rule.xml</code> 里的 <code>tableRule</code> 名字。不写就是单节点。</td></tr>
+    <tr><td rowspan="4"><code>&lt;dataHost&gt;</code></td><td><code>balance</code></td><td><code>0</code> 不开读写分离，读也走 <code>writeHost</code>；<code>1</code> 双主双从都可读；<code>2</code> 随机读；<code>3</code> 按主库压力。只做分片时填 0 最省心。</td></tr>
+    <tr><td><code>writeType</code></td><td><code>0</code> 写第一个 writeHost；<code>1</code> 随机写。</td></tr>
+    <tr><td><code>switchType</code></td><td><code>-1</code> 不自动切换；<code>1</code> 默认自动切；<code>2</code> 依据 MySQL 主从状态切。</td></tr>
+    <tr><td><code>dbDriver</code></td><td><code>jdbc</code> 用 JDBC 驱动（8.0 必须）；<code>native</code> 是老实现。</td></tr>
+  </tbody>
+</table>
+
+<h3>4.2 server.xml — 谁能连</h3>
+<pre data-copy><code>&lt;user name="root" defaultAccount="true"&gt;
+  &lt;property name="password"&gt;Root@123456&lt;/property&gt;
+  &lt;property name="schemas"&gt;DB01&lt;/property&gt;
+&lt;/user&gt;
+
+&lt;user name="reader"&gt;
+  &lt;property name="password"&gt;Root@123456&lt;/property&gt;
+  &lt;property name="schemas"&gt;DB01&lt;/property&gt;
+  &lt;property name="readOnly"&gt;true&lt;/property&gt;
+&lt;/user&gt;</code></pre>
+
+<p>这里的 <code>DB01</code> 是<b>逻辑库</b>，不是物理库 <code>db01</code>。用户只能看见 <code>schemas</code> 里列出的库。</p>
+
+<div class="note plain"><b>表级权限的 4 位数字是什么顺序</b>
+<p>放开 <code>&lt;privileges&gt;</code> 后，<code>dml="0110"</code> 这四位依次是 <b>insert / update / select / delete</b>，<code>1</code> 表示允许。所以 <code>0110</code> = 不能插、能改、能查、不能删。<br>课程里这段是注释掉的，真要按表授权时才用得上；一般用 <code>readOnly</code> 分读写账号就够。</p>
+</div>
+
+<h3>4.3 rule.xml — 怎么分</h3>
+<pre data-copy><code>&lt;tableRule name="auto-sharding-long"&gt;
+  &lt;rule&gt;
+    &lt;columns&gt;id&lt;/columns&gt;
+    &lt;algorithm&gt;rang-long&lt;/algorithm&gt;
+  &lt;/rule&gt;
+&lt;/tableRule&gt;
+
+&lt;function name="rang-long" class="io.mycat.route.function.AutoPartitionByLong"&gt;
+  &lt;property name="mapFile"&gt;autopartition-long.txt&lt;/property&gt;
+&lt;/function&gt;</code></pre>
+
+<p><code>columns</code> 是分片键，<code>algorithm</code> 指向下面的 <code>function</code>。真正的区间写在 <code>conf/autopartition-long.txt</code> 里，默认只有三行：</p>
+
+<pre data-copy><code># range start-end ,data node index
+# K=1000,M=10000.
+0-500M=0
+500M-1000M=1
+1000M-1500M=2</code></pre>
+
+<p>第三行的 <code>M</code> 是 <b>10000</b>（文件头注释已写明），所以 <code>500M</code> = 500 万。等号右边是 <code>dataNode</code> 列表里的<b>下标</b>：0 对应 dn1，1 对应 dn2，2 对应 dn3。</p>
+
+<div class="note warn"><b>这就是「超出 1500 万报错」的真正原因</b>
+<p>规则文件只定义了三段，<b>没有第四段</b>。id 超出 1500 万时找不到任何可用节点，插入直接失败。它不是「自动扩容」，也不会把数据堆到最后一个节点——除非你在 <code>function</code> 里显式配置 <code>defaultNode</code>。<br>要加区间就改这个文件、加一行 <code>1500M-2000M=3</code> 并在 <code>schema.xml</code> 里加 <code>dn4</code>，改完 <code>reload</code>。</p>
+</div>
+
+<h2 id="run">5. 跑通：看数据落在哪</h2>
+<p>目标是验证一件事：<b>同一张逻辑表，不同的 id 真的落到了不同机器上</b>。</p>
+
+<figure class="fig mid">
+  <img src="../assets/sharding/12-requirement.png" width="786" height="539" alt="TB_ORDER 被分成三个 dataNode，每个 dataNode 对应一台 MySQL 里的 db01 库中的 TB_ORDER 表。">
+  <figcaption><b>图 4</b>这节课的需求：<code>TB_ORDER</code> 分成三个节点，每个节点是一台独立 MySQL 上的 <code>db01.TB_ORDER</code>。</figcaption>
+</figure>
+
+<ol class="steps">
+<li><b>连 MyCat，确认逻辑库</b><span class="where">任意机器 · Linux 终端</span>
+<pre data-copy><code>mysql -h192.168.200.210 -P8066 -uroot -p</code></pre>
+<pre data-copy><code>SHOW DATABASES;</code></pre>
+<p class="check">列表里是 <code>DB01</code>，不是 <code>db01</code>。看到 <code>db01</code> 说明你连的是 MySQL 的 3306，不是 MyCat 的 8066。</p></li>
+
+<li><b>建表</b><span class="where">MyCat · 8066</span>
+<pre data-copy><code>USE DB01;
+
+CREATE TABLE TB_ORDER (
+  id BIGINT(20) NOT NULL,
+  title VARCHAR(100) NOT NULL,
+  PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;</code></pre>
+<p>这条 DDL 会被下发到三个分片，三台都会出现 <code>db01.TB_ORDER</code>。到任意一台确认一下：</p>
+<pre data-copy><code>SHOW CREATE TABLE db01.TB_ORDER\G</code></pre>
+<p class="check">三台都有这张表，结构一致。</p></li>
+
+<li><b>插数据，跨越三个区间</b><span class="where">MyCat · 8066</span>
+<pre data-copy><code>INSERT INTO TB_ORDER(id,title) VALUES
+  (1,'goods1'),
+  (2,'goods2'),
+  (5000000,'goods500w'),
+  (5000001,'goods500w+1'),
+  (10000000,'goods1000w'),
+  (15000000,'goods1500w');</code></pre>
+<p>再插一条越界的，看它报不报错：</p>
+<pre data-copy><code>INSERT INTO TB_ORDER(id,title) VALUES (15000001,'goods-over');</code></pre>
+<p class="check">最后一条被拒绝。前六条全部成功——这就是规则文件只写到 1500 万的直接后果。</p></li>
+
+<li><b>到三台分片上分别看</b><span class="where">.210 / .213 / .214 · 各自的 3306</span>
+<p>连到每台 MySQL 的 3306，分别执行同一条：</p>
+<pre data-copy><code>SELECT id, title FROM db01.TB_ORDER ORDER BY id;</code></pre>
+<p class="check">三台各自只看到自己那一段，合起来才是 MyCat 里看到的全部——这一眼就是分片。</p></li>
+</ol>
+
+<p>预期落点（对照下图）：</p>
+
+<figure class="fig">
+  <div class="rangeaxis">
+    <div class="ra-seg s1"><b>dn1</b><span>0 – 500 万</span><em>示例 id 1</em></div>
+    <div class="ra-seg s2"><b>dn2</b><span>500 万 – 1000 万</span><em>示例 id 5000000</em></div>
+    <div class="ra-seg s3"><b>dn3</b><span>1000 万 – 1500 万</span><em>示例 id 10000000</em></div>
+    <div class="ra-seg none"><b>无节点</b><span>1500 万以上</span><em>插入报错</em></div>
+  </div>
+  <figcaption><b>图 5</b><code>autopartition-long.txt</code> 的三段区间，以及文件里不存在的第四段。边界值到底归哪一段与版本实现有关，<code>5000000</code> 和 <code>15000000</code> 这两条正好用来实测。</figcaption>
+</figure>
+
+<table>
+  <thead><tr><th style="width:20%">id</th><th style="width:20%">落在</th><th>怎么判断的</th></tr></thead>
+  <tbody>
+    <tr><td><code>1</code> / <code>2</code></td><td>dn1（.210）</td><td>落在 <code>0-500M=0</code>，下标 0 → <code>dataNode</code> 列表第一个</td></tr>
+    <tr><td><code>5000000</code></td><td>dn2（.213）</td><td>边界值归后一段：<code>500M-1000M=1</code></td></tr>
+    <tr><td><code>5000001</code></td><td>dn2（.213）</td><td>同上</td></tr>
+    <tr><td><code>10000000</code></td><td>dn3（.214）</td><td><code>1000M-1500M=2</code></td></tr>
+    <tr><td><code>15000000</code></td><td>dn3（.214）</td><td>仍在第三段上界内</td></tr>
+    <tr><td><code>15000001</code></td><td>—</td><td>超出最后一段，找不到节点，报错</td></tr>
+  </tbody>
+</table>
+
+<div class="note plain"><b>边界值到底算哪一段，第一次用时实测一下</b>
+<p>不同版本的区间判断在边界上可能差一，<code>5000000</code> 与 <code>15000000</code> 这两条正好用来验。落点不对不影响理解，记下你所用版本的行为即可。</p>
+</div>
+
+<h2 id="rules">6. 分片规则速查</h2>
+<p>只列课程涉及和实际最常用的。规则名写在 <code>schema.xml</code> 的 <code>rule</code> 属性里，具体算法在 <code>rule.xml</code>。</p>
+
+<table>
+  <thead><tr><th style="width:23%">规则名</th><th style="width:25%">算法类</th><th>依据与适用</th></tr></thead>
+  <tbody>
+    <tr><td><code>auto-sharding-long</code></td><td><code>AutoPartitionByLong</code></td><td><b>范围</b>，区间写在映射文件里。适合按 ID 段或时间范围查的场景；缺点是新数据全落在最后一段，扩节点要改文件并迁数据。</td></tr>
+    <tr><td><code>mod-long</code></td><td><code>PartitionByMod</code></td><td><b>取模</b>，<code>id % count</code>。<code>count</code> 必须等于节点数。分布最均匀、适合随机读写；但节点数一变，几乎所有数据都要重算位置。</td></tr>
+    <tr><td><code>hash-int</code></td><td><code>PartitionByFileMap</code></td><td><b>按映射文件查表</b>，不是真的算哈希——名字容易误解。适合取值有限的枚举（省份、类型）。</td></tr>
+    <tr><td><code>sharding-by-intfile</code></td><td><code>PartitionByFileMap</code></td><td>和上一条同一个实现，区别只在映射文件的内容与语义。课程里讲「枚举分片」用的就是它。</td></tr>
+    <tr><td><code>consistent-hash</code></td><td><code>ConsistentHash</code></td><td><b>哈希环</b>，扩容时只迁移相邻一段数据。节点少时分布可能不均，上线前先用真实数据看分布。</td></tr>
+    <tr><td><code>sharding-by-date</code></td><td><code>PartitionByDate</code></td><td><b>按日期</b>，配 <code>dateFormat</code> / <code>sBeginDate</code> / <code>sPartionDay</code>。适合日志、流水；要预留足够的分片，到期加节点。</td></tr>
+  </tbody>
+</table>
+
+<div class="note tip"><b>范围 vs 取模，选哪个</b>
+<p>查询经常带范围（按时间段、按 ID 段）→ 范围分片，只扫相关节点。<br>只有等值查询、要求分布绝对均匀 → 取模。<br>两种都怕扩容：范围要改文件迁边界数据，取模要重算全部。真要「扩容只迁一部分」，用一致性哈希。</p>
+</div>
+
+<h2 id="route">7. SQL 怎么被路由</h2>
+<p>MyCat 拿到一条 SQL，先解析出分片键的值，再决定发给几个节点。分片键进没进 WHERE，成本差一个数量级。</p>
+
+<table>
+  <thead><tr><th style="width:38%">SQL 写法</th><th style="width:14%">下发</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td><code>WHERE id = 5000001</code></td><td>1 个节点</td><td>算得出确定的下标，直接发 dn2。</td></tr>
+    <tr><td><code>WHERE id BETWEEN 1 AND 4000000</code></td><td>1 个节点</td><td>范围分片能算出落在 dn1。</td></tr>
+    <tr><td><code>WHERE title = 'goods1'</code></td><td>3 个节点</td><td>没有分片键，<b>广播</b>到所有节点，结果回 MyCat 合并。节点越多越慢。</td></tr>
+    <tr><td><code>ORDER BY id LIMIT 10</code></td><td>3 个节点</td><td>各节点各取 10 条，MyCat 归并排序再取前 10。</td></tr>
+    <tr><td><code>LIMIT 100000, 10</code></td><td>3 个节点</td><td>每个节点要取 100010 条，内存里排序。深分页在分片下代价翻倍。</td></tr>
+    <tr><td><code>SELECT COUNT(*)</code></td><td>3 个节点</td><td>各节点算部分和，MyCat 相加。<code>SUM</code> / <code>MAX</code> 同理。</td></tr>
+  </tbody>
+</table>
+
+<p>两条必须记住的默认行为：</p>
+
+<ul>
+  <li><b><code>sqlMaxLimit</code> = 100。</b>不带 <code>LIMIT</code> 的查询会被自动补成 <code>LIMIT 100</code>。所以「MyCat 里只查出 100 行、直连分片却有 3000 行」不是数据丢了，是它加的限制。</li>
+  <li><b>结果集在 MyCat 内存里合并。</b>广播查询、跨节点排序、大结果集聚合都吃 MyCat 的堆内存。查询越「不带分片键」，越容易把它拖垮。</li>
+</ul>
+
+<p>想确认某条 SQL 到底发给了谁，最直接的办法不是猜，是到分片上开 general log 看：</p>
+<pre data-copy><code>SET GLOBAL general_log = ON;
+SET GLOBAL log_output = 'TABLE';
+SELECT event_time, argument FROM mysql.general_log
+WHERE argument LIKE '%TB_ORDER%' ORDER BY event_time DESC LIMIT 20;</code></pre>
+<p class="check">在 MyCat 里执行一条查询，三台上都能看到对应语句，就说明它是广播的；只有一台有，就是命中了分片。</p>
+
+<h2 id="traps">8. 八个坑</h2>
+<table>
+  <thead><tr><th style="width:26%">现象</th><th style="width:30%">原因</th><th>怎么办</th></tr></thead>
+  <tbody>
+    <tr><td>连不上，报认证失败或 <code>Unknown character set</code></td><td>5.1 驱动 + 8.0 的 <code>caching_sha2_password</code></td><td>换 8.x 驱动，<code>dbDriver="jdbc"</code>，URL 加 <code>serverTimezone</code></td></tr>
+    <tr><td><code>Table 'db01.TB_ORDER' doesn't exist</code></td><td>schema.xml 里的表名大小写与物理表不一致（Linux 上区分）</td><td>两边统一，建议全小写</td></tr>
+    <tr><td>查询只返回 100 行</td><td><code>sqlMaxLimit</code> 默认值</td><td>显式写 <code>LIMIT</code>，或调大 <code>sqlMaxLimit</code></td></tr>
+    <tr><td>跨分片 JOIN 很慢或结果不对</td><td>JOIN 被拆到各节点执行，再在内存合并</td><td>用 ER 分片让关联表同节点，或冗余字段、应用层拼装</td></tr>
+    <tr><td>插入不带 id 报错 / 三台主键重复</td><td>各分片各自自增，没有全局序列</td><td>业务侧生成雪花 ID，或配 <code>sequnceHandlerType</code> 全局序列</td></tr>
+    <tr><td>一个事务写两个分片，部分成功</td><td>本地事务管不到另一个库</td><td>设计上让一个事务只落一个分片；确有需要才上 XA / 分布式事务框架</td></tr>
+    <tr><td><code>ALTER TABLE</code> 只在部分节点生效</td><td>DDL 广播的行为与版本、表配置有关</td><td>逐节点执行后 <code>reload @@config;</code>，或停机窗口统一改</td></tr>
+    <tr><td>改完配置没反应</td><td>只改了文件，没让 MyCat 重读</td><td>9066 端口执行 <code>reload @@config;</code>，改 <code>server.xml</code> 要重启</td></tr>
+  </tbody>
+</table>
+
+<p>9066 管理端口常用的三条：</p>
+<pre data-copy><code>mysql -h192.168.200.210 -P9066 -uroot -p
+show @@datanode;     -- 各节点是否存在、是否可用
+show @@heartbeat;    -- 心跳状态，判断分片是不是活着
+reload @@config;     -- 重读 schema.xml / rule.xml</code></pre>
+<p class="check"><code>show @@heartbeat</code> 里某个节点是 <code>STATUS: INIT</code> 或一直失败，先查那台的 MySQL 是否在跑、账号密码对不对，再去应用侧排查。</p>
+
+<section class="quiz" id="quiz">
+  <p class="quiz-head">自测三问<span>先自己答，再展开对照</span></p>
+  <details><summary><span class="qno">Q1</span><span class="ask">为什么在 MyCat 里 <code>SHOW DATABASES</code> 看到的是 <code>DB01</code>，而物理库叫 <code>db01</code>？</span><span class="caret" aria-hidden="true"></span></summary>
+  <div class="ans"><p><code>DB01</code> 是 <code>schema.xml</code> 里定义的逻辑库，也是 <code>server.xml</code> 给用户授权的库；<code>db01</code> 是 <code>dataNode</code> 的 <code>database</code> 属性指向的物理库。<br>两者名字不同完全合法。好处是：以后把物理库改名、搬到别的机器，只改 <code>dataNode</code>，应用连接串和 SQL 都不用动。</p></div></details>
+  <details><summary><span class="qno">Q2</span><span class="ask">插入 <code>id=16000000</code> 报错，是 MyCat 坏了还是配置问题？</span><span class="caret" aria-hidden="true"></span></summary>
+  <div class="ans"><p>配置问题，而且行为是设计好的：<code>autopartition-long.txt</code> 只定义到 1500 万，超出的值找不到任何节点。<br>要么加区间、加节点，要么给 <code>function</code> 配 <code>defaultNode</code> 让它兜底到一个节点（但那个节点会变成热点）。<b>它不会自动扩容。</b></p></div></details>
+  <details><summary><span class="qno">Q3</span><span class="ask">同一条查询，带 <code>id</code> 和不带 <code>id</code>，为什么耗时差好几倍？</span><span class="caret" aria-hidden="true"></span></summary>
+  <div class="ans"><p>带 <code>id</code> 时 MyCat 算得出唯一节点，只发一台；不带 <code>id</code> 时没有分片键，只能<b>广播</b>到三台各查一遍，再把结果拉回 MyCat 合并排序。<br>节点越多、结果集越大，差距越明显。这也是选分片键时「要覆盖最高频查询条件」的原因。</p></div></details>
+</section>
+
+<h2 id="sources">资料</h2>
+<p class="refs">参考：<a href="https://www.mycat.org.cn/">MyCat 官网</a> · <a href="https://github.com/MyCATApache/Mycat-Server">MyCat-Server（GitHub）</a> · <a href="https://shardingsphere.apache.org/document/current/cn/overview/">ShardingSphere 文档</a> · <a href="https://dev.mysql.com/doc/refman/8.0/en/account-management.html">MySQL 8.0 账号与认证</a></p>
+<p class="source">核对日期 2026-11-26。本页配置按 MyCat 1.6 的文档与课程内容整理，<b>没有在真实的三节点环境里逐条执行</b>；第一次搭建时以每步的验收输出为准，尤其注意 MySQL 8.0 的驱动与认证差异。</p>
+
+<div class="footer"><a href="03-分库分表.html">← 03 分库分表</a> · <a href="../index.html#ops">总目录 · 运维篇</a> · <a href="04-读写分离.html">04 读写分离 →</a></div>
+</main>
+</div></body></html>

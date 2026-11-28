@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>7.2.4 mysqlshow · MySQL 笔记</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="layout">
+
+  <nav class="sidebar">
+    <p class="side-title">本页目录</p>
+    <ul class="nav-tree">
+      <li><a class="leaf" href="#s1">1. 它只是 SHOW 语句的一层壳</a></li>
+      <li><a class="leaf" href="#s2">2. 四个位置参数是下钻路径</a></li>
+      <li><a class="leaf" href="#s3">3. 截图给的两个选项</a></li>
+      <li><a class="leaf" href="#s4">4. --count 的真实代价</a></li>
+      <li><a class="leaf" href="#s5">5. 你看到的不是全部</a></li>
+      <li><a class="leaf" href="#s6">6. 只有最后一个参数算模式</a></li>
+      <li><a class="leaf" href="#s7">7. 什么时候用它，什么时候别用</a></li>
+    </ul>
+
+    <p class="side-title" style="margin-top:22px">当前位置</p>
+    <ul class="nav-tree">
+      <li><a href="../index.html">↑ 总目录</a>
+        <ul>
+          <li><a class="group" href="07-MySQL管理.html">07 MySQL 管理</a>
+            <ul>
+              <li><a class="leaf" href="07-01-系统数据库.html">7.1 系统数据库</a></li>
+              <li><a class="leaf" href="07-02-mysql.html">7.2.1 mysql</a></li>
+              <li><a class="leaf" href="07-03-mysqladmin.html">7.2.2 mysqladmin</a></li>
+              <li><a class="leaf" href="07-04-mysqlbinlog.html">7.2.3 mysqlbinlog</a></li>
+              <li><span class="current">7.2.4 mysqlshow</span></li>
+              <li><a class="leaf" href="07-06-mysqldump.html">7.2.5 mysqldump</a></li>
+              <li><a class="leaf" href="07-07-mysqlimport.html">7.2.6 mysqlimport</a></li>
+            </ul>
+          </li>
+        </ul>
+      </li>
+    </ul>
+  </nav>
+
+  <main class="main">
+
+    <div class="crumb"><a href="../index.html">总目录</a> / <a href="07-MySQL管理.html">07 MySQL 管理</a> / 7.2.4</div>
+    <h1><span class="chapter-no">7.2.4</span>mysqlshow</h1>
+    <p class="lede">截图那句定义说得很准：<strong>客户端对象查找工具</strong>，用来快速看有哪些库、库里有哪些表、表里有哪些列和索引。它比前四个工具都简单，因为它<strong>没有自己的逻辑</strong>——官方文档原话是「a command-line interface to several SQL <code>SHOW</code> statements」，一层把参数翻译成 <code>SHOW</code> 的壳。正因为它这么薄，两个东西才值得记：<code>--count</code> 的代价，和「不是所有对象都会显示出来」。</p>
+
+    <div class="meta">
+      <span>进阶篇 · 7.2.4</span>
+      <span>更新：2026-11-25</span>
+      <span>环境：MySQL 8.0</span>
+    </div>
+
+    <section class="quick">
+      <p class="quick-head">一屏速记<span>合上笔记，这 5 条要能自己说出来</span></p>
+      <ol>
+        <li>它自己的查询能力是零：官方定位就是若干 SQL <code>SHOW</code> 语句的命令行封装，<code>mysqlshow db</code> 基本等于 <code>SHOW TABLES FROM db</code>。</li>
+        <li>四个位置参数是<b>下钻路径</b>：<code>[db [table [column]]]</code>，给得越深返回越细。</li>
+        <li><code>--count</code> 是<b>真的逐表 <code>SELECT COUNT(*)</code></b>，官方明说对 non-MyISAM 表很慢；不带库名就扫全实例，连系统库和视图一起真查。</li>
+        <li><code>-i / --status</code> 走 <code>SHOW TABLE STATUS</code>，行数是 <b>InnoDB 的估算值</b>，和 <code>--count</code> 的数字对不上很正常。</li>
+        <li>输出<b>经过权限过滤</b>：只列你有权限的对象。「只看到 3 个库」不等于「服务器上只有 3 个库」，别拿它清点家底。</li>
+      </ol>
+    </section>
+
+    <h2 id="s1">1. 它只是 SHOW 语句的一层壳</h2>
+
+    <p>先把这个定位钉死，后面所有现象都能推出来：<strong>它不产生任何新信息</strong>。你在 <code>mysql</code> 里敲 <code>SHOW TABLES</code> 能看到的，它才看得到；<code>SHOW</code> 看不到的，它也看不到。</p>
+
+    <p>所以它唯一的价值是<strong>省掉一次交互</strong>：不用登录进 mysql、不用写分号、不用 <code>USE</code>，一条命令出结果，能直接塞进 shell 脚本或定时任务。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 680 290" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <text x="340" y="20" text-anchor="middle" font-size="11.5" fill="#8a9099">每个位置参数，对应一条 SHOW 语句；参数越多，下钻越深</text>
+        <text x="24" y="46" font-size="10.5" fill="#8a9099">你在命令行写的</text>
+        <text x="352" y="46" font-size="10.5" fill="#8a9099">它实际发出去的</text>
+
+        <rect x="20" y="54" width="296" height="42" rx="6" fill="#f4fafb" stroke="#b9dde5"/>
+        <text x="32" y="80" font-size="11.5" font-family="Consolas,monospace" fill="#00566b">mysqlshow -uroot -p</text>
+        <path d="M320 75 L338 75" stroke="#00758f" stroke-width="1.4"/>
+        <path d="M334 71.5 L341 75 L334 78.5 Z" fill="#00758f"/>
+        <rect x="348" y="54" width="308" height="42" rx="6" fill="#ffffff" stroke="#e4e7ec"/>
+        <text x="360" y="80" font-size="11" font-family="Consolas,monospace" fill="#1f2329">SHOW DATABASES</text>
+
+        <rect x="20" y="106" width="296" height="42" rx="6" fill="#f4fafb" stroke="#b9dde5"/>
+        <text x="32" y="132" font-size="11.5" font-family="Consolas,monospace" fill="#00566b">mysqlshow -uroot -p test</text>
+        <path d="M320 127 L338 127" stroke="#00758f" stroke-width="1.4"/>
+        <path d="M334 123.5 L341 127 L334 130.5 Z" fill="#00758f"/>
+        <rect x="348" y="106" width="308" height="42" rx="6" fill="#ffffff" stroke="#e4e7ec"/>
+        <text x="360" y="132" font-size="11" font-family="Consolas,monospace" fill="#1f2329">SHOW TABLES FROM test</text>
+
+        <rect x="20" y="158" width="296" height="42" rx="6" fill="#f4fafb" stroke="#b9dde5"/>
+        <text x="32" y="184" font-size="11.5" font-family="Consolas,monospace" fill="#00566b">mysqlshow -uroot -p test book</text>
+        <path d="M320 179 L338 179" stroke="#00758f" stroke-width="1.4"/>
+        <path d="M334 175.5 L341 179 L334 182.5 Z" fill="#00758f"/>
+        <rect x="348" y="158" width="308" height="42" rx="6" fill="#ffffff" stroke="#e4e7ec"/>
+        <text x="360" y="184" font-size="11" font-family="Consolas,monospace" fill="#1f2329">SHOW FULL COLUMNS FROM test.book</text>
+
+        <rect x="20" y="210" width="296" height="54" rx="6" fill="#f4fafb" stroke="#b9dde5"/>
+        <text x="32" y="234" font-size="11.5" font-family="Consolas,monospace" fill="#00566b">mysqlshow -uroot -p test book id</text>
+        <text x="32" y="252" font-size="9.5" fill="#8a9099">最后一层：只看 id 这一列</text>
+        <path d="M320 237 L338 237" stroke="#00758f" stroke-width="1.4"/>
+        <path d="M334 233.5 L341 237 L334 240.5 Z" fill="#00758f"/>
+        <rect x="348" y="210" width="308" height="54" rx="6" fill="#ffffff" stroke="#e4e7ec"/>
+        <text x="360" y="234" font-size="10.5" fill="#1f2329">列按 <tspan font-family="Consolas,monospace" fill="#00566b">id</tspan> 过滤；加 <tspan font-family="Consolas,monospace" fill="#00566b">-k</tspan> 看该列上的索引</text>
+        <text x="360" y="252" font-size="9.5" fill="#8a9099">这一层靠的是模式匹配，不是精确名</text>
+      </svg>
+      <figcaption><b>图 1</b>四层参数与四条 <code>SHOW</code> 语句一一对应。记住这个映射，就不用背输出长什么样。</figcaption>
+    </figure>
+
+    <h2 id="s2">2. 四个位置参数是下钻路径</h2>
+
+    <p>语法里那串方括号 <code>[db_name [tbl_name [col_name]]]</code> 容易读成「可选过滤条件」，其实它是<strong>下钻路径</strong>：给到第几层，就停在第几层，不会再往下。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 680 236" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <text x="340" y="20" text-anchor="middle" font-size="11.5" fill="#8a9099">四层路径，每多给一个参数就往下走一层</text>
+
+        <rect x="16" y="40" width="142" height="146" rx="8" fill="#ffffff" stroke="#e4e7ec"/>
+        <text x="30" y="62" font-size="9.5" fill="#8a9099">0 个参数</text>
+        <text x="30" y="90" font-size="16" font-weight="700" fill="#00566b">库</text>
+        <text x="30" y="110" font-size="9.5" fill="#4e5564">所有库名</text>
+        <path d="M30 122 L144 122" stroke="#eef1f5" stroke-width="1"/>
+        <text x="30" y="142" font-size="8.5" font-family="Consolas,monospace" fill="#00758f">mysqlshow</text>
+        <text x="30" y="160" font-size="9" fill="#b9bfc8">不带库名</text>
+        <text x="30" y="176" font-size="9" fill="#b9bfc8">= SHOW DATABASES</text>
+
+        <text x="166" y="116" font-size="13" fill="#c9cfd8">›</text>
+
+        <rect x="182" y="40" width="142" height="146" rx="8" fill="#ffffff" stroke="#e4e7ec"/>
+        <text x="196" y="62" font-size="9.5" fill="#8a9099">1 个参数</text>
+        <text x="196" y="90" font-size="16" font-weight="700" fill="#00566b">表</text>
+        <text x="196" y="110" font-size="9.5" fill="#4e5564">库里的所有表</text>
+        <path d="M196 122 L310 122" stroke="#eef1f5" stroke-width="1"/>
+        <text x="196" y="142" font-size="8.5" font-family="Consolas,monospace" fill="#00758f">mysqlshow test</text>
+        <text x="196" y="160" font-size="9" fill="#b9bfc8">只给库名</text>
+        <text x="196" y="176" font-size="9" fill="#b9bfc8">= SHOW TABLES</text>
+
+        <text x="332" y="116" font-size="13" fill="#c9cfd8">›</text>
+
+        <rect x="348" y="40" width="142" height="146" rx="8" fill="#ffffff" stroke="#e4e7ec"/>
+        <text x="362" y="62" font-size="9.5" fill="#8a9099">2 个参数</text>
+        <text x="362" y="90" font-size="16" font-weight="700" fill="#00566b">列</text>
+        <text x="362" y="110" font-size="9.5" fill="#4e5564">字段名与类型</text>
+        <path d="M362 122 L476 122" stroke="#eef1f5" stroke-width="1"/>
+        <text x="362" y="142" font-size="8.5" font-family="Consolas,monospace" fill="#00758f">mysqlshow test book</text>
+        <text x="362" y="160" font-size="9" fill="#b9bfc8">给到表名</text>
+        <text x="362" y="176" font-size="9" fill="#b9bfc8">= SHOW FULL COLUMNS</text>
+
+        <text x="498" y="116" font-size="13" fill="#c9cfd8">›</text>
+
+        <rect x="514" y="40" width="150" height="146" rx="8" fill="#f4fafb" stroke="#00758f"/>
+        <text x="528" y="62" font-size="9.5" fill="#00758f">3 个参数</text>
+        <text x="528" y="90" font-size="16" font-weight="700" fill="#00566b">列 + 索引</text>
+        <text x="528" y="110" font-size="9.5" fill="#4e5564">某列及其索引</text>
+        <path d="M528 122 L650 122" stroke="#dceaf0" stroke-width="1"/>
+        <text x="528" y="142" font-size="8.5" font-family="Consolas,monospace" fill="#00566b">mysqlshow test book id</text>
+        <text x="528" y="160" font-size="9" fill="#4e5564">最后一个是模式</text>
+        <text x="528" y="176" font-size="9" fill="#4e5564">配 -k 看索引</text>
+
+        <text x="24" y="212" font-size="10.5" fill="#8a9099">没有「只看某库的某张表」这种跳级写法：想看到列，库名和表名都得给全。</text>
+        <text x="24" y="230" font-size="10.5" fill="#b06a00">第四层不会只返回「该列」，它是按模式过滤列清单；只有配 -k 才切到索引视图。</text>
+      </svg>
+      <figcaption><b>图 2</b>四层下钻。给到哪层停在哪层，不能跳级，也不会自动展开下一层。</figcaption>
+    </figure>
+
+    <table>
+      <thead>
+        <tr><th>写法</th><th>看到什么</th><th>等价的 SQL</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>mysqlshow</code></td><td>库名列表，单列</td><td><code>SHOW DATABASES</code></td></tr>
+        <tr><td><code>mysqlshow test</code></td><td>库里的表名，单列</td><td><code>SHOW TABLES FROM test</code></td></tr>
+        <tr><td><code>mysqlshow test book</code></td><td>9 列：Field / Type / Collation / Null / Key / Default / Extra / Privileges / Comment</td><td><code>SHOW FULL COLUMNS FROM test.book</code></td></tr>
+        <tr><td><code>mysqlshow test book id</code></td><td>只列出匹配 <code>id</code> 的列</td><td><code>SHOW FULL COLUMNS ... LIKE 'id'</code></td></tr>
+        <tr><td><code>mysqlshow test book id -k</code></td><td>该列上的索引</td><td><code>SHOW INDEX ... WHERE Column_name LIKE 'id'</code></td></tr>
+      </tbody>
+    </table>
+
+    <div class="note plain">
+      <b>第二列那 9 个字段值得看一眼</b>
+      <p>它们不是 <code>mysqlshow</code> 自己算的，是 <code>SHOW FULL COLUMNS</code> 的原始输出。注意最后一列 <code>Privileges</code>——它会写着 <code>select,insert,update,references</code> 这种<strong>你在这个列上拥有的权限</strong>。这一列在 <code>DESC</code> 里是看不到的，因为 <code>DESC</code> 用的是 <code>SHOW COLUMNS</code>（非 FULL）。</p>
+    </div>
+
+    <h2 id="s3">3. 截图给的两个选项</h2>
+
+    <p>截图只列了 <code>--count</code> 和 <code>-i</code>，这两个确实是最常用的。但它们的<strong>取数方式完全不同</strong>，这是这一节最要紧的一点。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 680 236" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <text x="340" y="20" text-anchor="middle" font-size="11.5" fill="#8a9099">同一张表，两个选项走两条完全不同的取数路径</text>
+
+        <rect x="16" y="38" width="318" height="164" rx="8" fill="#ffffff" stroke="#e4e7ec"/>
+        <rect x="16" y="38" width="318" height="32" rx="8" fill="#e6f3f6"/>
+        <rect x="16" y="60" width="318" height="10" fill="#e6f3f6"/>
+        <text x="30" y="59" font-size="12" font-family="Consolas,monospace" font-weight="700" fill="#00566b">--count</text>
+        <text x="96" y="59" font-size="10" fill="#4e5564">多一列行数，真数出来的</text>
+
+        <text x="30" y="96" font-size="10" fill="#8a9099">打印出来的样子</text>
+        <text x="30" y="116" font-size="10" font-family="Consolas,monospace" fill="#1f2329">Database: test   Table: book</text>
+        <text x="30" y="132" font-size="10" font-family="Consolas,monospace" fill="#1f2329">Rows: 3</text>
+        <text x="30" y="148" font-size="10" font-family="Consolas,monospace" fill="#8a9099">（后面照常列字段）</text>
+
+        <path d="M30 158 L320 158" stroke="#eef1f5" stroke-width="1"/>
+        <text x="30" y="174" font-size="9.5" fill="#4e5564">背后是 <tspan font-family="Consolas,monospace">SELECT COUNT(*) FROM test.book</tspan></text>
+        <text x="30" y="192" font-size="9.5" fill="#c0392b">代价：真的扫一遍，千万行表是分钟级</text>
+
+        <rect x="346" y="38" width="318" height="164" rx="8" fill="#ffffff" stroke="#f0d9b0"/>
+        <rect x="346" y="38" width="318" height="32" rx="8" fill="#fdf3e3"/>
+        <rect x="346" y="60" width="318" height="10" fill="#fdf3e3"/>
+        <text x="360" y="59" font-size="12" font-family="Consolas,monospace" font-weight="700" fill="#b06a00">-i / --status</text>
+        <text x="462" y="59" font-size="10" fill="#8a6535">整行表状态，19 列</text>
+
+        <text x="360" y="96" font-size="10" fill="#8a9099">打印出来的样子</text>
+        <text x="360" y="116" font-size="10" font-family="Consolas,monospace" fill="#1f2329">Engine: InnoDB   Rows: 4079</text>
+        <text x="360" y="132" font-size="10" font-family="Consolas,monospace" fill="#1f2329">Data_length: 421888 ...</text>
+        <text x="360" y="148" font-size="10" font-family="Consolas,monospace" fill="#8a9099">（CREATE_TIME、COLLATION 等）</text>
+
+        <path d="M360 158 L650 158" stroke="#f5e7cf" stroke-width="1"/>
+        <text x="360" y="174" font-size="9.5" fill="#4e5564">背后是 <tspan font-family="Consolas,monospace">SHOW TABLE STATUS</tspan></text>
+        <text x="360" y="192" font-size="9.5" fill="#1a7f4b">代价：读统计，毫秒级；但 InnoDB 的行数是估算</text>
+      </svg>
+      <figcaption><b>图 3</b>一个精确但慢，一个快但只是估算。<code>-i</code> 也打 <code>Rows:</code>，那个数字和 <code>--count</code> 的<strong>不是同一回事</strong>。</figcaption>
+    </figure>
+
+    <table>
+      <thead>
+        <tr><th>选项</th><th>短形式</th><th>背后发的语句</th><th>说明</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>--count</code></td><td>无</td>
+          <td>每张表一次 <code>SELECT COUNT(*)</code>，库级再把各表加起来</td>
+          <td>输出多出 <code>Rows</code> / <code>Total Rows</code> 列</td>
+        </tr>
+        <tr>
+          <td><code>--status</code></td><td><code>-i</code></td>
+          <td><code>SHOW TABLE STATUS</code></td>
+          <td>引擎、行数估算、数据与索引大小、创建/更新时间</td>
+        </tr>
+        <tr>
+          <td><code>--keys</code></td><td><code>-k</code></td>
+          <td><code>SHOW INDEX</code></td>
+          <td>表上的索引；给了 <code>col_name</code> 就只列该列的</td>
+        </tr>
+        <tr>
+          <td><code>--show-table-type</code></td><td><code>-t</code></td>
+          <td><code>SHOW FULL TABLES</code></td>
+          <td>多一列 Type：<code>BASE TABLE</code> 或 <code>VIEW</code></td>
+        </tr>
+        <tr>
+          <td><code>--verbose</code></td><td><code>-v</code></td>
+          <td>—</td>
+          <td>可叠加，把连接过程也打出来，排查连不上时有用</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="note warn">
+      <b><code>--count</code> 没有短选项</b>
+      <p>官方选项表里它只有长形式，写成 <code>-c</code> 会直接报 <code>unknown option</code>。这一点和 <code>-i</code>、<code>-k</code>、<code>-t</code> 不一样，很容易顺手写错。</p>
+    </div>
+
+    <h2 id="s4">4. --count 的真实代价</h2>
+
+    <p>截图说「数据库及表的统计信息（数据库，表均可以不指定）」，这句话本身没错。但「不指定库」时它做的事情被这句话盖住了：<strong>它会把实例里每个库的每张表都 <code>COUNT(*)</code> 一遍</strong>。</p>
+
+    <p>官方文档对 <code>--count</code> 只有一句说明，最后半句是关键：「Show the number of rows per table. <strong>This can be slow for non-MyISAM tables.</strong>」——MyISAM 存了精确行数，所以快；InnoDB 没有，只能真数。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 680 252" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <text x="340" y="20" text-anchor="middle" font-size="11.5" fill="#8a9099">不带库名时，一个都跑不掉：连系统库也照数</text>
+
+        <rect x="16" y="34" width="648" height="86" rx="8" fill="#fbfcfd" stroke="#e4e7ec" stroke-dasharray="5 3"/>
+        <text x="28" y="52" font-size="10.5" fill="#8a9099">一个 mysqld 实例里所有可见的库</text>
+
+        <rect x="28" y="60" width="142" height="48" rx="6" fill="#ffffff" stroke="#e4e7ec"/>
+        <text x="40" y="80" font-size="9.5" font-family="Consolas,monospace" fill="#1f2329">mysql</text>
+        <text x="40" y="98" font-size="9" fill="#8a9099">37 张系统表</text>
+
+        <rect x="190" y="60" width="142" height="48" rx="6" fill="#ffffff" stroke="#e4e7ec"/>
+        <text x="202" y="80" font-size="9.5" font-family="Consolas,monospace" fill="#1f2329">information_schema</text>
+        <text x="202" y="98" font-size="9" fill="#8a9099">79 张元数据表</text>
+
+        <rect x="352" y="60" width="142" height="48" rx="6" fill="#ffffff" stroke="#e4e7ec"/>
+        <text x="364" y="80" font-size="9.5" font-family="Consolas,monospace" fill="#1f2329">performance_schema</text>
+        <text x="364" y="98" font-size="9" fill="#8a9099">87 张内存表</text>
+
+        <rect x="514" y="60" width="136" height="48" rx="6" fill="#ffffff" stroke="#e4e7ec"/>
+        <text x="526" y="80" font-size="9.5" font-family="Consolas,monospace" fill="#1f2329">sys</text>
+        <text x="526" y="98" font-size="9" fill="#8a9099">101 个视图</text>
+
+        <path d="M340 122 L340 136" stroke="#c0392b" stroke-width="1.5"/>
+        <path d="M335.5 131 L340 138 L344.5 131 Z" fill="#c0392b"/>
+
+        <rect x="16" y="140" width="648" height="58" rx="8" fill="#fdecea" stroke="#f0c4bd"/>
+        <text x="32" y="164" font-size="13" font-weight="700" fill="#c0392b">= 304 次 COUNT(*)，每张表一次</text>
+        <text x="32" y="184" font-size="10" fill="#8a6535">视图也会被真查一遍（它内部把视图展开成对基表的查询），不是数「视图有多少条定义」</text>
+
+        <text x="24" y="220" font-size="10.5" fill="#4e5564">已经只算四个系统库了；再带上业务库，表数轻易过千，每张表都是一次独立查询。</text>
+        <text x="24" y="240" font-size="10.5" fill="#b06a00">所以这个命令适合在自己机器的练习库上跑，不适合在忙着接业务的生产实例上随手敲。</text>
+      </svg>
+      <figcaption><b>图 4</b>「不指定库」等于「全都数一遍」。系统库、视图、大表一个都不跳过。</figcaption>
+    </figure>
+
+    <p>它的输出有三种形态，取决于你给到第几层。这个差异也值得记，因为很多人以为「<code>--count</code> 就是多一列行数」：</p>
+
+    <pre><span class="label">shell</span><code><span class="c"># ① 不给库名：一张库级汇总表</span>
+mysqlshow -uroot -p2143 --count
++--------------------+--------+------------+
+| Databases          | Tables | Total Rows |
++--------------------+--------+------------+
+| information_schema |     79 |      24620 |
+| mysql              |     37 |       5343 |
+| performance_schema |     87 |     262769 |
+| sys                |    101 |       7477 |
+| test               |      2 |          3 |
++--------------------+--------+------------+
+
+<span class="c"># ② 给库名：一张表级汇总表（多出 Columns 列）</span>
+mysqlshow -uroot -p2143 test --count
+Database: test
++-------+---------+------------+
+| Tables | Columns | Total Rows |
++-------+---------+------------+
+| book  |       3 |          2 |
+| emp   |       8 |         17 |
++-------+---------+------------+
+
+<span class="c"># ③ 给到表：头顶多一行 Rows，下面照常列字段</span>
+mysqlshow -uroot -p2143 test book --count
+Database: test
+Table: book
+Rows: 2
++-------+-------------+------+-----+---------+----------------+
+| Field | Type        | Null | Key | Default | Extra          |
++-------+-------------+------+-----+---------+----------------+
+| id    | int         | NO   | PRI | NULL    | auto_increment |
+| name  | varchar(50) | YES  |     | NULL    |                |
++-------+-------------+------+-----+---------+----------------+</code></pre>
+
+    <div class="note tip">
+      <b>只想估个规模，用 <code>-i</code> 就够了</b>
+      <p><code>mysqlshow -uroot -p2143 test -i</code> 走的是 <code>SHOW TABLE STATUS</code>，毫秒级返回。它的 <code>Rows</code> 对 InnoDB 是<strong>估算值</strong>，官方说可能和实际差 40%–50%，但看「哪张表最大」这种相对比较完全够用。要精确数字，再到具体表上单独 <code>COUNT(*)</code>。</p>
+    </div>
+
+    <h2 id="s5">5. 你看到的不是全部</h2>
+
+    <p>官方文档里有一句很容易被跳过的话：「The output displays only the names of those databases, tables, or columns for which you have some privileges.」</p>
+
+    <p>意思是<strong>它输出的是「你能看到的那部分」，不是「服务器上存在的」</strong>。普通账号敲 <code>mysqlshow</code>，很可能只列出两三个库，看起来像是刚装好的空实例，其实剩下的库它只是不显示。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 680 222" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <text x="340" y="20" text-anchor="middle" font-size="11.5" fill="#8a9099">同一个实例，两个账号看到的「库」数量可以完全不同</text>
+
+        <text x="24" y="44" font-size="10.5" fill="#4e5564">实例里实际存在：12 个库</text>
+        <rect x="20" y="52" width="60" height="30" rx="4" fill="#e6f3f6" stroke="#00758f"/>
+        <rect x="88" y="52" width="60" height="30" rx="4" fill="#e6f3f6" stroke="#00758f"/>
+        <rect x="156" y="52" width="60" height="30" rx="4" fill="#e6f3f6" stroke="#00758f"/>
+        <rect x="224" y="52" width="60" height="30" rx="4" fill="#e6f3f6" stroke="#00758f"/>
+        <rect x="20" y="90" width="60" height="30" rx="4" fill="#e6f3f6" stroke="#00758f"/>
+        <rect x="88" y="90" width="60" height="30" rx="4" fill="#e6f3f6" stroke="#00758f"/>
+        <rect x="156" y="90" width="60" height="30" rx="4" fill="#e6f3f6" stroke="#00758f"/>
+        <rect x="224" y="90" width="60" height="30" rx="4" fill="#e6f3f6" stroke="#00758f"/>
+        <rect x="20" y="128" width="60" height="30" rx="4" fill="#e6f3f6" stroke="#00758f"/>
+        <rect x="88" y="128" width="60" height="30" rx="4" fill="#e6f3f6" stroke="#00758f"/>
+        <rect x="156" y="128" width="60" height="30" rx="4" fill="#e6f3f6" stroke="#00758f"/>
+        <rect x="224" y="128" width="60" height="30" rx="4" fill="#e6f3f6" stroke="#00758f"/>
+
+        <path d="M296 105 L338 105" stroke="#00758f" stroke-width="1.4"/>
+        <path d="M334 101.5 L341 105 L334 108.5 Z" fill="#00758f"/>
+        <text x="292" y="94" text-anchor="end" font-size="9.5" fill="#8a9099">权限过滤</text>
+
+        <text x="348" y="44" font-size="10.5" fill="#c0392b">普通账号看到：3 个库</text>
+        <rect x="348" y="52" width="60" height="30" rx="4" fill="#e6f3f6" stroke="#00758f"/>
+        <rect x="416" y="52" width="60" height="30" rx="4" fill="#f7f9fa" stroke="#e4e7ec" stroke-dasharray="3 2"/>
+        <rect x="484" y="52" width="60" height="30" rx="4" fill="#f7f9fa" stroke="#e4e7ec" stroke-dasharray="3 2"/>
+        <rect x="552" y="52" width="60" height="30" rx="4" fill="#f7f9fa" stroke="#e4e7ec" stroke-dasharray="3 2"/>
+        <rect x="348" y="90" width="60" height="30" rx="4" fill="#f7f9fa" stroke="#e4e7ec" stroke-dasharray="3 2"/>
+        <rect x="416" y="90" width="60" height="30" rx="4" fill="#e6f3f6" stroke="#00758f"/>
+        <rect x="484" y="90" width="60" height="30" rx="4" fill="#f7f9fa" stroke="#e4e7ec" stroke-dasharray="3 2"/>
+        <rect x="552" y="90" width="60" height="30" rx="4" fill="#f7f9fa" stroke="#e4e7ec" stroke-dasharray="3 2"/>
+        <rect x="348" y="128" width="60" height="30" rx="4" fill="#f7f9fa" stroke="#e4e7ec" stroke-dasharray="3 2"/>
+        <rect x="416" y="128" width="60" height="30" rx="4" fill="#f7f9fa" stroke="#e4e7ec" stroke-dasharray="3 2"/>
+        <rect x="484" y="128" width="60" height="30" rx="4" fill="#f7f9fa" stroke="#e4e7ec" stroke-dasharray="3 2"/>
+        <rect x="552" y="128" width="60" height="30" rx="4" fill="#e6f3f6" stroke="#00758f"/>
+
+        <text x="20" y="186" font-size="10" fill="#8a9099">实心 = 有权限、会显示；虚线 = 存在但你无权访问，<tspan fill="#c0392b">列表里根本不出现</tspan></text>
+        <text x="20" y="208" font-size="10.5" fill="#b06a00">所以别拿它清点「这台机器上有几个库」——尤其在权限收紧的账号下，它会静默少报。</text>
+      </svg>
+      <figcaption><b>图 5</b>输出是权限过滤后的结果，不是清单。这条对 <code>--count</code> 的库级汇总同样成立：没权限的库不会被计入。</figcaption>
+    </figure>
+
+    <h2 id="s6">6. 只有最后一个参数算模式</h2>
+
+    <p>这是个很细、但一定会碰到的规则，<strong>官方文档没有单独强调，只在通配符那段话里带出来</strong>：位置参数里<strong>只有最后一个会被当成 LIKE 模式</strong>，前面的都按字面名查。</p>
+
+    <p>配套的行为是：<code>*</code> 和 <code>?</code> 会被转成 SQL 的 <code>%</code> 和 <code>_</code>。也就是说，<em>下划线在你写模式的那个位置上是通配符</em>，不是字面下划线。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 680 250" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <text x="340" y="20" text-anchor="middle" font-size="11.5" fill="#8a9099">同一串命令里，最后那个参数的身份和前面不一样</text>
+
+        <rect x="24" y="36" width="86" height="34" rx="6" fill="#f7f9fa" stroke="#dfe3e9"/>
+        <text x="67" y="58" text-anchor="middle" font-size="11" font-family="Consolas,monospace" fill="#4e5564">mysqlshow</text>
+        <rect x="118" y="36" width="62" height="34" rx="6" fill="#e6f3f6" stroke="#00758f"/>
+        <text x="149" y="58" text-anchor="middle" font-size="11" font-family="Consolas,monospace" fill="#00566b">my_db</text>
+        <rect x="188" y="36" width="90" height="34" rx="6" fill="#fdf3e3" stroke="#f0d9b0"/>
+        <text x="233" y="58" text-anchor="middle" font-size="11" font-family="Consolas,monospace" fill="#b06a00">my_table</text>
+
+        <path d="M149 70 L149 96" stroke="#00758f" stroke-width="1.3"/>
+        <path d="M145 91 L149 98 L153 91 Z" fill="#00758f"/>
+        <path d="M233 70 L233 96" stroke="#f29111" stroke-width="1.3"/>
+        <path d="M229 91 L233 98 L237 91 Z" fill="#f29111"/>
+
+        <rect x="24" y="100" width="290" height="56" rx="8" fill="#f4fafb" stroke="#b9dde5"/>
+        <text x="38" y="122" font-size="11" font-weight="700" fill="#00566b">前面的参数：字面名</text>
+        <text x="38" y="142" font-size="9.5" fill="#4e5564">原样拼进 SHOW TABLES FROM my_db</text>
+
+        <rect x="330" y="100" width="326" height="56" rx="8" fill="#fdf3e3" stroke="#f0d9b0"/>
+        <text x="344" y="122" font-size="11" font-weight="700" fill="#b06a00">最后一个参数：LIKE 模式</text>
+        <text x="344" y="142" font-size="9.5" fill="#8a6535">my_table 里的 _ 变成「任意一个字符」，还会匹配 my1table</text>
+
+        <rect x="24" y="172" width="632" height="44" rx="8" fill="#ffffff" stroke="#e4e7ec"/>
+        <text x="38" y="192" font-size="10.5" fill="#1f2329">表名恰好带下划线、又需要看它的列时：</text>
+        <text x="38" y="208" font-size="10" font-family="Consolas,monospace" fill="#00758f">mysqlshow -uroot -p2143 my_db my_table %</text>
+        <text x="330" y="192" font-size="9.5" fill="#4e5564">← 末尾补一个 % 当模式</text>
+        <text x="330" y="208" font-size="9.5" fill="#8a9099">my_table 退回字面名</text>
+
+        <text x="24" y="238" font-size="10" fill="#8a9099">在 Windows cmd 里 * 和 ? 不会被 shell 抢先展开；bash 里要先加引号，否则可能被当前目录的文件名吃掉。</text>
+      </svg>
+      <figcaption><b>图 6</b>末尾补一个 <code>%</code> 是官方文档给的正解：多给一个参数，表名就退回字面位置，<code>%</code> 接管模式。</figcaption>
+    </figure>
+
+    <p>顺带记一个 shell 层的坑：在 bash 里写 <code>mysqlshow test t*</code>，<code>t*</code> 会先被 shell 当文件名展开（当前目录有匹配文件时就会变成一串文件名），根本到不了 <code>mysqlshow</code>。加引号即可：</p>
+
+    <pre><span class="label">shell</span><code><span class="c"># bash 里要引号，Windows cmd 里不用</span>
+mysqlshow -uroot -p2143 test 't*'
+
+<span class="c"># 下划线转义：Unix shell 下写两个反斜杠更保险</span>
+mysqlshow -uroot -p2143 'my\_db'
+
+<span class="c"># 官方给的兜底写法：末尾补 %，让前一个参数退回字面名</span>
+mysqlshow -uroot -p2143 my_db my_table %</code></pre>
+
+    <h2 id="s7">7. 什么时候用它，什么时候别用</h2>
+
+    <p>它最大的好处是「一条命令、不用进会话」；最大的局限也在同一处——<strong>输出是画出来的 ASCII 表格，不是结果集</strong>。要拿去做统计或进脚本，它并不合适。</p>
+
+    <table>
+      <thead>
+        <tr><th></th><th><code>mysqlshow</code></th><th>进会话敲 <code>SHOW</code></th><th>查 <code>information_schema</code></th></tr>
+      </thead>
+      <tbody>
+        <tr><td>要不要登录会话</td><td>不要，一条命令</td><td>要</td><td>要</td></tr>
+        <tr><td>输出形态</td><td>ASCII 表格，给人看</td><td>结果集</td><td>结果集</td></tr>
+        <tr><td>能否 <code>WHERE</code> / 聚合 / JOIN</td><td>不能</td><td>不能</td><td>能</td></tr>
+        <tr><td>塞进脚本</td><td>得 <code>grep</code> / <code>awk</code> 硬解</td><td>不方便</td><td>可直接用</td></tr>
+        <tr><td>典型场景</td><td>临时确认一下结构</td><td>会话里随手看</td><td>巡检、报表、统计大表</td></tr>
+      </tbody>
+    </table>
+
+    <pre><span class="label">sql</span><code><span class="c">-- 想按大小排、按行数排，mysqlshow 做不到，得回到 SQL</span>
+<span class="k">SELECT</span> table_name,
+       table_rows,
+       <span class="f">ROUND</span>(data_length <span class="k">/</span> <span class="n">1024</span> <span class="k">/</span> <span class="n">1024</span>, <span class="n">1</span>) <span class="k">AS</span> data_mb,
+       engine
+<span class="k">FROM</span> <span class="f">information_schema.tables</span>
+<span class="k">WHERE</span> table_schema <span class="k">=</span> <span class="s">'test'</span>
+<span class="k">ORDER BY</span> data_length <span class="k">DESC</span>;</code></pre>
+
+    <table>
+      <thead>
+        <tr><th>现象</th><th>原因</th><th>怎么做</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>报 <code>unknown option '-c'</code></td>
+          <td><code>--count</code> 没有短形式</td>
+          <td>写全 <code>--count</code></td>
+        </tr>
+        <tr>
+          <td>报 <code>Unknown database</code></td>
+          <td>库名写错，或这个账号连这个库都看不到</td>
+          <td>先不带参数跑一次，看它到底能看到哪些库</td>
+        </tr>
+        <tr>
+          <td>输出比预期少很多库</td>
+          <td>输出经过权限过滤</td>
+          <td>换高权限账号复核，别据此判断「服务器上只有这些」</td>
+        </tr>
+        <tr>
+          <td>列出了一堆没想匹配的表</td>
+          <td>最后一个参数被当模式，里面的 <code>_</code> 是通配符</td>
+          <td>末尾补一个 <code>%</code>，或用引号加反斜杠转义</td>
+        </tr>
+        <tr>
+          <td>命令卡住很久没返回</td>
+          <td><code>--count</code> 在逐表 <code>COUNT(*)</code>，碰上大表就在扫</td>
+          <td><kbd>Ctrl</kbd>+<kbd>C</kbd> 中断；要估算改用 <code>-i</code></td>
+        </tr>
+        <tr>
+          <td><code>Rows</code> 和实际条数对不上</td>
+          <td><code>-i</code> 的 <code>Rows</code> 是 InnoDB 统计估算</td>
+          <td>要精确就 <code>SELECT COUNT(*)</code>；或直接用 <code>--count</code></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="note tip">
+      <b>这一页要带走的三句</b>
+      <p>1. 它<strong>只是 SHOW 语句的一层壳</strong>，四个位置参数是下钻路径（库 → 表 → 列 → 索引），给到哪层停在哪层。<br>
+      2. <code>--count</code> 是<strong>真的逐表数</strong>，不带库名就是整实例扫一遍，连系统库和视图都不放过；只想估规模用 <code>-i</code>。<br>
+      3. 输出<strong>只包含你有权限的对象</strong>，且<strong>只有最后一个参数算模式</strong>——这两条决定了它不能当清点工具用。</p>
+    </div>
+
+    <section class="quiz">
+      <p class="quiz-head">自测三问<span>先自己答一遍，再点开对答案</span></p>
+      <details>
+        <summary><span class="qno">Q1</span><span class="ask"><code>mysqlshow --count</code> 和 <code>mysqlshow -i</code> 打出来的行数差很多，哪个是真的？</span><span class="caret" aria-hidden="true"></span></summary>
+        <div class="ans"><p><code>--count</code> 是真的 <code>SELECT COUNT(*)</code>；<code>-i</code> 走 SHOW TABLE STATUS，InnoDB 返回采样估算，差 40%~50% 都正常。要精确只能 COUNT。</p></div>
+      </details>
+      <details>
+        <summary><span class="qno">Q2</span><span class="ask"><code>mysqlshow itcast 'user_log'</code> 明明有这张表却匹配不到，为什么？</span><span class="caret" aria-hidden="true"></span></summary>
+        <div class="ans"><p>只有<b>最后一个位置参数</b>会被当成 LIKE 模式，而 <code>_</code> 在 LIKE 里是「任意一个字符」。写成 <code>'user\_log'</code> 转义，或按官方建议在末尾补 <code>%</code>：<code>'user_log%'</code>，让表名退回字面匹配。</p></div>
+      </details>
+      <details>
+        <summary><span class="qno">Q3</span><span class="ask">想用它统计「这台实例一共多少张表」，结果少了一大半，为什么？</span><span class="caret" aria-hidden="true"></span></summary>
+        <div class="ans"><p>输出按当前账号的权限过滤，没权限的库和表根本不会出现。要全量统计，得查 <code>information_schema.TABLES</code>。</p></div>
+      </details>
+    </section>
+    <div class="footer">
+      <a href="07-04-mysqlbinlog.html">← 7.2.3 mysqlbinlog</a> · <a href="07-06-mysqldump.html">7.2.5 mysqldump →</a> · <a href="07-MySQL管理.html">MySQL 管理</a> · <a href="../index.html">总目录</a>
+    </div>
+
+  </main>
+</div>
+</body>
+</html>

@@ -11,12 +11,18 @@ const postsCollection = defineCollection({
 		tags: z.array(z.string()).optional().default([]),
 		category: z.string().optional().nullable().default(""),
 		lang: z.string().optional().default(""),
+		format: z.enum(["markdown", "html", "pdf", "file"]).default("markdown"),
+		target: z.string().regex(/^\/(?!\/)[^\\?#]*$/, "使用站内绝对路径，例如 /mysql/").optional(),
 
 		/* For internal use */
 		prevTitle: z.string().default(""),
 		prevSlug: z.string().default(""),
 		nextTitle: z.string().default(""),
 		nextSlug: z.string().default(""),
+	}).superRefine((data, ctx) => {
+		if (data.format !== "markdown" && !data.target) {
+			ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["target"], message: "非 Markdown 笔记必须填写 target" });
+		}
 	}),
 });
 const specCollection = defineCollection({

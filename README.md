@@ -1,6 +1,8 @@
 # 逐光未尽 · 个人展示与笔记
 
-基于 [Fuwari](https://github.com/saicaca/fuwari) 的个人网站：展示首页、项目集、Markdown 笔记、中文全文搜索、明暗主题，静态部署到 GitHub Pages。
+基于 [Fuwari](https://github.com/saicaca/fuwari) 的个人网站：展示首页、项目集、Markdown 笔记与 HTML 专题、中文全文搜索、明暗主题，静态部署到 GitHub Pages。
+
+HTML 专题及 PDF、附件的接入方式见 [发布与更新说明](docs/publishing-html-notes.md)。
 
 ## 本地运行
 

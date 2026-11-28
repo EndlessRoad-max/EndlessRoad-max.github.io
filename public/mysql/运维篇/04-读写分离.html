@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>04 读写分离：一主一从、双主双从 · 运维篇 · MySQL 笔记</title>
+<link rel="stylesheet" href="../assets/style.css"><link rel="stylesheet" href="../assets/replication.css"><link rel="stylesheet" href="../assets/sharding.css"><link rel="stylesheet" href="../assets/readwrite.css">
+<script src="../assets/replication.js" defer></script>
+</head>
+<body class="replication sharding readwrite"><div class="layout">
+
+<nav class="sidebar" aria-label="本页目录">
+  <p class="side-title">本页目录</p>
+  <a href="#what">1. 它解决什么</a>
+  <a href="#one">2. 一主一从：只改三处</a>
+  <a href="#dual">3. 双主双从：多两台的理由</a>
+  <a href="#cnf">4. 四台的 my.cnf</a>
+  <a href="#link">5. 接上复制：四条链路</a>
+  <a href="#xml2">6. 双主双从的 XML</a>
+  <a href="#verify">7. 验三件事</a>
+  <a href="#traps">8. 五个坑</a>
+  <a href="#quiz">自测三问</a>
+  <p class="side-title" style="margin-top:22px">当前位置</p>
+  <ul class="nav-tree">
+    <li><a href="../index.html" class="root">↑ 总目录</a>
+      <ul>
+        <li><a href="01-日志.html">01 日志</a></li>
+        <li><a href="02-主从复制.html">02 主从复制</a></li>
+        <li><a href="03-分库分表.html">03 分库分表</a>
+          <ul>
+            <li><a href="03-01-MyCat实现.html">03-01 MyCat 实现</a></li>
+          </ul>
+        </li>
+        <li><span class="current">04 读写分离</span></li>
+      </ul>
+    </li>
+  </ul>
+</nav>
+
+<main class="main">
+<div class="crumb"><a href="../index.html">总目录</a> / 运维篇 / 04</div>
+<h1><span class="chapter-no">04</span>读写分离</h1>
+<p class="lede">一行代码不改，让写走主库、读走从库。这一页按课程的顺序走：先一主一从改三处配置跑通，再上双主双从——多两台机器、四台 <code>my.cnf</code>、四条复制链路，最后验「主库停掉，写还在」。</p>
+<div class="meta"><span>环境：MySQL 8.0 + MyCat 1.6</span><span>五台：MyCat .210 · M1 .211 · S1 .212 · M2 .213 · S2 .214</span><span>整理：2026-11-27</span></div>
+
+<section class="quick">
+  <p class="quick-head">一屏速记<span>合上笔记，这 4 条要能自己说出来</span></p>
+  <ol>
+    <li><b>读写分离只决定「SQL 发给谁」，它不复制数据。</b>从库上的数是主从复制搬过去的，复制没通，切得再准也只是把读发给一个空库。</li>
+    <li><b>一主一从只改 <code>schema.xml</code> 三处：</b><code>schema → dataNode → dataHost</code>。<b>最后</b>把 <code>readHost</code> 塞进 <code>writeHost</code> 里面。三个名字必须首尾相接。</li>
+    <li><b><code>balance</code> 决定读怎么分：</b><code>0</code> 读也走主库，<code>1</code> 从库加<b>备用主库</b>都读，<code>2</code> 主从随机，<code>3</code> 只读从库。<b>一主一从下 <code>1</code> 和 <code>3</code> 结果一样，差别要到双主双从才显出来。</b></li>
+    <li><b>双主双从买的是「写」的高可用：</b><code>writeType=0</code> 写第一台、挂了写第二台，<code>switchType=1</code> 才自动切。<b>切过去不会自己切回来。</b></li>
+  </ol>
+</section>
+
+<h2 id="what">1. 它解决什么</h2>
+<p>读写分离把读和写分到不同服务器：主库只接写，从库接读。多数业务读远多于写，读分出去以后，主库的锁竞争、缓冲池和 CPU 都松下来了。</p>
+<p>但因果要说清：<b>读写分离本身不搬数据</b>。从库上的数据是主从复制同步过去的（02 章）。复制没配好，MyCat 分发得再准，读的也是一份旧数据或空库。</p>
+
+<figure class="fig hero">
+  <a href="../assets/readwrite/01-overview.png" data-diagram><img src="../assets/readwrite/01-overview.png" width="1708" height="758" alt="应用程序连接 MyCat，MyCat 通过 writeHost 把写请求发给 mysql(m) 主库，通过 readHost 把读请求发给 mysql(s) 从库；主库再用 binlog 把变更复制给从库。" loading="lazy"></a>
+  <figcaption><b>图 1</b>课程里的分工：应用只连 MyCat，<code>insert / update / delete</code> 走 <code>writeHost</code>，<code>select</code> 走 <code>readHost</code>，两台之间那条线是已经配好的主从复制。<span class="caption-action">点击放大</span></figcaption>
+</figure>
+
+<p>MyCat 的判据是<b>语句类型</b>，不是业务语义。它看这条 SQL 是不是 <code>select</code>，是就发读节点，不是就发写节点。所以「这条查询必须读到最新值」这种需求，别指望它猜得到。</p>
+
+<div class="note warn"><b>三条前提，缺一条就会踩坑</b>
+<p><b>一、复制是通的。</b><code>SHOW REPLICA STATUS</code> 两个 <code>Yes</code>，<code>Seconds_Behind_Source</code> 在你能接受的范围内。</p>
+<p><b>二、业务能接受读延迟。</b>复制是异步的：主库提交完就返回，从库可能晚几十毫秒到几秒。刚写完立刻查，读到旧值是正常现象，不是 bug。</p>
+<p><b>三、别指望事务内的读也走主库。</b>MyCat 按单条语句分发，不认事务边界。一个事务里先 <code>update</code> 再 <code>select</code>，那条 <code>select</code> 照样可能被发到从库。</p>
+</div>
+
+<h2 id="one">2. 一主一从：只改三处</h2>
+<p>一台主库 .211 写、一台从库 .212 读。全部改动都在 <code>schema.xml</code>，三个名字把三段配置串起来，改完 <code>reload</code> 就生效。</p>
+
+<pre data-copy><code>&lt;schema name="ITCAST_RW" checkSQLschema="true" sqlMaxLimit="100"
+        dataNode="dn7" /&gt;                        &lt;!-- ① --&gt;
+
+&lt;dataNode name="dn7" dataHost="dhost7" database="itcast" /&gt;    &lt;!-- ② --&gt;
+
+&lt;dataHost name="dhost7" maxCon="1000" minCon="10"
+          balance="1" writeType="0" switchType="1"
+          dbType="mysql" dbDriver="jdbc"&gt;
+  &lt;heartbeat&gt;select user()&lt;/heartbeat&gt;
+
+  &lt;writeHost host="master"
+             url="jdbc:mysql://192.168.200.211:3306?useSSL=false&amp;amp;serverTimezone=Asia/Shanghai"
+             user="root" password="1234"&gt;
+    &lt;readHost host="slave"                     &lt;!-- ③ --&gt;
+              url="jdbc:mysql://192.168.200.212:3306?useSSL=false&amp;amp;serverTimezone=Asia/Shanghai"
+              user="root" password="1234" /&gt;
+  &lt;/writeHost&gt;
+&lt;/dataHost&gt;</code></pre>
+
+<p>课程原图上那几个红箭头标的就是这三个值要对应：</p>
+
+<figure class="fig xmlmap">
+  <a href="../assets/readwrite/02-xml-map.png" data-diagram><img src="../assets/readwrite/02-xml-map.png" width="1739" height="755" alt="schema 的 dataNode 值等于 dataNode 的 name，dataNode 的 dataHost 值等于 dataHost 的 name，dataHost 下 writeHost 嵌套 readHost；下方是 server.xml 给用户授权的 schemas 列表。" loading="lazy"></a>
+  <figcaption><b>图 2</b>三处对应关系。红框之间那几条箭头就是「值必须相等」，写错一个字母，MyCat 启动直接报找不到节点。<span class="caption-action">点击放大</span></figcaption>
+</figure>
+
+<table>
+  <thead><tr><th style="width:34%">位置</th><th style="width:26%">写错会怎样</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td><b>①</b> 逻辑库 → 节点</td><td>启动失败</td><td><code>schema</code> 的 <code>dataNode</code> 必须等于 <code>dataNode</code> 的 <code>name</code>，<b>同一个字符串</b>。</td></tr>
+    <tr><td><b>②</b> 节点 → 主机</td><td>启动失败</td><td><code>dataNode</code> 的 <code>dataHost</code> 必须等于 <code>dataHost</code> 的 <code>name</code>。同一行里的 <code>database</code> 填<b>物理库名</b> <code>itcast</code>，不是逻辑库 <code>ITCAST_RW</code>。</td></tr>
+    <tr><td><b>③</b> 从库写在哪</td><td>从库不生效</td><td><code>readHost</code> 必须<b>嵌在 <code>writeHost</code> 内部</b>。写成并列的两个标签，MyCat 不报错，但读全压主库。</td></tr>
+    <tr><td><code>server.xml</code> 的 <code>schemas</code></td><td>登录后看不到库</td><td>用户能看见的逻辑库要在 <code>&lt;property name="schemas"&gt;ITCAST_RW&lt;/property&gt;</code> 里列出。</td></tr>
+  </tbody>
+</table>
+
+<h3><code>balance</code>：读到底发给谁</h3>
+<p>这是本页最该记牢的一个值。课程的四行表：</p>
+
+<table>
+  <thead><tr><th style="width:14%">取值</th><th>行为</th></tr></thead>
+  <tbody>
+    <tr><td><code>0</code></td><td>不开启读写分离，<b>所有读也发到当前可用的 <code>writeHost</code></b>。等于白配。</td></tr>
+    <tr><td><code>1</code></td><td>全部 <code>readHost</code> 与<b>备用的 <code>writeHost</code></b> 都参与 <code>select</code> 的负载均衡。主要给双主双从用。</td></tr>
+    <tr><td><code>2</code></td><td>读写都随机发到 <code>writeHost</code>、<code>readHost</code>。<b>写也会被发到从库</b>，实际很少用。</td></tr>
+    <tr><td><code>3</code></td><td>读请求随机分发到 <code>writeHost</code> 对应的 <code>readHost</code>，<b><code>writeHost</code> 不承担读压力</b>。</td></tr>
+  </tbody>
+</table>
+
+<div class="note warn"><b><code>1</code> 里的「备用 writeHost」，一主一从时并不存在</b>
+<p><code>1</code> 的完整语义是「全部 <code>readHost</code> <b>加备用 <code>writeHost</code></b> 参与 <code>select</code>」。一主一从只有一个 <code>writeHost</code>，而且它是正在用的那台、不是「备用」——所以主库不参与读，读全落在从库上，<b>填 <code>1</code> 没问题</b>。</p>
+<p>这也是一主一从下 <code>1</code> 和 <code>3</code> 看不出区别的原因：只有一个 <code>readHost</code> 时两种取值结果相同。差别要到第 6 节才出现——那时 M2 是「备用的 <code>writeHost</code>」，<code>1</code> 会让它一起分担读。</p>
+</div>
+
+<div class="note plain"><b>逻辑库名这一章换了，不影响做法</b>
+<p>分库分表那章的逻辑库叫 <code>DB01</code>，这一章课程用的是 <code>ITCAST_RW</code>、物理库 <code>itcast</code>。名字只是示例，改哪几处、怎么对应，两章完全一样。</p>
+</div>
+
+<h2 id="dual">3. 双主双从：多两台的理由</h2>
+<p>一主一从的死穴很直接：<b>主库一停，写全断</b>。MyCat 的 <code>switchType</code> 换的是同一个 <code>dataHost</code> 里的另一个 <code>writeHost</code>，只有一个 <code>writeHost</code> 时无处可切，只能等主库活过来。</p>
+<p>双主双从就是补这个洞：两台主库互为主备，M1 接写、M2 待命，各自再带一个从库分担读。M1 挂了，MyCat 把写切到 M2；M1 修好后从 M2 把数据追回来。</p>
+
+<figure class="fig topology">
+  <a href="../assets/readwrite/03-dual-arch.png" data-diagram><img src="../assets/readwrite/03-dual-arch.png" width="1623" height="750" alt="应用程序连 MyCat，MyCat 分两路：一路到 m1 与 s1，一路到 m2 与 s2；m1 与 m2 之间是双向复制，s1 复制 m1，s2 复制 m2。" loading="lazy"></a>
+  <figcaption><b>图 3</b>四条复制链路：<code>M1 → S1</code>、<code>M2 → S2</code>、<code>M1 ↔ M2</code> 双向。没有中间那条竖线，「切到 M2 再切回来」这条路就断了。<span class="caption-action">点击放大</span></figcaption>
+</figure>
+
+<p>五台机器的分工：</p>
+
+<div class="envtable">
+<table>
+  <thead><tr><th style="width:8%">#</th><th style="width:26%">IP</th><th style="width:18%">角色</th><th>装什么</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td><code>192.168.200.210</code></td><td>MyCat</td><td>MyCat 中间件 + 可选的一个 MySQL（课程里 .210 同时是第一台分片，本页用不到）</td></tr>
+    <tr><td>2</td><td><code>192.168.200.211</code></td><td><b>M1</b> 主</td><td>MySQL，默认接所有写</td></tr>
+    <tr><td>3</td><td><code>192.168.200.212</code></td><td><b>S1</b> 从</td><td>MySQL，复制 M1，分担读</td></tr>
+    <tr><td>4</td><td><code>192.168.200.213</code></td><td><b>M2</b> 备主</td><td>MySQL，M1 挂了接写；平时也参与读</td></tr>
+    <tr><td>5</td><td><code>192.168.200.214</code></td><td><b>S2</b> 从</td><td>MySQL，复制 M2，分担读</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>开工前把五台的防火墙关掉——复制和 MyCat 的连接都靠端口，开着防火墙调试会很痛苦：</p>
+<pre data-copy><code>systemctl stop firewalld
+systemctl disable firewalld</code></pre>
+
+<div class="note plain"><b>M2 不是「闲置的备机」</b>
+<p>架构图上 M2 标着「备」，但那是<b>写的备</b>。第 6 节配 <code>balance="1"</code> 之后，M2、S1、S2 三台都在接 <code>select</code>，只有 M1 被排除在读之外。<br>把它当「备用机器所以性能可以差一点」是常见的误判，它平时是干活的。</p>
+</div>
+
+<h2 id="cnf">4. 四台的 my.cnf</h2>
+<p>四台 MySQL 只加三类配置：唯一的 <code>server-id</code>、要同步的库、以及两台主库各自的 <code>log-slave-updates</code>。改完四台都重启。</p>
+
+<table>
+  <thead><tr><th style="width:14%">机器</th><th style="width:22%">IP</th><th style="width:15%"><code>server-id</code></th><th style="width:23%"><code>log-slave-updates</code></th><th>角色</th></tr></thead>
+  <tbody>
+    <tr><td><b>M1</b></td><td>.211</td><td><b>1</b></td><td><b>要</b></td><td>主，同时是 M2 的从</td></tr>
+    <tr><td><b>S1</b></td><td>.212</td><td><b>2</b></td><td>不要</td><td>M1 的从，只读</td></tr>
+    <tr><td><b>M2</b></td><td>.213</td><td><b>3</b></td><td><b>要</b></td><td>备主，同时是 M1 的从</td></tr>
+    <tr><td><b>S2</b></td><td>.214</td><td><b>4</b></td><td>不要</td><td>M2 的从，只读</td></tr>
+  </tbody>
+</table>
+
+<p>M1 的 <code>/etc/my.cnf</code>，在 <code>[mysqld]</code> 段里加：</p>
+<pre data-copy><code>[mysqld]
+# 集群内唯一，四台不能重
+server-id=1
+
+# 只同步这三个库
+binlog-do-db=db01
+binlog-do-db=db02
+binlog-do-db=db03
+
+# 作为从库收到的事件，也要写进自己的 binlog
+log-slave-updates</code></pre>
+
+<p>M2 把 <code>server-id</code> 改成 <code>3</code>，其余一样。S1、S2 只写 <code>server-id</code>（分别是 2 和 4），不需要后两项。</p>
+
+<div class="note tip"><b>为什么两台主库都要开 <code>log-slave-updates</code></b>
+<p>M2 从 M1 收到的事件，默认<b>只落到自己的 relay log</b>，不写进 M2 的 binlog。而 S2 只认 M2 的 binlog——不开这个开关，M1 写的数永远到不了 S2。</p>
+<p>这就是「级联复制」的前提：中间那台既当从库、又要把收到的东西继续往下发，就必须自己写 binlog。同理，M1 挂了切到 M2 之后，M1 恢复时也要靠这条链路把 M2 上的新数据追回来。</p>
+</div>
+
+<div class="note warn"><b><code>binlog-do-db</code> 看的是「当前默认库」，不是表所在的库</b>
+<p>判断依据是执行语句时 <code>USE</code> 的那个库。所以：</p>
+<pre data-copy><code>USE db02;
+UPDATE db01.tb_user SET name='x' WHERE id=1;   -- 这条不会进 binlog</code></pre>
+<p>从库上就少了这一行，而且主库本地执行成功、不报任何错——最难查的一类不同步。<br>两件事保平安：跨库操作前显式 <code>USE</code> 到目标库；或者干脆不用 <code>binlog-do-db</code>，做全量复制，用 <code>binlog-ignore-db</code> 排除系统库。</p>
+</div>
+
+<p>四台都重启：</p>
+<pre data-copy><code>systemctl restart mysqld</code></pre>
+<p class="check">重启后各自 <code>SELECT @@server_id;</code>，四台的值必须是 1 / 2 / 3 / 4，重了直接停复制。</p>
+
+<h2 id="link">5. 接上复制：四条链路</h2>
+<p>课程文档里只写了「两台从库指向各自的主库」两条。但图 3 里 M1 与 M2 之间那条双向箭头也是复制——<b>不配它，双主就不成立</b>：M2 接写之后产生的数据，M1 恢复时追不回来。</p>
+
+<table class="t-link">
+  <thead><tr><th>链路</th><th>谁指向谁</th><th>作用</th></tr></thead>
+  <tbody>
+    <tr><td>①</td><td><b>S1 → M1</b></td><td>正常的读写分离：M1 的写同步给 S1，S1 承担读。</td></tr>
+    <tr><td>②</td><td><b>S2 → M2</b></td><td>同上，S2 读 M2 的数据。</td></tr>
+    <tr><td>③</td><td><b>M2 → M1</b></td><td>M1 的写要能流到 M2，再由 M2 转给 S2（靠 <code>log-slave-updates</code>）。</td></tr>
+    <tr><td>④</td><td><b>M1 → M2</b></td><td>M1 挂了以后写到 M2；M1 恢复时靠这条把 M2 的新数据追回来。</td></tr>
+  </tbody>
+</table>
+
+<p>表里的箭头写的是<b>配置方向</b>：<code>M2 → M1</code> 表示在 M2 上 <code>CHANGE REPLICATION SOURCE</code> 指向 M1，数据实际是从 M1 流到 M2。③④ 两条正好相反，别看反。</p>
+
+<ol class="steps">
+<li><b>两台主库各建一个复制账号</b><span class="where">M1 / M2 · 各自的 3306</span>
+<pre data-copy><code>CREATE USER 'repl'@'%' IDENTIFIED BY 'Root@123456';
+GRANT REPLICATION SLAVE ON *.* TO 'repl'@'%';</code></pre>
+<p class="check">账号在两台主库上都要有——因为对方既是主、也是从，都要来连。</p></li>
+
+<li><b>四个方向各配一次</b><span class="where">在「从」的那一台上执行</span>
+<p>S1 指向 M1：</p>
+<pre data-copy><code>CHANGE REPLICATION SOURCE TO
+  SOURCE_HOST='192.168.200.211',
+  SOURCE_PORT=3306,
+  SOURCE_USER='repl',
+  SOURCE_PASSWORD='Root@123456',
+  SOURCE_LOG_FILE='binlog.000001',
+  SOURCE_LOG_POS=157;</code></pre>
+<p>S2 把 <code>SOURCE_HOST</code> 换成 <code>192.168.200.213</code>；M2 换成 <code>.211</code>；M1 换成 <code>.213</code>。位点用各自主库上 <code>SHOW MASTER STATUS;</code> 的 <code>File</code> 和 <code>Position</code>。</p>
+<p>8.0.23 之前的老写法是 <code>CHANGE MASTER TO MASTER_HOST=… MASTER_LOG_FILE=…</code>，课程 PPT 用的就是它，两条语句等价。</p></li>
+
+<li><b>启动并验收</b><span class="where">四台</span>
+<pre data-copy><code>START REPLICA;
+SHOW REPLICA STATUS\G</code></pre>
+<p class="check">每台都是 <code>Replica_IO_Running: Yes</code>、<code>Replica_SQL_Running: Yes</code>，且 <code>Source_Host</code> 指向对的那台。8.0.22 之前这两个字段叫 <code>Slave_IO_Running</code> / <code>Master_Host</code>。</p></li>
+</ol>
+
+<div class="note danger"><b>双主 + 双向复制，自增主键一定会撞</b>
+<p>两台都能写，各自 <code>AUTO_INCREMENT</code> 从 1 开始数。M1 插入 <code>id=5</code>、M2 同时插入 <code>id=5</code>，复制到对端就是 <code>Duplicate entry '5' for key 'PRIMARY'</code>，SQL 线程直接停——而且这种停是<b>静默的</b>，只有去看状态才发现。</p>
+<p>两个办法，选一个：</p>
+<pre data-copy><code>-- M1
+SET GLOBAL auto_increment_increment = 2;
+SET GLOBAL auto_increment_offset    = 1;   -- 奇数：1,3,5…
+
+-- M2
+SET GLOBAL auto_increment_increment = 2;
+SET GLOBAL auto_increment_offset    = 2;   -- 偶数：2,4,6…</code></pre>
+<p>写进 <code>my.cnf</code> 才能重启后保持。更彻底的做法是业务侧生成全局唯一 ID（雪花算法之类），数据库不再依赖自增。</p>
+</div>
+
+<p>还有一点值得知道：<b>双向复制为什么不会无限反弹</b>。每个复制事件头里带着产生它的 <code>server_id</code>，从库收到后发现「这个 id 是我自己」，直接丢弃（<code>replicate_same_server_id</code> 默认 <code>0</code>）。所以四个 <code>server-id</code> 必须各不相同——不是为了好看。</p>
+
+<h2 id="xml2">6. 双主双从的 XML</h2>
+<p>结构只比一主一从多一层：两个 <code>writeHost</code> 并列，各自带一个 <code>readHost</code>。三个属性的值一起决定「写去哪、读去哪、挂了怎么办」。</p>
+
+<pre data-copy><code>&lt;dataHost name="dhost7" maxCon="1000" minCon="10"
+          balance="1" writeType="0" switchType="1"
+          dbType="mysql" dbDriver="jdbc"&gt;
+  &lt;heartbeat&gt;select user()&lt;/heartbeat&gt;
+
+  &lt;writeHost host="master1"
+             url="jdbc:mysql://192.168.200.211:3306?useSSL=false&amp;amp;serverTimezone=Asia/Shanghai"
+             user="root" password="1234"&gt;
+    &lt;readHost host="slave1"
+              url="jdbc:mysql://192.168.200.212:3306?useSSL=false&amp;amp;serverTimezone=Asia/Shanghai"
+              user="root" password="1234" /&gt;
+  &lt;/writeHost&gt;
+
+  &lt;writeHost host="master2"
+             url="jdbc:mysql://192.168.200.213:3306?useSSL=false&amp;amp;serverTimezone=Asia/Shanghai"
+             user="root" password="1234"&gt;
+    &lt;readHost host="slave2"
+              url="jdbc:mysql://192.168.200.214:3306?useSSL=false&amp;amp;serverTimezone=Asia/Shanghai"
+              user="root" password="1234" /&gt;
+  &lt;/writeHost&gt;
+&lt;/dataHost&gt;</code></pre>
+
+<table>
+  <thead><tr><th style="width:20%">属性</th><th style="width:10%">值</th><th>实际效果</th></tr></thead>
+  <tbody>
+    <tr><td rowspan="2"><code>balance</code></td><td><code>1</code></td><td>所有 <code>readHost</code> 加备用 <code>writeHost</code> 都参与 <code>select</code>。这一套配置下的实际效果：<b>S1、S2、M2 都读，M1 只写</b>。</td></tr>
+    <tr><td><code>3</code></td><td>只读 <code>readHost</code>。想彻底不让 M2 分担读时用它，但 M1 挂了之后读的余量会少一台。</td></tr>
+    <tr><td rowspan="2"><code>writeType</code></td><td><code>0</code></td><td>写全发第一个 <code>writeHost</code>，它挂了才发第二个。<b>双主必须用 0。</b></td></tr>
+    <tr><td><code>1</code></td><td>随机发到一个 <code>writeHost</code>。两台都在写，双主下等于主动制造主键冲突，别用。</td></tr>
+    <tr><td rowspan="3"><code>switchType</code></td><td><code>1</code></td><td>默认值，靠 <code>&lt;heartbeat&gt;</code> 探活，失败就自动切到下一个 <code>writeHost</code>。</td></tr>
+    <tr><td><code>-1</code></td><td>不自动切。切换由人决定，适合「宁可停一会儿也不能写错」的场景。</td></tr>
+    <tr><td><code>2</code></td><td>依据 MySQL 的主从状态判断是否切换，比心跳更谨慎。</td></tr>
+  </tbody>
+</table>
+
+<div class="note danger"><b>切过去，不会自己切回来</b>
+<p>MyCat 把写切到 M2 之后，会在 <code>conf/dnindex.properties</code> 里记下当前用的是哪个 <code>writeHost</code>，<b>重启也照这个来</b>。M1 修好之后，MyCat 仍然写 M2。</p>
+<p>这时候最危险的动作是「M1 好了，手动让它也接写」——两边同时写，撞主键、数据分叉。正确顺序：</p>
+<p>① 确认 M1 的复制已经追平（<code>SHOW REPLICA STATUS</code> 里 <code>Seconds_Behind_Source</code> 归零，<code>Replica_SQL_Running: Yes</code>）→ ② 决定留 M2 还是回 M1 → ③ 回 M1 的话改回配置并<b>重启 MyCat</b>（<code>reload</code> 不重置这个记录）→ ④ 把旧的那台设成只读，防止有人直连写进去。</p>
+</div>
+
+<h2 id="verify">7. 验三件事</h2>
+<p>配完别急着说通，按顺序验：<b>写进去从库有 → 读真的落在从库 → 主库停掉写还在</b>。三件都过，才算搭成。</p>
+
+<ol class="steps">
+<li><b>写进去，从库能查到</b><span class="where">MyCat 8066 · 然后到 S1 的 3306</span>
+<pre data-copy><code>mysql -h192.168.200.210 -P8066 -uroot -p</code></pre>
+<pre data-copy><code>USE ITCAST_RW;
+
+CREATE TABLE tb_user (
+  id INT PRIMARY KEY,
+  name VARCHAR(50) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT INTO tb_user VALUES (1,'Tom'),(2,'Jerry');</code></pre>
+<p>然后到 S1 上直连 3306 看：</p>
+<pre data-copy><code>SELECT * FROM itcast.tb_user;</code></pre>
+<p class="check">两条都在。查不到就回到第 4、5 节：<code>log-slave-updates</code> 开了没、<code>SHOW REPLICA STATUS</code> 是不是两个 Yes。</p></li>
+
+<li><b>读真的走了从库</b><span class="where">S1 · 3306</span>
+<p>MyCat 的读发给了谁，肉眼看不出来。最直接的办法是在从库上开 general log，再从 MyCat 查一次：</p>
+<pre data-copy><code>SET GLOBAL general_log = ON;
+SET GLOBAL log_output = 'TABLE';</code></pre>
+<pre data-copy><code>SELECT event_time, argument FROM mysql.general_log
+WHERE argument LIKE '%tb_user%' ORDER BY event_time DESC LIMIT 10;</code></pre>
+<p class="check">出现了 <code>select * from tb_user</code>，说明读确实到 S1 了。查不到、只有 M1 有——<code>balance</code> 还是 <code>0</code>，或者 <code>readHost</code> 写在了 <code>writeHost</code> 外面。</p></li>
+
+<li><b>主库停掉，写还在</b><span class="where">.211 停服务，然后在 MyCat 里写</span>
+<pre data-copy><code>systemctl stop mysqld</code></pre>
+<pre data-copy><code>INSERT INTO tb_user VALUES (3,'Spike');</code></pre>
+<p>再看心跳和落点：</p>
+<pre data-copy><code>mysql -h192.168.200.210 -P9066 -uroot -p
+show @@heartbeat;</code></pre>
+<p class="check">插入成功、数据出现在 M2（以及 S2），<code>show @@heartbeat</code> 里 master1 变成失败状态。没切过去，先确认 <code>switchType</code> 是不是 <code>1</code>。</p>
+<p>测完记得 <code>systemctl start mysqld</code> 把 M1 拉起来，并按第 6 节那段「切过去不会切回来」的顺序处理。</p></li>
+</ol>
+
+<h2 id="traps">8. 五个坑</h2>
+<table>
+  <thead><tr><th style="width:30%">现象</th><th style="width:30%">原因</th><th>怎么办</th></tr></thead>
+  <tbody>
+    <tr><td>刚写完，MyCat 里查不到</td><td>复制异步，读被发到还没追上的从库</td><td>关键读单独配一个只含主库的 <code>dataHost</code>，别和普通读共用</td></tr>
+    <tr><td>事务里先写后读，读到旧值</td><td>MyCat 按语句分发，不认事务边界</td><td>事务内要强一致就直连主库，或把这批读挪到事务外</td></tr>
+    <tr><td>配了 <code>readHost</code> 但读全压主库</td><td><code>balance="0"</code>，或 <code>readHost</code> 写成了并列标签</td><td>改成 <code>3</code>；确认 <code>readHost</code> 在 <code>writeHost</code> 内部</td></tr>
+    <tr><td>从库 SQL 线程停，报 1062</td><td>双主两边写了同一个主键</td><td>删掉冲突行 → <code>START REPLICA</code>；根治靠自增错开或全局 ID</td></tr>
+    <tr><td>M1 恢复后两边都在写</td><td><code>dnindex.properties</code> 记着上次切到 M2，不会自动回</td><td>人工确认追平后再改配置并重启 MyCat，旧主设只读</td></tr>
+  </tbody>
+</table>
+
+<p>配置改完没反应，先看这两条：<code>schema.xml</code> 可以热加载，<code>server.xml</code> 必须重启。</p>
+<pre data-copy><code>mysql -h192.168.200.210 -P9066 -uroot -p
+reload @@config;      -- 重读 schema.xml / rule.xml
+show @@datanode;      -- 节点是否可用
+show @@heartbeat;     -- 心跳，判断主库是否还活着</code></pre>
+<p class="check">改的是 <code>server.xml</code> 却只跑了 <code>reload</code>，改动不会生效——这是「明明改对了却没用」最常见的原因。</p>
+
+<section class="quiz" id="quiz">
+  <p class="quiz-head">自测三问<span>先自己答，再展开对照</span></p>
+  <details><summary><span class="qno">Q1</span><span class="ask"><code>balance="1"</code> 在一主一从和双主双从下，读的分发有什么不同？</span><span class="caret" aria-hidden="true"></span></summary>
+  <div class="ans"><p><b>一主一从：</b>只有 <code>readHost</code>（S1）参与读，主库只写。因为 <code>1</code> 里的「备用 <code>writeHost</code>」这时候根本不存在——唯一的 <code>writeHost</code> 是正在用的主库，不是备用的。<br><b>双主双从：</b>M2 就是那个「备用 <code>writeHost</code>」，于是 M2、S1、S2 三台一起分担 <code>select</code>，只有 M1 被排除在读之外。<br>想让备用主库也不读，用 <code>3</code>（读只发给 <code>readHost</code>）。</p></div></details>
+  <details><summary><span class="qno">Q2</span><span class="ask">双主双从里，为什么两台主库都要开 <code>log-slave-updates</code>？</span><span class="caret" aria-hidden="true"></span></summary>
+  <div class="ans"><p>因为 S2 只认 M2 的 binlog。M2 从 M1 收到的事件默认只写 relay log，不写自己的 binlog——不开这个开关，M1 写的数永远到不了 S2。<br>同理 M1 也要开：它挂了以后从 M2 追数据，追到的东西得能继续往下发给 S1。<b>中间那台既当从、又要把收到的东西往下发，就必须自己写 binlog。</b></p></div></details>
+  <details><summary><span class="qno">Q3</span><span class="ask">M1 挂过、MyCat 已经切到 M2 了。M1 修好之后，它能自动接回写吗？</span><span class="caret" aria-hidden="true"></span></summary>
+  <div class="ans"><p>不能。MyCat 把当前使用的 <code>writeHost</code> 记在 <code>conf/dnindex.properties</code> 里，重启也按它来，没有「切回原主」的机制。<br>而且直接让 M1 接写很危险：它停机期间 M2 写的数还没同步过来，两边同时写会撞主键、数据分叉。正确做法是等 M1 的复制追平（<code>Seconds_Behind_Source</code> 归零）再决定留谁，切换要重启 MyCat，切换后把没在用的那台设成只读。</p></div></details>
+</section>
+
+<h2 id="sources">资料</h2>
+<p class="refs">参考：<a href="https://www.mycat.org.cn/">MyCat 官网</a> · <a href="https://dev.mysql.com/doc/refman/8.0/en/replication-howto.html">MySQL 8.0 复制配置</a> · <a href="https://dev.mysql.com/doc/refman/8.0/en/replication-options-source.html">复制相关系统变量</a> · <a href="https://dev.mysql.com/doc/refman/8.0/en/replication-features-auto-increment.html">复制与 AUTO_INCREMENT</a></p>
+<p class="source">核对日期 2026-11-27。配置按 MyCat 1.6 文档与课程内容整理，<b>没有在五台真实实例上逐条执行验证</b>；第一次搭建时以每步的验收输出为准。课程 PPT 用的是 <code>CHANGE MASTER</code> / <code>SHOW SLAVE STATUS</code> 老语法，8.0.23 起对应的新语法在正文里已标注。<code>balance</code> 的取值语义以 MyCat 1.6 为准，MyCat2 不兼容这套配置。</p>
+
+<div class="footer"><a href="03-01-MyCat实现.html">← 03-01 MyCat 实现</a> · <a href="../index.html#ops">总目录 · 运维篇</a></div>
+</main>
+</div></body></html>

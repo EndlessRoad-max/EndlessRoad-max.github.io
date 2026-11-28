@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>02-04 已有数据与排错 · MySQL 笔记</title>
+<link rel="stylesheet" href="../assets/style.css"><link rel="stylesheet" href="../assets/replication.css">
+<script src="../assets/replication.js" defer></script>
+</head>
+<body class="replication"><div class="layout">
+
+<nav class="sidebar" aria-label="本页目录">
+  <p class="side-title">本页目录</p>
+  <a href="#choose">1. 三条路，先选一条</a>
+  <a href="#snapshot">2. 带坐标的快照</a>
+  <a href="#trace">3. 没同步，按链路查</a>
+  <a href="#lag">4. 延迟怎么判</a>
+  <a href="#worker">5. worker 报错</a>
+  <a href="#quiz">自测三问</a>
+  <p class="side-title" style="margin-top:22px">当前位置</p>
+  <ul class="nav-tree">
+    <li><a href="../index.html" class="root">↑ 总目录</a>
+      <ul>
+        <li><a href="01-日志.html">01 日志</a></li>
+        <li><a href="02-主从复制.html">02 主从复制</a>
+          <ul>
+            <li><a href="02-01-GTID复制.html">02-01 GTID 复制</a></li>
+            <li><a href="02-02-成熟部署与故障切换.html">02-02 成熟部署与切换</a></li>
+            <li><a href="02-03-网络与协议.html">02-03 网络与协议细节</a></li>
+            <li><span class="current">02-04 已有数据与排错</span></li>
+          </ul>
+        </li>
+        <li><a href="03-分库分表.html">03 分库分表</a>
+          <ul>
+            <li><a href="03-01-MyCat实现.html">03-01 MyCat 实现</a></li>
+          </ul>
+        </li>
+        <li><a href="04-读写分离.html">04 读写分离</a></li>
+      </ul>
+    </li>
+  </ul>
+</nav>
+
+<main class="main">
+<div class="crumb"><a href="../index.html">总目录</a> / 运维篇 / <a href="02-主从复制.html">02 主从复制</a> / 02-04</div>
+<h1><span class="chapter-no">02-04</span>已有数据与排错</h1>
+<p class="lede">课程从空库开始搭，真实环境里主库早就有数据了。这一页补两件事：<b>怎么把历史数据接上</b>，以及<b>没同步时按链路往下查</b>而不靠猜。</p>
+<div class="meta"><span>环境：MySQL 8.0.32 起</span><span>前置：<a href="02-主从复制.html">02</a> 的四步已做完、复制尚未启动</span><span>整理：2026-11-26</span></div>
+
+<section class="quick">
+  <p class="quick-head">一屏速记<span>合上笔记，这 4 条要能自己说出来</span></p>
+  <ol>
+    <li><b>历史数据不会自己流过来。</b>从当前位置启动，只接得上之后的新变更，而且不报错。</li>
+    <li><b>顺序固定：</b>带坐标的快照 → 导入从库 → 用<b>这份快照的坐标</b>启动。坐标与快照必须同源。</li>
+    <li><b>排错按链路走：</b>连上了吗 → 收到了吗 → 应用了吗 → 查的是不是那台库。</li>
+    <li><b>延迟不能只看一个数。</b><code>Seconds_Behind_Source</code> 的 0 和 <code>NULL</code> 都不代表追平，要看收发两条坐标。</li>
+  </ol>
+</section>
+
+<h2 id="choose">1. 三条路，先选一条</h2>
+<p>把主库现有数据搬成从库的起点，只有三种做法。本页把第一种写全，另两种只给适用场景——细节各自不同，别混着抄命令。</p>
+<table>
+  <thead><tr><th style="width:22%">做法</th><th style="width:38%">适合</th><th>代价与限制</th></tr></thead>
+  <tbody>
+    <tr><td><b>mysqldump</b><br>逻辑备份</td><td>几十 GB 以内、要跨小版本、只想搬部分库或部分表。</td><td>导出要读全表，导入是重新执行 SQL，慢；大表导入期间从库基本不可用。</td></tr>
+    <tr><td><b>Clone Plugin</b><br>8.0.17 起内置</td><td>整实例、同版本、几百 GB 的大库。物理页拷贝，比逻辑导入快一个量级。</td><td>要求源端可连、两端插件可用、磁盘够；只搬整实例，不能挑库。</td></tr>
+    <tr><td><b>物理备份</b><br>xtrabackup 等</td><td>已有备份体系，想直接用备份做基线。</td><td>工具与版本要匹配；备份必须带 binlog 坐标，否则还得另找起点。</td></tr>
+  </tbody>
+</table>
+<div class="note warn"><b>不选也行，但别选错</b><p>「先启动复制，再手工补历史数据」不是第三条路——两边的写入顺序会错，重复键和缺行会一起出现。要么快照打底，要么整库重建。</p></div>
+
+<h2 id="snapshot">2. 带坐标的快照</h2>
+<div class="scope">
+  <p><b>前提：</b>主库配置、复制账号、从库配置已完成（<a href="02-主从复制.html#source">02 主库四步</a> / <a href="02-主从复制.html#replica">从库五步</a>的前两步），复制<b>尚未启动</b>；GTID 为 OFF；要复制的库是 <code>db01</code>，表都是 InnoDB；从库没有要保留的同名数据。</p>
+</div>
+
+<ol class="steps">
+<li><b>导出快照，让工具把坐标写进文件</b><span class="where">主库 · Linux 终端</span>
+<pre data-copy><code>mysqldump -u root -p \
+  --single-transaction --source-data=2 \
+  --set-gtid-purged=OFF \
+  --routines --events --triggers \
+  --databases db01 \
+  --result-file=/tmp/db01-seed.sql
+
+grep -m 1 -E '^-- CHANGE (REPLICATION SOURCE|MASTER)' /tmp/db01-seed.sql</code></pre>
+<p><code>--single-transaction</code> 给 InnoDB 拿一致快照；<code>--source-data=2</code> 把坐标写成<b>注释</b>（<code>=1</code> 会写成可执行语句，导入时会改掉从库的复制配置）；本页不开 GTID，所以 <code>--set-gtid-purged=OFF</code>。</p>
+<p class="check">命令正常结束、文件非空、能 grep 到含文件名和位置的注释。<b>把这行抄下来</b>——后面不要再用新的 <code>SHOW MASTER STATUS</code> 覆盖它。</p>
+<p>导出开始时会短暂取全局读锁，长事务会让它等；导出期间不要做 DDL。非 InnoDB 表不受这个快照保护，会被单独加锁读。</p></li>
+
+<li><b>传到从库并导入</b><span class="where">主库 · Linux 终端</span>
+<pre data-copy><code># replica_os_user 换成从库的系统账号
+scp /tmp/db01-seed.sql replica_os_user@192.168.200.201:/tmp/db01-seed.sql</code></pre>
+<span class="where replica">从库 · mysql 客户端（管理员）</span>
+<pre data-copy><code>-- 此刻没有业务连接、没有在跑的复制通道
+SET GLOBAL super_read_only = OFF;
+SET GLOBAL read_only = OFF;
+SET SESSION sql_log_bin = 0;
+SOURCE /tmp/db01-seed.sql;
+SET SESSION sql_log_bin = 1;
+SET GLOBAL super_read_only = ON;</code></pre>
+<p><code>sql_log_bin = 0</code> 让这段导入不写进从库自己的 binlog——否则将来这台从库被提升为主库，会把这些行再发一遍。</p>
+<p>最后一条会同时打开 <code>read_only</code>。导入没报错再抽查 <code>db01</code> 的表和数据量；失败就先恢复只读、修好再继续，别带病启动复制。</p>
+<p>从库若开了事件调度器，保持 <code>event_scheduler=OFF</code>，别让导进来的定时任务自己跑。</p></li>
+
+<li><b>用快照的坐标启动</b><span class="where replica">从库 · mysql 客户端</span>
+<pre data-copy><code>CHANGE REPLICATION SOURCE TO
+  SOURCE_HOST = '192.168.200.200',
+  SOURCE_PORT = 3306,
+  SOURCE_USER = 'itcast',
+  SOURCE_PASSWORD = 'Root@123456',
+  SOURCE_LOG_FILE = 'binlog.000010',   -- 抄备份注释里的值
+  SOURCE_LOG_POS  = 984,               -- 同上
+  SOURCE_SSL = 1;
+
+START REPLICA;
+SHOW REPLICA STATUS\G</code></pre>
+<p>已有的库和表<b>不要重建</b>，从库现在就是这个状态，接着往后应用即可。</p></li>
+</ol>
+
+<h2 id="trace">3. 没同步，按链路查</h2>
+<p>在<b>从库</b>执行 <code>SHOW REPLICA STATUS\G</code>，顺着链路走一遍：连上了吗 → 收到了吗 → 应用了吗 → 查的是不是该看的数据。</p>
+<table>
+  <thead><tr><th style="width:27%">现象</th><th>第一步</th></tr></thead>
+  <tbody>
+    <tr><td><code>Empty set</code></td><td>确认连的是从库（<code>@@hostname</code>、<code>@@port</code>），并确认 <code>CHANGE REPLICATION SOURCE</code> 真的执行成功了。</td></tr>
+    <tr><td><code>Replica_IO_Running</code> 为 <code>No</code> 或 <code>Connecting</code></td><td>先读 <code>Last_IO_Error</code>。超时/拒绝：地址、监听、端口、防火墙；<code>1045</code>：账号来源或密码；SSL 类报错：TLS 配置。最快的办法是把主库那段手工连接重跑一次。</td></tr>
+    <tr><td><code>Replica_SQL_Running: No</code></td><td>读 <code>Last_SQL_Error</code>。<code>1062</code> 多为重复键，<code>1032</code> 多为找不到行——先查从库是否被误写、初始数据是否缺失，不要直接跳过事务。</td></tr>
+    <tr><td>报日志不存在 / 已清理</td><td>核对完整报错、源地址、文件名与位置。需要的 binlog 已被清理，只能从备份重新初始化；<b>1236 不是单一原因</b>，别看到它就照同一个方案改。</td></tr>
+    <tr><td>报主从 UUID 相同</td><td>通常是直接拷了数据目录。可重建的从库优先重新初始化，别在运行中手改 <code>auto.cnf</code>。</td></tr>
+    <tr><td>两个 <code>Yes</code>，但查不到新数据</td><td>确认主库事务已提交、连的地址对、在新事务里重查；再查复制过滤、延迟、以及<b>初始数据缺口</b>（本页第 1 节的坑）。</td></tr>
+    <tr><td>从库能写进数据</td><td>只读没生效。检查 <code>read_only</code> / <code>super_read_only</code>；已经写进去的脏数据要先评估，别直接让它复制回主库。</td></tr>
+  </tbody>
+</table>
+
+<h2 id="lag">4. 延迟怎么判</h2>
+<p><code>Seconds_Behind_Source</code> 只能当参考：<b>0 不代表追平</b>（接收早断了，或者本地刚好应用完），<b><code>NULL</code> 也不代表零延迟</b>。</p>
+<pre data-copy><code>SHOW REPLICA STATUS\G
+-- 收到哪了：Source_Log_File + Read_Source_Log_Pos
+-- 应用到哪：Relay_Source_Log_File + Exec_Source_Log_Pos</code></pre>
+<p>两对数都带文件名，<b>不能只把两个数字相减</b>：跨文件时数字会回退。</p>
+<table>
+  <thead><tr><th style="width:30%">表现</th><th>常见原因</th></tr></thead>
+  <tbody>
+    <tr><td>收得快、用得慢</td><td>大事务（几万行一个事务）、DDL、从库上还有查询在抢资源、单线程应用追不上主库并发。</td></tr>
+    <tr><td>收得慢</td><td>网络带宽或延迟、主库 Dump 线程被大事务阻塞、binlog 太大。</td></tr>
+    <tr><td>应用卡住不动</td><td>锁等待、唯一键冲突、表上没有可用索引导致逐行回表扫。</td></tr>
+  </tbody>
+</table>
+<p>确认是「收得快、用得慢」之后，再去看大事务、锁等待、表上有没有可用索引、CPU 和磁盘 I/O。<b>先找瓶颈，再谈并行参数</b>：8.0.27 起 <code>replica_parallel_workers</code> 默认 4，但把线程数调大不会让一条大事务变快。</p>
+
+<h2 id="worker">5. worker 报错，怎么看到具体原因</h2>
+<p>并行应用时，<code>Last_SQL_Error</code> 可能只说某个 worker 失败，细节在这里：</p>
+<pre data-copy><code>SELECT CHANNEL_NAME, WORKER_ID, SERVICE_STATE,
+       LAST_ERROR_NUMBER, LAST_ERROR_MESSAGE
+FROM performance_schema.replication_applier_status_by_worker
+WHERE LAST_ERROR_NUMBER &lt;&gt; 0;</code></pre>
+<p>在从库查。改连接参数前先 <code>STOP REPLICA;</code>，改完再 <code>START REPLICA;</code>——<b>不要把旧坐标重新抄一遍</b>，那会让它从旧位置重放。</p>
+
+<section class="quiz" id="quiz">
+  <p class="quiz-head">自测三问<span>先自己答，再展开对照</span></p>
+  <details><summary><span class="qno">Q1</span><span class="ask">为什么必须用「快照里的坐标」，而不是启动前再查一次 <code>SHOW MASTER STATUS</code>？</span><span class="caret" aria-hidden="true"></span></summary>
+  <div class="ans"><p>快照是某一刻的一致视图，坐标必须和它对齐。启动前再查一次，两者之间发生的变更既不在快照里、也不会被重放——那段数据就永久缺失。<br>导出完成后坐标就固定了，中间有新写入不影响，重放会补上。</p></div></details>
+  <details><summary><span class="qno">Q2</span><span class="ask">导入从库时为什么要 <code>SET SESSION sql_log_bin = 0</code>？</span><span class="caret" aria-hidden="true"></span></summary>
+  <div class="ans"><p>防止这段导入写进从库自己的 binlog。否则将来这台从库被提升为主库、或挂了下级从库，这些行会被再发一遍，造成重复。<br>注意它是 session 级，只影响当前连接；导入完记得开回来。</p></div></details>
+  <details><summary><span class="qno">Q3</span><span class="ask"><code>Seconds_Behind_Source</code> 显示 0，能说明从库追平了吗？</span><span class="caret" aria-hidden="true"></span></summary>
+  <div class="ans"><p>不能。它算的是「应用时间」与「主库当前时间」的差，接收已经断掉、或本地刚好应用完时，都可能显示 0；8.0 里还可能是 <code>NULL</code>。<br>判断进度只能看收发两条坐标，并确认 <code>Replica_IO_Running</code> 是 <code>Yes</code>。</p></div></details>
+</section>
+
+<h2 id="sources">资料</h2>
+<p class="refs">官方文档：<a href="https://dev.mysql.com/doc/refman/8.0/en/mysqldump.html">mysqldump</a> · <a href="https://dev.mysql.com/doc/refman/8.0/en/clone-plugin.html">Clone Plugin</a> · <a href="https://dev.mysql.com/doc/refman/8.0/en/replication-problems.html">复制故障处理</a> · <a href="https://dev.mysql.com/doc/refman/8.0/en/replication-delayed.html">延迟与进度</a></p>
+<p class="source">核对日期 2026-11-26。本页命令按 8.0 官方文档整理，没有在真实主从上执行过；第一次操作请在有备份的环境里试。</p>
+
+<div class="footer"><a href="02-03-网络与协议.html">← 02-03 网络与协议</a> · <a href="../index.html">总目录</a> · <a href="03-分库分表.html">03 分库分表 →</a></div>
+</main>
+</div></body></html>

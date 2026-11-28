@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>02-01 GTID 复制：换主库后怎样接上 · MySQL 笔记</title>
+<link rel="stylesheet" href="../assets/style.css"><link rel="stylesheet" href="../assets/replication.css">
+<script src="../assets/replication.js" defer></script>
+</head>
+<body class="replication"><div class="layout">
+
+<nav class="sidebar" aria-label="本页目录">
+  <p class="side-title">本页目录</p>
+  <a href="#what">1. GTID 是什么</a>
+  <a href="#fresh">2. 全新环境怎么开</a>
+  <a href="#existing">3. 主库已有数据</a>
+  <a href="#verify">4. 怎么确认追上了</a>
+  <a href="#limits">5. 它不解决什么</a>
+  <a href="#quiz">自测三问</a>
+  <p class="side-title" style="margin-top:22px">当前位置</p>
+  <ul class="nav-tree">
+    <li><a href="../index.html" class="root">↑ 总目录</a>
+      <ul>
+        <li><a href="01-日志.html">01 日志</a></li>
+        <li><a href="02-主从复制.html">02 主从复制</a>
+          <ul>
+            <li><span class="current">02-01 GTID 复制</span></li>
+            <li><a href="02-02-成熟部署与故障切换.html">02-02 成熟部署与切换</a></li>
+            <li><a href="02-03-网络与协议.html">02-03 网络与协议细节</a></li>
+            <li><a href="02-04-已有数据与排错.html">02-04 已有数据与排错</a></li>
+          </ul>
+        </li>
+        <li><a href="03-分库分表.html">03 分库分表</a>
+          <ul>
+            <li><a href="03-01-MyCat实现.html">03-01 MyCat 实现</a></li>
+          </ul>
+        </li>
+        <li><a href="04-读写分离.html">04 读写分离</a></li>
+      </ul>
+    </li>
+  </ul>
+</nav>
+
+<main class="main">
+<div class="crumb"><a href="../index.html">总目录</a> / 运维篇 / <a href="02-主从复制.html">02 主从复制</a> / 02-01</div>
+<h1><span class="chapter-no">02-01</span>GTID 复制</h1>
+<p class="lede">位点复制的痛点是「换一台主库，位点就作废」。GTID 给每个事务发一个全局编号，从库只认「哪些事务我执行过」，换源不用再找文件名和位置。</p>
+<div class="meta"><span>环境：MySQL 8.0.32+</span><span>前置：<a href="02-主从复制.html">02 主从复制</a> 已搭通</span><span>整理：2026-11-26</span></div>
+
+<section class="quick">
+  <p class="quick-head">一屏速记<span>合上笔记，这 4 条要能自己说出来</span></p>
+  <ol>
+    <li><b>编号：</b>GTID = <code>来源 server_uuid : 事务序号</code>。级联转发时<b>保留原来的来源</b>，所以一台实例的已执行集合里可能有多个 UUID。</li>
+    <li><b>作用：</b>换源后靠集合自动对齐、已执行的自动跳过。<b>不改变异步确认方式，不保证数据必然一致，也不会自己切主库。</b></li>
+    <li><b>写法：</b><code>SOURCE_AUTO_POSITION=1</code> 与 <code>SOURCE_LOG_FILE/POS</code> <b>互斥</b>，用 GTID 就只写前者。</li>
+    <li><b>前提：</b>从库接得上，靠的是主库还留着它缺的那段 binlog；历史日志被清掉，照样得用备份重建。</li>
+  </ol>
+</section>
+
+<h2 id="what">1. GTID 是什么</h2>
+<p>开 GTID 后，主库每提交一个事务就给它一个编号：<code>uuid-a:108</code>。从库记住「我执行过哪些编号」，重连时把自己缺的部分告诉主库，主库只发这些。</p>
+
+<figure class="fig">
+  <svg viewBox="0 0 680 268" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif" role="img" aria-label="主库已产生 1 到 110 号事务，从库已执行 1 到 107 号，自动定位补齐 108 到 110。">
+    <text x="18" y="26" font-size="12" font-weight="700" fill="#00566b">主库产生 1–110，从库执行到 107</text>
+    <text x="18" y="44" font-size="10.5" fill="#8a9099">AUTO_POSITION 让从库自己说「我缺 108–110」，不需要人去找位点</text>
+
+    <text x="18" y="88" font-size="11" font-weight="700" fill="#00566b">主库 A</text>
+    <rect x="88" y="70" width="300" height="30" rx="5" fill="#e6f3f6" stroke="#b9dde5"/>
+    <text x="98" y="90" font-size="11" font-family="Consolas,monospace" fill="#00566b">uuid-a:1–107</text>
+    <rect x="396" y="70" width="60" height="30" rx="5" fill="#fdf3e3" stroke="#f0d9b0"/>
+    <text x="405" y="90" font-size="11" font-family="Consolas,monospace" fill="#b06a00">108</text>
+    <rect x="462" y="70" width="60" height="30" rx="5" fill="#fdf3e3" stroke="#f0d9b0"/>
+    <text x="471" y="90" font-size="11" font-family="Consolas,monospace" fill="#b06a00">109</text>
+    <rect x="528" y="70" width="60" height="30" rx="5" fill="#fdf3e3" stroke="#f0d9b0"/>
+    <text x="537" y="90" font-size="11" font-family="Consolas,monospace" fill="#b06a00">110</text>
+
+    <text x="18" y="150" font-size="11" font-weight="700" fill="#1a7f4b">从库 B</text>
+    <rect x="88" y="132" width="300" height="30" rx="5" fill="#f5fbf7" stroke="#cfe8d8"/>
+    <text x="98" y="152" font-size="11" font-family="Consolas,monospace" fill="#1a7f4b">uuid-a:1–107</text>
+    <rect x="396" y="132" width="192" height="30" rx="5" fill="#ffffff" stroke="#dfe3e9" stroke-dasharray="5 4"/>
+    <text x="406" y="152" font-size="10.5" fill="#8a9099">缺 108–110，自动补</text>
+
+    <path d="M492 106 L492 128" stroke="#c9a06a" stroke-width="1.4"/>
+    <path d="M488 124 L492 131 L496 124 Z" fill="#c9a06a"/>
+    <text x="502" y="122" font-size="10" fill="#b06a00">只发这一小段</text>
+
+    <line x1="18" y1="184" x2="662" y2="184" stroke="#eef1f5"/>
+    <text x="18" y="206" font-size="10.5" fill="#4e5564">发生切换：新主库的 UUID 变了，事务编号由新来源自己排，从库照样按集合对齐。</text>
+    <text x="18" y="224" font-size="10.5" fill="#4e5564">执行过的编号不会被再做一遍——这就是 GTID 能防重复、能直接换源的原理。</text>
+    <text x="18" y="248" font-size="10" fill="#8a9099">注意：图中编号是示意；真实集合形如 3e11fa47-71ca-11e1-9e33-c80aa9429562:1-110</text>
+  </svg>
+  <figcaption><b>图 1</b>GTID 的定位方式：不比文件名和偏移，只比「执行过哪些事务」。</figcaption>
+</figure>
+
+<p>它替掉了位点复制里最烦的一件事：主库换了、日志轮转了、路径变了，位点全作废。改成集合之后，从库只要说清自己有什么，剩下的主库来补。</p>
+
+<h2 id="fresh">2. 全新环境怎么开</h2>
+<div class="note warn"><b>只适用于两台全新的练习实例</b><p>下面的做法是「一开始就开着 GTID」。<b>不要</b>把正文里已经在跑的 <code>gtid_mode=OFF</code> 环境直接 <code>SET</code> 成 ON——在线转换是分阶段的流程，见<a href="#limits">第 5 节</a>。</p></div>
+
+<ol class="steps">
+<li><b>两边都写进配置</b><span class="where">主库 · 配置文件</span>
+<pre data-copy><code>[mysqld]
+server-id = 1
+log-bin = binlog
+binlog-format = ROW
+gtid-mode = ON
+enforce-gtid-consistency = ON
+log-replica-updates = ON</code></pre>
+<span class="where replica">从库 · 配置文件</span>
+<pre data-copy><code>[mysqld]
+server-id = 2
+log-bin = binlog
+binlog-format = ROW
+gtid-mode = ON
+enforce-gtid-consistency = ON
+log-replica-updates = ON
+relay-log = relay-bin
+read-only = ON
+super-read-only = ON</code></pre>
+<p><code>server-id</code> 两台必须不同；<code>enforce-gtid-consistency</code> 是 <code>gtid-mode=ON</code> 的前提，两项一起开。</p></li>
+
+<li><b>重启后核对</b><span class="where">两台 · mysql 客户端</span>
+<pre data-copy><code>SELECT @@server_id, @@server_uuid,
+       @@gtid_mode, @@enforce_gtid_consistency,
+       @@log_bin, @@log_replica_updates;</code></pre>
+<p class="check">期望 <code>ON / ON / 1 / 1</code>，两个 <code>server_uuid</code> 不同。之后建复制账号、测 TLS 连通，完全照<a href="02-主从复制.html#s3">02 主页「主库第 3 步」</a>做，账号与密码规则一样。</p></li>
+
+<li><b>用 AUTO_POSITION 指源</b><span class="where replica">从库 · mysql 客户端</span>
+<pre data-copy><code>CHANGE REPLICATION SOURCE TO
+  SOURCE_HOST = '192.168.200.200',
+  SOURCE_PORT = 3306,
+  SOURCE_USER = 'repl',
+  SOURCE_PASSWORD = 'ReplaceWithYourReplPassword!',
+  SOURCE_AUTO_POSITION = 1,
+  SOURCE_SSL = 1;
+
+START REPLICA;
+SHOW REPLICA STATUS\G</code></pre>
+<p><b>不写</b> <code>SOURCE_LOG_FILE</code> 和 <code>SOURCE_LOG_POS</code>——给了位点就不是自动定位了，两者互斥。</p>
+<p class="check">看 <code>Auto_Position: 1</code>、两个 <code>Running</code> 为 <code>Yes</code>、<code>Retrieved_Gtid_Set</code> 开始出现 UUID 区间。再按正文第 6 步写一条 <code>INSERT</code>，在从库查得到才算通。</p></li>
+</ol>
+
+<h2 id="existing">3. 主库已有数据，怎么初始化</h2>
+<div class="scope">
+  <p><b>前提：</b>主库已开 GTID 且在跑业务；从库是<b>全新的</b>、没有业务写入、没有 GTID 历史；工具用 8.0.32+。已有 GTID 冲突的从库不能靠清空掩盖，只能重建。</p>
+</div>
+
+<ol class="steps">
+<li><b>导出：这次要带 GTID 集合</b><span class="where">主库 · Linux 终端</span>
+<pre data-copy><code>mysqldump -u root -p \
+  --single-transaction --source-data=2 \
+  --set-gtid-purged=ON \
+  --routines --events --triggers \
+  --databases db01 \
+  --result-file=/tmp/gtid-seed.sql
+
+grep -m 2 -E '^SET @@GLOBAL.gtid_purged|^-- CHANGE (REPLICATION SOURCE|MASTER)' /tmp/gtid-seed.sql</code></pre>
+<p><code>--set-gtid-purged=ON</code> 会把源库的已执行集合写进备份（<code>SET @@GLOBAL.gtid_purged</code>），从库导入后就拥有了「这些事务我做过」的账。位点模式下这里写 <code>OFF</code>，GTID 模式下写 <code>ON</code>——同一个参数，两种场景取值相反。</p>
+<p class="check">能 grep 到 <code>gtid_purged</code> 与坐标注释两行。<b>注意：</b>即使只导 <code>db01</code>，写进去的集合仍然包含源库<b>所有</b>已执行事务。所以要复制的业务库必须一次导全，不能漏库还声称完整；系统账号另行管理。</p></li>
+
+<li><b>导入：临时放开只读</b><span class="where replica">从库 · mysql 客户端（管理员）</span>
+<pre data-copy><code>SET GLOBAL super_read_only = OFF;
+SET GLOBAL read_only = OFF;
+SOURCE /tmp/gtid-seed.sql;
+SET GLOBAL super_read_only = ON;
+SHOW REPLICA STATUS\G</code></pre>
+<p>备份脚本自己会处理 <code>sql_log_bin</code> 和 <code>gtid_purged</code>，不用手动加。导入过程不能报错；有错就先修，别急着启动复制。新的从库没有冲突 GTID，这一步才是安全的。</p>
+<p class="check"><code>SELECT @@GLOBAL.gtid_executed;</code> 此时应当已经包含备份里那段集合。</p></li>
+
+<li><b>启动后先看集合，再看数据</b>
+<p>连接参数与<a href="#fresh">第 2 节第 3 步</a>完全一样：<code>SOURCE_AUTO_POSITION=1</code>，不写位点。<code>START REPLICA</code> 之后，从库会从集合的缺口处向主库要日志。</p>
+<p class="check">主库必须保留缺口那一段 binlog，直到从库收完。日志已被清理时，只能重新取基线。</p></li>
+</ol>
+
+<h2 id="verify">4. 怎么确认追上了</h2>
+<p>「两个 <code>Yes</code>」只说明线程活着。要判断数据到没到，用一个集合去等：</p>
+<pre data-copy><code>-- 主库：记下这一刻的集合
+SELECT @@GLOBAL.gtid_executed;
+
+-- 从库：最多等 30 秒，看这个集合是否已执行完
+SELECT WAIT_FOR_EXECUTED_GTID_SET('uuid-a:1-110', 30);</code></pre>
+<p>返回 <code>0</code> 表示这批事务都执行过了；返回 <code>1</code> 表示等超时，还没追上。</p>
+<div class="note warn"><b>「执行过」不等于「逐行校验过」</b><p>复制过滤、跳过的事务、绕过 binlog 的手工写入，都可能让两边的数据不一样。要证明一致，得另做校验（checksum、逐表比对）。</p></div>
+<p>状态里还有两个集合：<code>Retrieved_Gtid_Set</code> 是收到哪些，<code>Executed_Gtid_Set</code> 是执行了哪些。<b>不要要求前者包含后者</b>——从库自己本地产生的事务、以及其他来源的事务，也会出现在已执行集合里。</p>
+
+<h2 id="limits">5. 它不解决什么</h2>
+<div class="grid2 compact-cards">
+  <div class="card"><b>不改变确认时机</b><p>GTID 仍然是异步复制，主库提交完就返回，不等副本。</p></div>
+  <div class="card"><b>不保证数据一致</b><p>它只保证「不重复执行」，不保证内容逐行相同。</p></div>
+  <div class="card"><b>不会自己切主库</b><p>判断、隔离、提升、改路由，是故障管理的事。</p></div>
+  <div class="card"><b>不能替代日志保留</b><p>主库把缺口那段删了，GTID 也补不回来。</p></div>
+</div>
+<p><b>已经在跑 OFF 的环境</b>要转 ON，是分阶段流程（<code>OFF → OFF_PERMISSIVE → ON_PERMISSIVE → ON</code>，并且先开 <code>enforce_gtid_consistency</code>），不能一条 <code>SET</code> 完事。具体步骤以官方文档为准：<a href="https://dev.mysql.com/doc/refman/8.0/en/replication-mode-change-online-enable-gtids.html">在线启用 GTID</a>。本页不提供「照着抄就能上生产」的转换清单。</p>
+
+<section class="quiz" id="quiz">
+  <p class="quiz-head">自测三问<span>先自己答，再展开对照</span></p>
+  <details><summary><span class="qno">Q1</span><span class="ask">从库 <code>Executed_Gtid_Set</code> 里出现了两个不同 UUID，正常吗？</span><span class="caret" aria-hidden="true"></span></summary>
+  <div class="ans"><p>正常。事务跨级联转发时保留<b>原来源</b>的 GTID，所以一台实例的集合里会有多个 UUID 区间：一部分来自老主库，一部分来自现任主库，还可能有它自己本地执行的事务。</p></div></details>
+  <details><summary><span class="qno">Q2</span><span class="ask">为什么 GTID 建从库时 <code>--set-gtid-purged</code> 要写 <code>ON</code>，而搬到别的实例却写 <code>OFF</code>？</span><span class="caret" aria-hidden="true"></span></summary>
+  <div class="ans"><p>建从库要让新实例知道「这些事务在源上已经做过了」，否则重放会重复。<code>ON</code> 把集合写进备份，导入后就有了账。<br>搬到另一个独立实例（不参与复制）时写集合反而会让它拒绝执行、或污染它的执行历史，所以用 <code>OFF</code>。</p></div></details>
+  <details><summary><span class="qno">Q3</span><span class="ask"><code>WAIT_FOR_EXECUTED_GTID_SET</code> 返回 0，能说明两边数据完全一致吗？</span><span class="caret" aria-hidden="true"></span></summary>
+  <div class="ans"><p>不能。它只证明这批事务在从库执行过。复制过滤、手工跳过、绕过 binlog 的写入，都会让数据出现差异。要一致就得单独做校验。</p></div></details>
+</section>
+
+<h2 id="sources">资料</h2>
+<p class="refs">官方文档：<a href="https://dev.mysql.com/doc/refman/8.0/en/replication-gtids-howto.html">GTID 复制配置</a> · <a href="https://dev.mysql.com/doc/refman/8.0/en/replication-mode-change-online-enable-gtids.html">在线启用 GTID</a> · <a href="https://dev.mysql.com/doc/refman/8.0/en/replication-gtids-concepts.html">GTID 概念</a></p>
+<p class="source">核对日期 2026-11-26。本页为文档核对结果，未在两台真实实例上逐条执行。</p>
+
+<div class="footer"><a href="02-主从复制.html">← 02 主从复制</a> · <a href="../index.html">总目录</a> · <a href="02-02-成熟部署与故障切换.html">02-02 成熟部署与切换 →</a></div>
+</main>
+</div></body></html>

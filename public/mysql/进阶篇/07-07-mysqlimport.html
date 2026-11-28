@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>7.2.6 mysqlimport 与 source · MySQL 笔记</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="layout">
+
+  <nav class="sidebar">
+    <p class="side-title">本页目录</p>
+    <a href="#s1">1. 它是 -T 的另一半</a>
+    <a href="#s2">2. 语法：文件名就是表名</a>
+    <a href="#s3">3. 文件由谁读</a>
+    <a href="#s4">4. 选项与实战</a>
+    <a href="#s5">5. source：导 SQL 脚本</a>
+    <a href="#s6">6. 按文件选命令</a>
+    <p class="side-title" style="margin-top:22px">当前位置</p>
+    <ul class="nav-tree">
+      <li><a href="../index.html">↑ 总目录</a>
+        <ul>
+          <li><a class="group" href="07-MySQL管理.html">07 MySQL 管理</a>
+            <ul>
+              <li><a class="leaf" href="07-01-系统数据库.html">7.1 系统数据库</a></li>
+              <li><a class="leaf" href="07-02-mysql.html">7.2.1 mysql</a></li>
+              <li><a class="leaf" href="07-03-mysqladmin.html">7.2.2 mysqladmin</a></li>
+              <li><a class="leaf" href="07-04-mysqlbinlog.html">7.2.3 mysqlbinlog</a></li>
+              <li><a class="leaf" href="07-05-mysqlshow.html">7.2.4 mysqlshow</a></li>
+              <li><a class="leaf" href="07-06-mysqldump.html">7.2.5 mysqldump</a></li>
+              <li><span class="current">7.2.6 mysqlimport</span></li>
+            </ul>
+          </li>
+        </ul>
+      </li>
+    </ul>
+  </nav>
+
+  <main class="main">
+
+    <div class="crumb">
+      <a href="../index.html">总目录</a> /
+      <a href="07-MySQL管理.html">进阶篇 · 07 MySQL 管理</a> /
+      mysqlimport / source
+    </div>
+    <h1><span class="chapter-no">7.2.6</span>mysqlimport 与 source</h1>
+    <p class="lede">两个「往回灌」的工具：<code>mysqlimport</code> 灌的是 <strong>文本数据文件</strong>（<code>mysqldump -T</code> 的产物之一），<code>source</code> 跑的是 <strong>SQL 脚本</strong>。分不清这两者，恢复时就会拿错命令。</p>
+
+    <div class="meta">
+      <span>进阶篇 · 7.2 常用客户端工具</span>
+      <span>更新：2026-11-25</span>
+      <span>环境：MySQL 8.0</span>
+    </div>
+
+    <section class="quick">
+      <p class="quick-head">一屏速记<span>合上笔记，这 5 条要能自己说出来</span></p>
+      <ol>
+        <li>它只干一件事：把文本文件按行灌进<b>一张已经存在的表</b>。<b>表名 = 去掉扩展名的文件名</b>，命令行里没有「指定表名」这个参数。</li>
+        <li>默认由<b>服务端</b>读文件（路径必须落在 <code>secure_file_priv</code> 目录内，账号要有 <code>FILE</code> 权限）；<code>--local</code> 才改成客户端读。</li>
+        <li><code>--local</code> 要求服务端 <code>local_infile=ON</code>，8.0 默认是 OFF，不打开会报 <code>ERROR 3950</code>。</li>
+        <li>它是 mysqldump <code>-T</code> 的另一半：<code>-T</code> 拆出 <code>.sql</code>（建表）+ <code>.txt</code>（数据），恢复时先跑 .sql 建表，再用 mysqlimport 灌 .txt。</li>
+        <li><code>source</code> 是 mysql 客户端里的命令，读的是<b>客户端本机</b>文件；执行前必须先 <code>USE 库名</code>，否则脚本里没写库名的语句全部报错。</li>
+      </ol>
+    </section>
+
+    <h2 id="s1">1. 它是 <code>-T</code> 的另一半</h2>
+
+    <p><code>mysqldump -T</code> 一条命令产出两个文件：<code>emp.sql</code> 存建表语句、<code>emp.txt</code> 存数据。恢复时也得两头走——<strong>SQL 归 mysql 客户端，数据归 mysqlimport</strong>。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 680 246" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <text x="340" y="20" text-anchor="middle" font-size="11.5" fill="#8a9099">mysqldump -T 拆出两个文件；恢复也是两步，没有一条命令全包</text>
+
+        <rect x="14" y="34" width="186" height="176" rx="8" fill="#f4fafb" stroke="#b9dde5"/>
+        <text x="28" y="58" font-size="11.5" font-weight="700" fill="#00758f">备份（服务端写）</text>
+        <text x="28" y="84" font-size="10.5" font-family="Consolas,monospace" fill="#00566b">mysqldump -T 目录</text>
+        <text x="28" y="102" font-size="10.5" font-family="Consolas,monospace" fill="#00566b">itcast emp</text>
+        <text x="28" y="132" font-size="10.5" fill="#8a9099">一条命令，两个文件</text>
+        <text x="28" y="152" font-size="10.5" fill="#8a9099">目录必须落在</text>
+        <text x="28" y="170" font-size="10.5" fill="#8a9099">secure_file_priv 之内</text>
+        <text x="28" y="194" font-size="10.5" fill="#8a9099">结构与数据分家</text>
+
+        <rect x="222" y="52" width="152" height="46" rx="6" fill="#ffffff" stroke="#dfe3e9"/>
+        <text x="236" y="72" font-size="11.5" font-family="Consolas,monospace" fill="#00566b" font-weight="600">emp.sql</text>
+        <text x="236" y="88" font-size="10" fill="#8a9099">建表语句</text>
+
+        <rect x="222" y="146" width="152" height="46" rx="6" fill="#ffffff" stroke="#dfe3e9"/>
+        <text x="236" y="166" font-size="11.5" font-family="Consolas,monospace" fill="#00566b" font-weight="600">emp.txt</text>
+        <text x="236" y="182" font-size="10" fill="#8a9099">数据 · TAB 分隔</text>
+
+        <path d="M202 88 L218 78" stroke="#c9cfd8" stroke-width="1.4"/>
+        <path d="M202 150 L218 164" stroke="#c9cfd8" stroke-width="1.4"/>
+
+        <rect x="396" y="44" width="268" height="62" rx="6" fill="#fdf7f6" stroke="#f5d3cf"/>
+        <text x="408" y="64" font-size="11" font-weight="700" fill="#c0392b">① 跑脚本：mysql 客户端</text>
+        <text x="408" y="86" font-size="10.5" font-family="Consolas,monospace" fill="#1f2329">mysql -uroot -p itcast &lt; emp.sql</text>
+
+        <rect x="396" y="138" width="268" height="62" rx="6" fill="#f5fbf7" stroke="#cfe8d8"/>
+        <text x="408" y="158" font-size="11" font-weight="700" fill="#1a7f4b">② 灌数据：mysqlimport</text>
+        <text x="408" y="180" font-size="10.5" font-family="Consolas,monospace" fill="#1f2329">mysqlimport -uroot -p itcast emp.txt</text>
+
+        <path d="M374 75 L392 75" stroke="#c9cfd8" stroke-width="1.4"/>
+        <path d="M374 169 L392 169" stroke="#c9cfd8" stroke-width="1.4"/>
+
+        <text x="340" y="232" text-anchor="middle" font-size="10.5" fill="#b06a00">mysqlimport 只搬数据，不建表；建表那半截只能交给 mysql</text>
+      </svg>
+      <figcaption><b>图 1</b><code>-T</code> 的两个产物，对应两条不同的恢复命令。顺序不能反：先建表，再灌数据。</figcaption>
+    </figure>
+
+    <h2 id="s2">2. 语法：文件名就是表名</h2>
+
+    <p>课程给的语法只有一行，但里面藏着一个没写出来的约定——<strong>表名不由你指定，而是从文件名推出来</strong>：去掉扩展名，剩下的就是表名。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 680 240" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <rect x="14" y="24" width="652" height="34" rx="6" fill="#1b2430"/>
+        <text x="28" y="46" font-size="11.5" font-family="Consolas,monospace" fill="#e6edf3">mysqlimport</text>
+        <text x="100" y="46" font-size="11.5" font-family="Consolas,monospace" fill="#ff9d6f">[options]</text>
+        <text x="178" y="46" font-size="11.5" font-family="Consolas,monospace" fill="#a5e3a0">db_name</text>
+        <text x="254" y="46" font-size="11.5" font-family="Consolas,monospace" fill="#e6edf3">textfile1 [textfile2 ...]</text>
+        <text x="28" y="74" font-size="9.5" fill="#8a9099">工具</text>
+        <text x="100" y="74" font-size="9.5" fill="#8a9099">连接参数 / 分隔符</text>
+        <text x="178" y="74" font-size="9.5" fill="#8a9099">进哪个库</text>
+        <text x="254" y="74" font-size="9.5" fill="#8a9099">文件（可给多个）</text>
+
+        <text x="28" y="108" font-size="11.5" font-weight="700" fill="#4e5564">文件名 → 表名</text>
+
+        <rect x="28" y="118" width="176" height="34" rx="5" fill="#ffffff" stroke="#dfe3e9"/>
+        <text x="40" y="140" font-size="11" font-family="Consolas,monospace" fill="#00566b">/tmp/city.txt</text>
+        <path d="M208 135 L232 135" stroke="#c9cfd8" stroke-width="1.4"/>
+        <rect x="236" y="118" width="96" height="34" rx="5" fill="#e6f3f6" stroke="#00758f"/>
+        <text x="284" y="140" text-anchor="middle" font-size="11" font-family="Consolas,monospace" fill="#00566b" font-weight="600">city</text>
+
+        <rect x="28" y="160" width="176" height="34" rx="5" fill="#ffffff" stroke="#dfe3e9"/>
+        <text x="40" y="182" font-size="11" font-family="Consolas,monospace" fill="#00566b">/tmp/emp.txt</text>
+        <path d="M208 177 L232 177" stroke="#c9cfd8" stroke-width="1.4"/>
+        <rect x="236" y="160" width="96" height="34" rx="5" fill="#e6f3f6" stroke="#00758f"/>
+        <text x="284" y="182" text-anchor="middle" font-size="11" font-family="Consolas,monospace" fill="#00566b" font-weight="600">emp</text>
+
+        <text x="28" y="216" font-size="10.5" fill="#8a9099">patient.txt、patient.text、patient 三个文件都进 patient 表</text>
+
+        <rect x="396" y="100" width="268" height="134" rx="8" fill="#fdf7f6" stroke="#f5d3cf"/>
+        <text x="412" y="124" font-size="11.5" font-weight="700" fill="#c0392b">三条约束</text>
+        <text x="412" y="148" font-size="10.5" fill="#8a6535">① 表必须先建好，否则 1146</text>
+        <text x="412" y="172" font-size="10.5" fill="#8a6535">② 没有参数能指定表名</text>
+        <text x="412" y="196" font-size="10.5" fill="#8a6535">③ -c 调的是列顺序，不是表</text>
+        <text x="412" y="220" font-size="10.5" fill="#8a6535">④ 给多个文件 = 一次灌多张表</text>
+      </svg>
+      <figcaption><b>图 2</b>命令里根本没有「表名」这个位置。想导到别的表，只能先把文件改名。</figcaption>
+    </figure>
+
+    <pre><span class="label">语法</span><code>mysqlimport [options] db_name textfile1 [textfile2 ...]</code></pre>
+
+    <pre><span class="label">课程示例</span><code>mysqlimport -uroot -p2143 test /tmp/city.txt</code></pre>
+
+    <div class="note warn">
+      <b>两个符号别读错</b>
+      <p><code>-p2143</code> 是「密码 = 2143」，紧贴 <code>-p</code> 没有空格；写成 <code>-p 2143</code> 会被当成两个参数，<code>2143</code> 会顶到 <code>db_name</code> 的位置上去。<br>
+      <code>test</code> 是<strong>库名</strong>，不是表名。这一步等价于「先 <code>USE test</code>」。</p>
+    </div>
+
+    <h2 id="s3">3. 文件由谁读：默认在服务器上</h2>
+
+    <p>这是 <code>mysqlimport</code> 最容易卡住的地方。它本质是 <code>LOAD DATA INFILE</code> 的命令行包装，<strong>默认由服务端读文件</strong>——你写的路径是数据库服务器上的路径，不是你本机的。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 680 268" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <rect x="8" y="8" width="328" height="248" rx="10" fill="#fdf7f6" stroke="#f5d3cf"/>
+        <text x="28" y="36" font-size="12.5" font-weight="700" fill="#c0392b">默认：服务端读文件</text>
+
+        <circle cx="34" cy="64" r="3.5" fill="#c0392b"/>
+        <text x="48" y="68" font-size="11.5" fill="#1f2329">路径是「数据库服务器上」的</text>
+        <circle cx="34" cy="96" r="3.5" fill="#c0392b"/>
+        <text x="48" y="100" font-size="11.5" fill="#1f2329">账号需要 FILE 权限</text>
+        <circle cx="34" cy="128" r="3.5" fill="#c0392b"/>
+        <text x="48" y="132" font-size="11.5" fill="#1f2329">目录必须在 secure_file_priv 内</text>
+        <circle cx="34" cy="160" r="3.5" fill="#c0392b"/>
+        <text x="48" y="164" font-size="11.5" fill="#1f2329">否则 ERROR 1290 (HY000)</text>
+
+        <rect x="26" y="182" width="292" height="56" rx="6" fill="#ffffff" stroke="#f0d9d5"/>
+        <text x="38" y="202" font-size="10.5" fill="#8a9099">例（服务器上的路径）</text>
+        <text x="38" y="224" font-size="11" font-family="Consolas,monospace" fill="#00566b">/var/lib/mysql-files/emp.txt</text>
+
+        <rect x="344" y="8" width="328" height="248" rx="10" fill="#f5fbf7" stroke="#cfe8d8"/>
+        <text x="364" y="36" font-size="12.5" font-weight="700" fill="#1a7f4b">加 --local / -L：客户端读</text>
+
+        <circle cx="370" cy="64" r="3.5" fill="#1a7f4b"/>
+        <text x="384" y="68" font-size="11.5" fill="#1f2329">路径是「你自己电脑上」的</text>
+        <circle cx="370" cy="96" r="3.5" fill="#1a7f4b"/>
+        <text x="384" y="100" font-size="11.5" fill="#1f2329">不需要 FILE 权限</text>
+        <circle cx="370" cy="128" r="3.5" fill="#1a7f4b"/>
+        <text x="384" y="132" font-size="11.5" fill="#1f2329">服务端 local_infile 必须为 ON</text>
+        <circle cx="370" cy="160" r="3.5" fill="#1a7f4b"/>
+        <text x="384" y="164" font-size="11.5" fill="#1f2329">8.0 默认 OFF → ERROR 3950</text>
+
+        <rect x="362" y="182" width="292" height="56" rx="6" fill="#ffffff" stroke="#cfe8d8"/>
+        <text x="374" y="202" font-size="10.5" fill="#8a9099">例（本机路径）</text>
+        <text x="374" y="224" font-size="11" font-family="Consolas,monospace" fill="#00566b">C:/temp/emp.txt</text>
+      </svg>
+      <figcaption><b>图 3</b>同一个「路径」参数，加不加 <code>--local</code> 指向两台不同的机器。远程连库时先想清楚文件到底在哪一边。</figcaption>
+    </figure>
+
+    <pre><span class="label">sql</span><code><span class="c">-- 先确认两个开关，比试错快</span>
+<span class="k">SHOW</span> <span class="k">VARIABLES</span> <span class="k">LIKE</span> <span class="s">'secure_file_priv'</span>;  <span class="c">-- 空值 = 禁止导入导出；NULL 也一样</span>
+<span class="k">SHOW</span> <span class="k">VARIABLES</span> <span class="k">LIKE</span> <span class="s">'local_infile'</span>;    <span class="c">-- 8.0 默认 OFF</span>
+
+<span class="c">-- 临时打开（重启失效）</span>
+<span class="k">SET</span> <span class="k">GLOBAL</span> local_infile <span class="k">=</span> <span class="f">ON</span>;</code></pre>
+
+    <div class="note danger">
+      <b>报错对照</b>
+      <p><code>ERROR 1290 (HY000): The MySQL server is running with the --secure-file-priv option</code> → 没加 <code>--local</code>，而路径不在 <code>secure_file_priv</code> 目录里。要么把文件挪进去，要么加 <code>--local</code>。<br>
+      <code>ERROR 3950 (42000): Loading local data is disabled</code> → 加了 <code>--local</code>，但服务端 <code>local_infile</code> 还是 OFF。<br>
+      <code>ERROR 1146 (42S02): Table 'test.city' doesn't exist</code> → 表没建。<code>mysqlimport</code> 不负责建表。</p>
+    </div>
+
+    <div class="note tip">
+      <b>这个「信任目录」的完整说明</b>
+      <p><code>secure_file_priv</code> 的三种取值（目录 / <code>NULL</code> / 空字符串）、各平台默认值、四个常见报错和修改方式，都整理在 <a href="07-06-mysqldump.html#trust">mysqldump · secure_file_priv 信任目录</a> 那一节。这里只记一条结论：<strong>它约束的是「服务端读写文件」，加 <code>--local</code> 就完全不经过它</strong>。</p>
+    </div>
+
+    <h2 id="s4">4. 选项与实战</h2>
+
+    <table>
+      <thead><tr><th>选项</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td><code>-L</code> / <code>--local</code></td><td>从客户端本机读文件，而不是服务端</td></tr>
+        <tr><td><code>-d</code> / <code>--delete</code></td><td><strong>导入前先清空目标表</strong>。用于覆盖式恢复，别对生产库随手加</td></tr>
+        <tr><td><code>-r</code> / <code>--replace</code></td><td>遇到唯一键冲突，用新行替换旧行</td></tr>
+        <tr><td><code>-i</code> / <code>--ignore</code></td><td>遇到唯一键冲突，跳过新行</td></tr>
+        <tr><td><code>--fields-terminated-by</code></td><td>字段分隔符，<strong>默认 <code>\t</code></strong>。与 <code>mysqldump -T</code> 的导出设置必须一致</td></tr>
+        <tr><td><code>--fields-enclosed-by</code><br><code>--fields-optionally-enclosed-by</code></td><td>字段包围符，CSV 一般用 <code>"</code>；后者表示「有就剥掉，没有也行」</td></tr>
+        <tr><td><code>--lines-terminated-by</code></td><td>行结束符，Windows 生成的 CSV 常需 <code>'\r\n'</code></td></tr>
+        <tr><td><code>--ignore-lines=N</code></td><td>跳过前 N 行，CSV 去表头用</td></tr>
+        <tr><td><code>-c</code> / <code>--columns</code></td><td>按给定列名顺序对应，文件列序与表列序不一致时用</td></tr>
+        <tr><td><code>--use-threads=N</code></td><td>并行加载线程数，多个文件时才有意义</td></tr>
+        <tr><td><code>-f</code> / <code>--force</code></td><td>某个文件出错也继续处理剩下的</td></tr>
+      </tbody>
+    </table>
+
+    <pre><span class="label">shell</span><code><span class="c"># 与 mysqldump -T 配套：先建表，再灌数据</span>
+mysql -uroot -p123456 itcast &lt; /var/lib/mysql-files/emp.sql
+mysqlimport -uroot -p123456 itcast /var/lib/mysql-files/emp.txt
+
+<span class="c"># 一个目录里全是「表名.txt」，一次灌完（覆盖式，慎用 --delete）</span>
+mysqlimport -uroot -p123456 --delete itcast /var/lib/mysql-files/*.txt
+
+<span class="c"># CSV：分隔符、包围符、跳过表头，三项都要和导出时对齐</span>
+mysqlimport -uroot -p123456 --local \
+  --fields-terminated-by=',' --fields-optionally-enclosed-by='"' \
+  --ignore-lines=1 test /tmp/city.csv</code></pre>
+
+    <div class="note tip">
+      <b>分隔符不一致 = 整行塞进第一列</b>
+      <p>导入结果「第一列塞满了整行、其余列全是 NULL」，不是数据坏了，是分隔符没对上。<code>mysqldump -T</code> 默认用 TAB，所以导入时<strong>不要</strong>画蛇添足加 <code>--fields-terminated-by=','</code>；反过来，导出时用 <code>--fields-terminated-by=','</code>，导入也必须一致。</p>
+    </div>
+
+    <h2 id="s5">5. <code>source</code>：在客户端里跑 SQL 脚本</h2>
+
+    <p><code>mysqlimport</code> 只认数据文件。<strong>要导的是 <code>.sql</code> 脚本，就用 <code>source</code></strong>——它是 mysql 客户端的内置命令，不是 SQL 语句。</p>
+
+    <pre><span class="label">语法</span><code>source /root/xxxxx.sql
+
+<span class="c">-- 等价简写（反斜杠 + 点）</span>
+\. /root/xxxxx.sql</code></pre>
+
+    <pre><span class="label">mysql 会话</span><code>mysql&gt; <span class="k">USE</span> itcast;              <span class="c">-- 单库备份里没有建库语句，必须先选库</span>
+Database changed
+mysql&gt; <span class="k">source</span> /root/itcast.sql;
+Query OK, 0 rows affected (0.00 sec)
+Query OK, 1 row affected (0.01 sec)
+...
+mysql&gt; <span class="k">SELECT</span> <span class="f">COUNT</span>(*) <span class="k">FROM</span> emp;</code></pre>
+
+    <figure class="fig">
+      <svg viewBox="0 0 680 210" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <text x="340" y="20" text-anchor="middle" font-size="11.5" fill="#8a9099">同一个 xxx.sql，三条路都能跑，差别在「在哪执行、错了停不停」</text>
+
+        <rect x="14" y="34" width="208" height="156" rx="8" fill="#f4fafb" stroke="#b9dde5"/>
+        <text x="28" y="58" font-size="11.5" font-weight="700" fill="#00758f">source（会话内）</text>
+        <text x="28" y="82" font-size="10.5" font-family="Consolas,monospace" fill="#00566b">mysql&gt; source x.sql</text>
+        <text x="28" y="108" font-size="10.5" fill="#4e5564">不用退出客户端</text>
+        <text x="28" y="128" font-size="10.5" fill="#4e5564">可以先 USE，边导边查</text>
+        <text x="28" y="148" font-size="10.5" fill="#4e5564">出错打印后继续往下跑</text>
+        <text x="28" y="174" font-size="10" fill="#8a9099">适合手工恢复、调试</text>
+
+        <rect x="236" y="34" width="208" height="156" rx="8" fill="#f5fbf7" stroke="#cfe8d8"/>
+        <text x="250" y="58" font-size="11.5" font-weight="700" fill="#1a7f4b">重定向（命令行）</text>
+        <text x="250" y="82" font-size="10.5" font-family="Consolas,monospace" fill="#00566b">mysql db &lt; x.sql</text>
+        <text x="250" y="108" font-size="10.5" fill="#4e5564">库名写在命令行里</text>
+        <text x="250" y="128" font-size="10.5" fill="#4e5564">遇错默认中止</text>
+        <text x="250" y="148" font-size="10.5" fill="#4e5564">可写进 shell 脚本 / 定时任务</text>
+        <text x="250" y="174" font-size="10" fill="#8a9099">适合自动化、批量</text>
+
+        <rect x="458" y="34" width="208" height="156" rx="8" fill="#fdf7f6" stroke="#f5d3cf"/>
+        <text x="472" y="58" font-size="11.5" font-weight="700" fill="#c0392b">mysqlimport</text>
+        <text x="472" y="82" font-size="10.5" font-family="Consolas,monospace" fill="#00566b">mysqlimport db x.txt</text>
+        <text x="472" y="108" font-size="10.5" fill="#4e5564">只吃数据文本，不吃 .sql</text>
+        <text x="472" y="128" font-size="10.5" fill="#4e5564">表必须已存在</text>
+        <text x="472" y="148" font-size="10.5" fill="#4e5564">表名由文件名决定</text>
+        <text x="472" y="174" font-size="10" fill="#8a9099">适合 -T 产物、CSV 批量</text>
+      </svg>
+      <figcaption><b>图 4</b><code>source</code> 与 <code>&lt;</code> 重定向做的是同一件事，区别只在「脚本里能不能写」。</figcaption>
+    </figure>
+
+    <div class="note warn">
+      <b><code>source</code> 的三个坑</b>
+      <p><strong>① 忘了 <code>USE</code>。</strong>单库备份不带建库语句，直接 <code>source</code> 会一路报 <code>ERROR 1046 (3D000): No database selected</code>。<br>
+      <strong>② 路径是本机的。</strong><code>source</code> 由客户端读文件再发给服务端，所以 <code>/root/xxxxx.sql</code> 指的是<strong>你运行 mysql 命令那台机器</strong>的路径，不需要 <code>FILE</code> 权限，也不受 <code>secure_file_priv</code> 限制——这一点和 <code>mysqlimport</code> 的默认行为正好相反。<br>
+      <strong>③ 出错不中断。</strong>交互式执行时，某条语句失败只打印一行错误，后面继续跑。恢复完必须自己核对：<code>SELECT COUNT(*) FROM 表名</code>，或数一下输出里 <code>ERROR</code> 的条数。</p>
+    </div>
+
+    <div class="note plain">
+      <b>Windows 下的路径</b>
+      <p>反斜杠在 mysql 客户端里有转义含义，<code>source C:\temp\a.sql</code> 容易被吃掉字符。统一写成 <code>source C:/temp/a.sql</code>，最省事。</p>
+    </div>
+
+    <h2 id="s6">6. 按手里的文件选命令</h2>
+
+    <figure class="fig">
+      <svg viewBox="0 0 680 232" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <text x="340" y="20" text-anchor="middle" font-size="11.5" fill="#8a9099">恢复没有万能命令，先看手里的文件长什么样</text>
+
+        <rect x="14" y="34" width="208" height="150" rx="8" fill="#f4fafb" stroke="#b9dde5"/>
+        <text x="28" y="58" font-size="11.5" font-family="Consolas,monospace" font-weight="700" fill="#00758f">xxx.sql</text>
+        <text x="28" y="78" font-size="10.5" fill="#4e5564">含 CREATE DATABASE</text>
+        <text x="28" y="106" font-size="10.5" fill="#8a9099">mysql -uroot -p &lt; xxx.sql</text>
+        <text x="28" y="126" font-size="10.5" fill="#8a9099">（不用写库名）</text>
+        <text x="28" y="156" font-size="10" fill="#1a7f4b">-B / -A 的产物走这条</text>
+
+        <rect x="236" y="34" width="208" height="150" rx="8" fill="#f7f9fa" stroke="#e4e7ec"/>
+        <text x="250" y="58" font-size="11.5" font-family="Consolas,monospace" font-weight="700" fill="#1f2329">xxx.sql</text>
+        <text x="250" y="78" font-size="10.5" fill="#4e5564">只有表 / 数据，无建库</text>
+        <text x="250" y="106" font-size="10.5" fill="#8a9099">USE itcast;</text>
+        <text x="250" y="126" font-size="10.5" fill="#8a9099">source /root/xxx.sql;</text>
+        <text x="250" y="156" font-size="10" fill="#b06a00">单库 db_name 的产物走这条</text>
+
+        <rect x="458" y="34" width="208" height="150" rx="8" fill="#fdf7f6" stroke="#f5d3cf"/>
+        <text x="472" y="58" font-size="11.5" font-family="Consolas,monospace" font-weight="700" fill="#c0392b">xxx.txt / .csv</text>
+        <text x="472" y="78" font-size="10.5" fill="#4e5564">纯数据，表要先存在</text>
+        <text x="472" y="106" font-size="10.5" fill="#8a9099">mysqlimport db xxx.txt</text>
+        <text x="472" y="126" font-size="10.5" fill="#8a9099">（表名 = 文件名）</text>
+        <text x="472" y="156" font-size="10" fill="#b06a00">-T 的 .txt 走这条</text>
+
+        <text x="340" y="210" text-anchor="middle" font-size="10.5" fill="#8a9099">拿不准就先 <tspan font-family="Consolas,monospace">head -3 xxx.sql</tspan> 看一眼开头有没有 CREATE DATABASE</text>
+      </svg>
+      <figcaption><b>图 5</b>三条路线对应三种产物。选错命令的典型表现是 <code>ERROR 1046</code>（没选库）或 <code>ERROR 1146</code>（表不存在）。</figcaption>
+    </figure>
+
+    <div class="note tip">
+      <b>一句话记住</b>
+      <p><code>.sql</code> 是<strong>客户端读</strong>、逐条发给服务端执行，所以要么 <code>source</code>、要么 <code>&lt;</code>；<code>.txt</code> 是<strong>服务端读</strong>（除非 <code>--local</code>），所以必须落在 <code>secure_file_priv</code> 里。方向搞反，报错码会提示你。</p>
+    </div>
+
+    <section class="quiz">
+      <p class="quiz-head">自测三问<span>先自己答一遍，再点开对答案</span></p>
+      <details>
+        <summary><span class="qno">Q1</span><span class="ask"><code>mysqlimport -uroot -p itcast /tmp/itcast.csv</code> 报「表不存在」，可文件明明就叫 itcast？</span><span class="caret" aria-hidden="true"></span></summary>
+        <div class="ans"><p>表名取的是<b>文件名</b>（itcast.csv → 表 itcast），位置参数 itcast 是<b>库名</b>。mysqlimport 从不建表，必须先用 <code>CREATE TABLE</code> 建好同名表。</p></div>
+      </details>
+      <details>
+        <summary><span class="qno">Q2</span><span class="ask">不加 <code>--local</code> 报 <code>ERROR 1290</code>，加上就通了，为什么？</span><span class="caret" aria-hidden="true"></span></summary>
+        <div class="ans"><p>不加时由<b>服务端</b>读文件，路径必须在 <code>secure_file_priv</code> 指定目录内（该变量为 <code>NULL</code> 时完全禁止）。<code>--local</code> 改成客户端读、再通过网络送过去，绕开这个目录限制，但要 <code>local_infile=ON</code>。</p></div>
+      </details>
+      <details>
+        <summary><span class="qno">Q3</span><span class="ask">用 <code>source</code> 导入脚本报 <code>No database selected</code>，脚本本身没问题吧？</span><span class="caret" aria-hidden="true"></span></summary>
+        <div class="ans"><p>脚本可能只写了 <code>CREATE TABLE t ...</code> 这类不带库名的语句。<code>source</code> 只是把文件内容当 SQL 逐条执行，<b>不会自动切库</b>——进客户端后先 <code>USE itcast;</code> 再 source，或在脚本开头自己写 USE。</p></div>
+      </details>
+    </section>
+    <div class="footer">
+      <a href="07-06-mysqldump.html">← 7.2.5 mysqldump</a> · <a href="07-MySQL管理.html">MySQL 管理</a> · <a href="../index.html">总目录</a>
+    </div>
+
+  </main>
+</div>
+</body>
+</html>

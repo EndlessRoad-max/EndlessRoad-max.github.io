@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>7.2.5 mysqldump · MySQL 笔记</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="layout">
+
+  <nav class="sidebar">
+    <p class="side-title">本页目录</p>
+    <a href="#s1">1. 命令结构</a>
+    <a href="#s2">2. 备份粒度</a>
+    <a href="#s3">3. 能力边界</a>
+    <a href="#s4">4. 选项与实战</a>
+    <a href="#trust" style="padding-left:24px;font-size:12.5px;color:#8a9099">· secure_file_priv 信任目录</a>
+    <p class="side-title" style="margin-top:22px">当前位置</p>
+    <ul class="nav-tree">
+      <li><a href="../index.html">↑ 总目录</a>
+        <ul>
+          <li><a class="group" href="07-MySQL管理.html">07 MySQL 管理</a>
+            <ul>
+              <li><a class="leaf" href="07-01-系统数据库.html">7.1 系统数据库</a></li>
+              <li><a class="leaf" href="07-02-mysql.html">7.2.1 mysql</a></li>
+              <li><a class="leaf" href="07-03-mysqladmin.html">7.2.2 mysqladmin</a></li>
+              <li><a class="leaf" href="07-04-mysqlbinlog.html">7.2.3 mysqlbinlog</a></li>
+              <li><a class="leaf" href="07-05-mysqlshow.html">7.2.4 mysqlshow</a></li>
+              <li><span class="current">7.2.5 mysqldump</span></li>
+              <li><a class="leaf" href="07-07-mysqlimport.html">7.2.6 mysqlimport</a></li>
+            </ul>
+          </li>
+        </ul>
+      </li>
+    </ul>
+  </nav>
+
+  <main class="main">
+
+    <div class="crumb">
+      <a href="../index.html">总目录</a> /
+      <a href="07-MySQL管理.html">进阶篇 · 07 MySQL 管理</a> /
+      mysqldump
+    </div>
+    <h1><span class="chapter-no">7.2.5</span>mysqldump</h1>
+    <p class="lede">逻辑备份工具。产物是一个纯文本 <code>.sql</code>，内容是「建表语句 + 插入语句」，重放一遍就能还原数据。中小库备份的默认答案。</p>
+
+    <div class="meta">
+      <span>进阶篇 · 7.2 常用客户端工具</span>
+      <span>更新：2026-11-25</span>
+      <span>环境：MySQL 8.0</span>
+    </div>
+
+    <section class="quick">
+      <p class="quick-head">一屏速记<span>合上笔记，这 5 条要能自己说出来</span></p>
+      <ol>
+        <li>备份的是 <b>database</b>，不是整个 MySQL 安装。备几个由写法决定：<code>db_name</code> 备一个、<code>-B db1 db2</code> 备几个、<code>-A</code> 备全部。</li>
+        <li>单给 <code>db_name</code> 时，导出文件里<b>既没有 CREATE DATABASE 也没有 USE</b>，目标库必须事先存在；<code>-B</code> / <code>-A</code> 才带。</li>
+        <li><code>-A</code> 才是「整个实例」，它连 <code>mysql</code> 系统库一起导，<b>账号和授权也在里面</b>——这和 mysqlpump 默认不导账号正好相反。</li>
+        <li>存储过程、触发器、定时事件<b>默认都不导</b>，必须显式加 <code>--routines --triggers --events</code>，否则恢复时业务逻辑静默丢失。</li>
+        <li>线上库必加 <code>--single-transaction</code>（InnoDB 一致性快照，不锁表）；导到别的实例常加 <code>--set-gtid-purged=OFF</code>，否则导入报 GTID 冲突。</li>
+      </ol>
+    </section>
+
+    <h2 id="s1">1. 一条命令拆成四段</h2>
+
+    <figure class="fig">
+      <svg viewBox="0 0 680 175" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <rect x="24" y="34" width="108" height="40" rx="6" fill="#00758f"/>
+        <text x="78" y="59" text-anchor="middle" font-size="13" font-family="Consolas,monospace" fill="#ffffff">mysqldump</text>
+
+        <rect x="134" y="34" width="152" height="40" rx="6" fill="#fdf3e3" stroke="#f0d9b0"/>
+        <text x="210" y="59" text-anchor="middle" font-size="13" font-family="Consolas,monospace" fill="#b06a00">[options]</text>
+
+        <rect x="292" y="34" width="108" height="40" rx="6" fill="#e6f3f6" stroke="#b9dde5"/>
+        <text x="346" y="59" text-anchor="middle" font-size="13" font-family="Consolas,monospace" fill="#00566b">db_name</text>
+
+        <rect x="406" y="34" width="122" height="40" rx="6" fill="#f2f4f7" stroke="#e4e7ec"/>
+        <text x="467" y="59" text-anchor="middle" font-size="12.5" font-family="Consolas,monospace" fill="#4e5564">&gt; dump.sql</text>
+
+        <path d="M78 76 L78 86" stroke="#c9cfd8" stroke-width="1.2"/>
+        <path d="M210 76 L210 86" stroke="#c9cfd8" stroke-width="1.2"/>
+        <path d="M346 76 L346 86" stroke="#c9cfd8" stroke-width="1.2"/>
+        <path d="M467 76 L467 86" stroke="#c9cfd8" stroke-width="1.2"/>
+
+        <text x="78" y="102" text-anchor="middle" font-size="11.5" fill="#4e5564" font-weight="600">工具本体</text>
+        <text x="210" y="102" text-anchor="middle" font-size="11.5" fill="#b06a00" font-weight="600">连接参数</text>
+        <text x="210" y="118" text-anchor="middle" font-size="10.5" font-family="Consolas,monospace" fill="#8a9099">-u -p -h -P</text>
+        <text x="346" y="102" text-anchor="middle" font-size="11.5" fill="#00566b" font-weight="600">备份谁</text>
+        <text x="346" y="118" text-anchor="middle" font-size="10.5" font-family="Consolas,monospace" fill="#8a9099">db / -B / -A</text>
+        <text x="467" y="102" text-anchor="middle" font-size="11.5" fill="#4e5564" font-weight="600">写到文件</text>
+
+        <text x="340" y="152" text-anchor="middle" font-size="11.5" fill="#8a9099">注：PowerShell 的 &gt; 会生成 UTF-16 文件导致导入失败，改用 --result-file=dump.sql</text>
+      </svg>
+      <figcaption><b>图 1</b>命令结构。第三段决定备份范围，这是整页的关键。</figcaption>
+    </figure>
+
+    <pre><span class="label">语法</span><code>mysqldump [options] db_name [tables]
+mysqldump [options] --databases/-B db1 [db2 db3...]
+mysqldump [options] --all-databases/-A</code></pre>
+
+    <h2 id="s2">2. 备份粒度：database，不是整个 MySQL</h2>
+
+    <p>这是最容易搞混的一点：<strong>它备份的永远是 database（库/模式），不是整个 MySQL 安装。</strong>具体备几个库，由参数决定。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 680 272" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <text x="340" y="22" text-anchor="middle" font-size="11.5" fill="#8a9099">同一个实例下的三个库，三种写法各备多少（连接参数统一为 -uroot -p）</text>
+
+        <text x="20" y="50" font-size="10.5" font-family="Consolas,monospace" fill="#8a9099">mysqldump -uroot -p</text>
+        <text x="20" y="68" font-size="11.5" font-family="Consolas,monospace" font-weight="600" fill="#00758f">itcast</text>
+        <text x="20" y="86" font-size="11" fill="#8a9099">只备这一个库</text>
+        <rect x="20" y="98" width="180" height="40" rx="6" fill="#e6f3f6" stroke="#00758f" stroke-width="1.5"/>
+        <text x="34" y="123" font-size="12" fill="#00566b" font-weight="600">itcast</text>
+        <rect x="20" y="146" width="180" height="40" rx="6" fill="#fbfcfd" stroke="#e4e7ec" stroke-dasharray="4 3"/>
+        <text x="34" y="171" font-size="12" fill="#b9bfc8">itheimadb</text>
+        <rect x="20" y="194" width="180" height="40" rx="6" fill="#fbfcfd" stroke="#e4e7ec" stroke-dasharray="4 3"/>
+        <text x="34" y="219" font-size="12" fill="#b9bfc8">mysql（系统库）</text>
+        <text x="20" y="260" font-size="10.5" fill="#b06a00">✗ 文件里没有 CREATE DATABASE</text>
+
+        <text x="250" y="50" font-size="10.5" font-family="Consolas,monospace" fill="#8a9099">mysqldump -uroot -p -B</text>
+        <text x="250" y="68" font-size="11.5" font-family="Consolas,monospace" font-weight="600" fill="#00758f">itcast itheimadb</text>
+        <text x="250" y="86" font-size="11" fill="#8a9099">备列出的这几个</text>
+        <rect x="250" y="98" width="180" height="40" rx="6" fill="#e6f3f6" stroke="#00758f" stroke-width="1.5"/>
+        <text x="264" y="123" font-size="12" fill="#00566b" font-weight="600">itcast</text>
+        <rect x="250" y="146" width="180" height="40" rx="6" fill="#e6f3f6" stroke="#00758f" stroke-width="1.5"/>
+        <text x="264" y="171" font-size="12" fill="#00566b" font-weight="600">itheimadb</text>
+        <rect x="250" y="194" width="180" height="40" rx="6" fill="#fbfcfd" stroke="#e4e7ec" stroke-dasharray="4 3"/>
+        <text x="264" y="219" font-size="12" fill="#b9bfc8">mysql（系统库）</text>
+        <text x="250" y="260" font-size="10.5" fill="#1a7f4b">✓ 自带 CREATE DATABASE</text>
+
+        <text x="480" y="50" font-size="10.5" font-family="Consolas,monospace" fill="#8a9099">mysqldump -uroot -p</text>
+        <text x="480" y="68" font-size="11.5" font-family="Consolas,monospace" font-weight="600" fill="#00758f">-A</text>
+        <text x="480" y="86" font-size="11" fill="#8a9099">整个实例所有库</text>
+        <rect x="480" y="98" width="180" height="40" rx="6" fill="#e6f3f6" stroke="#00758f" stroke-width="1.5"/>
+        <text x="494" y="123" font-size="12" fill="#00566b" font-weight="600">itcast</text>
+        <rect x="480" y="146" width="180" height="40" rx="6" fill="#e6f3f6" stroke="#00758f" stroke-width="1.5"/>
+        <text x="494" y="171" font-size="12" fill="#00566b" font-weight="600">itheimadb</text>
+        <rect x="480" y="194" width="180" height="40" rx="6" fill="#e6f3f6" stroke="#00758f" stroke-width="1.5"/>
+        <text x="494" y="219" font-size="12" fill="#00566b" font-weight="600">mysql（系统库）</text>
+        <text x="480" y="260" font-size="10.5" fill="#1a7f4b">✓ 含建库语句，也含系统库</text>
+      </svg>
+      <figcaption><b>图 2</b>三档粒度。蓝色 = 备份覆盖范围，虚线 = 不备。三条命令都是可直接执行的完整写法。</figcaption>
+    </figure>
+
+    <div class="note warn">
+      <b>为什么第一档没有 CREATE DATABASE</b>
+      <p>单个 <code>db_name</code> 只导出「库里有什么」，不导出「建这个库」这个动作。所以恢复命令里必须写目标库：<br>
+      <code>mysql -uroot -p itcast &lt; dump.sql</code>　否则报 <code>ERROR 1046 (3D000): No database selected</code>。<br>
+      反过来说，正因为 <code>-B</code>/<code>-A</code> 自带建库语句，才有 <code>-n, --no-create-db</code> 这个开关去关掉它。</p>
+    </div>
+
+    <h2 id="s3">3. 能力边界：<code>-A</code> 也不等于整个 MySQL</h2>
+
+    <p>「整个 MySQL 软件」这个说法要拆开看。<strong>逻辑备份只搬数据，不搬软件。</strong>哪怕加了 <code>-A</code>：</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 680 300" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <rect x="8" y="8" width="328" height="284" rx="10" fill="#f5fbf7" stroke="#cfe8d8"/>
+        <text x="28" y="38" font-size="13" font-weight="700" fill="#1a7f4b">✓ 逻辑备份带得走的</text>
+
+        <circle cx="34" cy="66" r="3.5" fill="#1a7f4b"/>
+        <text x="48" y="70" font-size="12" fill="#1f2329">表结构 CREATE TABLE</text>
+        <circle cx="34" cy="100" r="3.5" fill="#1a7f4b"/>
+        <text x="48" y="104" font-size="12" fill="#1f2329">表数据 INSERT</text>
+        <circle cx="34" cy="134" r="3.5" fill="#1a7f4b"/>
+        <text x="48" y="138" font-size="12" fill="#1f2329">视图 / 触发器（加 --triggers）</text>
+        <circle cx="34" cy="168" r="3.5" fill="#1a7f4b"/>
+        <text x="48" y="172" font-size="12" fill="#1f2329">存储过程 / 函数（加 --routines）</text>
+        <circle cx="34" cy="202" r="3.5" fill="#1a7f4b"/>
+        <text x="48" y="206" font-size="12" fill="#1f2329">事件 EVENT（加 --events）</text>
+        <circle cx="34" cy="236" r="3.5" fill="#1a7f4b"/>
+        <text x="48" y="240" font-size="12" fill="#1f2329">账号权限（<tspan font-family="Consolas,monospace">-A</tspan> 时随 mysql 库走）</text>
+
+        <rect x="344" y="8" width="328" height="284" rx="10" fill="#fdf7f6" stroke="#f5d3cf"/>
+        <text x="364" y="38" font-size="13" font-weight="700" fill="#c0392b">✗ 带不走的（要另想办法）</text>
+
+        <circle cx="370" cy="66" r="3.5" fill="#c0392b"/>
+        <text x="384" y="70" font-size="12" fill="#1f2329">my.cnf / my.ini 配置</text>
+        <circle cx="370" cy="100" r="3.5" fill="#c0392b"/>
+        <text x="384" y="104" font-size="12" fill="#1f2329">ibdata1、*.ibd 物理页</text>
+        <circle cx="370" cy="134" r="3.5" fill="#c0392b"/>
+        <text x="384" y="138" font-size="12" fill="#1f2329">redo / undo 日志</text>
+        <circle cx="370" cy="168" r="3.5" fill="#c0392b"/>
+        <text x="384" y="172" font-size="12" fill="#1f2329">binlog 二进制日志</text>
+        <circle cx="370" cy="202" r="3.5" fill="#c0392b"/>
+        <text x="384" y="206" font-size="12" fill="#1f2329">插件 / 全局参数 / 复制拓扑</text>
+        <circle cx="370" cy="236" r="3.5" fill="#c0392b"/>
+        <text x="384" y="240" font-size="12" fill="#1f2329">用户账号（只备单库时）</text>
+        <text x="384" y="256" font-size="10.5" fill="#b06a00">↑ 表都在、应用连不上，就是这条</text>
+      </svg>
+      <figcaption><b>图 3</b>逻辑备份的覆盖范围。右边才是「整机」和「一个库」的真正差距。</figcaption>
+    </figure>
+
+    <div class="note danger">
+      <b>最容易踩：账号没备走</b>
+      <p>账号和权限存在 <code>mysql</code> 系统库里。<code>mysqldump -uroot -p itcast</code> 只导业务库，<strong>账号根本不进文件</strong>——恢复到新实例后表都在、应用连不上。</p>
+      <p><code>-A</code> 能带上，因为它是连 <code>mysql</code> 库一起导的，账号以 <code>INSERT INTO mysql.user</code> 的形式落进文件。但这引出另一个坑：跨版本恢复（5.7 → 8.0）时 <code>user</code> 表结构变了，带密码哈希的 INSERT 很容易失败。</p>
+      <p>更稳的做法是把账号导成语句，而不是表数据：</p>
+      <pre style="margin:10px 0 0"><code><span class="c">-- 生成一份 grant 脚本，再在目标库执行</span>
+<span class="k">SELECT</span> <span class="f">CONCAT</span>(<span class="s">'SHOW GRANTS FOR '''</span>, user, <span class="s">'''@'''</span>, host, <span class="s">''';'</span>)
+<span class="k">FROM</span> <span class="f">mysql.user</span>;</code></pre>
+    </div>
+
+    <p>真要「整机级」备份，方向不是加参数，而是换手段：物理备份（XtraBackup / 停机拷数据目录）、或 MySQL Shell 的 <code>util.dumpInstance()</code>。</p>
+
+    <h2 id="s4">4. 选项与实战</h2>
+
+    <figure class="fig">
+      <svg viewBox="0 0 680 204" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <text x="250" y="34" text-anchor="middle" font-size="12" fill="#4e5564" font-weight="600">表结构</text>
+        <text x="250" y="50" text-anchor="middle" font-size="10" font-family="Consolas,monospace" fill="#8a9099">CREATE TABLE</text>
+        <text x="430" y="34" text-anchor="middle" font-size="12" fill="#4e5564" font-weight="600">表数据</text>
+        <text x="430" y="50" text-anchor="middle" font-size="10" font-family="Consolas,monospace" fill="#8a9099">INSERT</text>
+
+        <path d="M24 60 L540 60" stroke="#eef0f3" stroke-width="1"/>
+
+        <text x="24" y="92" font-size="12" fill="#1f2329">默认</text>
+        <circle cx="250" cy="88" r="11" fill="#e8f6ee" stroke="#1a7f4b"/>
+        <text x="250" y="93" text-anchor="middle" font-size="13" font-weight="700" fill="#1a7f4b">✓</text>
+        <circle cx="430" cy="88" r="11" fill="#e8f6ee" stroke="#1a7f4b"/>
+        <text x="430" y="93" text-anchor="middle" font-size="13" font-weight="700" fill="#1a7f4b">✓</text>
+
+        <path d="M24 112 L540 112" stroke="#eef0f3" stroke-width="1"/>
+
+        <text x="24" y="140" font-size="12" font-family="Consolas,monospace" fill="#b06a00">-d</text>
+        <text x="48" y="140" font-size="11" fill="#8a9099">--no-data　只要结构</text>
+        <circle cx="250" cy="136" r="11" fill="#e8f6ee" stroke="#1a7f4b"/>
+        <text x="250" y="141" text-anchor="middle" font-size="13" font-weight="700" fill="#1a7f4b">✓</text>
+        <circle cx="430" cy="136" r="11" fill="#fdecea" stroke="#e3b5b0"/>
+        <text x="430" y="141" text-anchor="middle" font-size="13" font-weight="700" fill="#c0392b">✗</text>
+
+        <path d="M24 160 L540 160" stroke="#eef0f3" stroke-width="1"/>
+
+        <text x="24" y="188" font-size="12" font-family="Consolas,monospace" fill="#b06a00">-t</text>
+        <text x="48" y="188" font-size="11" fill="#8a9099">--no-create-info　只要数据</text>
+        <circle cx="250" cy="184" r="11" fill="#fdecea" stroke="#e3b5b0"/>
+        <text x="250" y="189" text-anchor="middle" font-size="13" font-weight="700" fill="#c0392b">✗</text>
+        <circle cx="430" cy="184" r="11" fill="#e8f6ee" stroke="#1a7f4b"/>
+        <text x="430" y="189" text-anchor="middle" font-size="13" font-weight="700" fill="#1a7f4b">✓</text>
+      </svg>
+      <figcaption><b>图 4</b>记法：<code>-d</code> 是 data → 不要数据 → 只要结构；<code>-t</code> 是 table → 不要表 → 只要数据。</figcaption>
+    </figure>
+
+    <h3>连接选项</h3>
+    <table>
+      <thead><tr><th>选项</th><th>全称</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td><code>-u</code></td><td><code>--user-name</code></td><td>指定用户名</td></tr>
+        <tr><td><code>-p</code></td><td><code>--password[=name]</code></td><td>指定密码；<code>-p</code> 后不加空格，直接跟密码，或留空等提示输入</td></tr>
+        <tr><td><code>-h</code></td><td><code>--host-name</code></td><td>指定服务器 IP 或域名</td></tr>
+        <tr><td><code>-P</code></td><td><code>--port=#</code></td><td>端口（大写 P 是端口，小写 p 是密码）</td></tr>
+      </tbody>
+    </table>
+
+    <h3>输出选项</h3>
+
+    <p>这一组里只有 <code>-T</code> 需要传值——它后面跟的是一个<strong>目录路径</strong>，其余全是纯开关（加了就生效，不加就关）。忘记写目录会直接报语法错误。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 680 215" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <rect x="10" y="10" width="660" height="38" rx="6" fill="#1b2430"/>
+        <text x="24" y="34" font-size="11.5" font-family="Consolas,monospace" fill="#e6edf3">mysqldump -uroot -p itcast emp <tspan fill="#ff9d6f" font-weight="700">-T</tspan> <tspan fill="#a5e3a0">/var/lib/mysql-files/</tspan></text>
+
+        <path d="M190 48 L190 64" stroke="#c9cfd8" stroke-width="1.5"/>
+        <path d="M185 58 L190 65 L195 58 Z" fill="#c9cfd8"/>
+
+        <rect x="20" y="70" width="340" height="132" rx="8" fill="#ffffff" stroke="#e4e7ec"/>
+        <text x="34" y="92" font-size="11.5" font-weight="700" fill="#4e5564">输出目录（必须显式写出来）</text>
+
+        <rect x="34" y="102" width="314" height="36" rx="5" fill="#f7f9fa" stroke="#dfe3e9"/>
+        <text x="46" y="125" font-size="11.5" font-family="Consolas,monospace" fill="#00566b" font-weight="600">emp.sql</text>
+        <text x="340" y="125" text-anchor="end" font-size="10.5" fill="#8a9099">建表语句</text>
+
+        <rect x="34" y="146" width="314" height="36" rx="5" fill="#f7f9fa" stroke="#dfe3e9"/>
+        <text x="46" y="169" font-size="11.5" font-family="Consolas,monospace" fill="#00566b" font-weight="600">emp.txt</text>
+        <text x="340" y="169" text-anchor="end" font-size="10.5" fill="#8a9099">数据，默认 TAB 分隔</text>
+
+        <rect x="380" y="70" width="290" height="132" rx="8" fill="#fdf3e3" stroke="#f0d9b0"/>
+        <text x="394" y="92" font-size="11.5" font-weight="700" fill="#b06a00">三个硬前提，缺一个就报 1290</text>
+        <text x="394" y="118" font-size="11" fill="#8a6535">① 目录在 secure_file_priv 的值之内</text>
+        <text x="394" y="142" font-size="11" fill="#8a6535">② 连接的账号有 FILE 权限</text>
+        <text x="394" y="166" font-size="11" fill="#8a6535">③ mysqld 进程能读写该目录</text>
+        <text x="394" y="190" font-size="10" fill="#b9a06d">文件是服务端写的，不是客户端</text>
+      </svg>
+      <figcaption><b>图 5</b><code>-T</code> 的输出是一对文件，落在你指定的目录里。目录由服务端写，所以受 <code>secure_file_priv</code> 限制——这是它和别的输出选项最不一样的地方。</figcaption>
+    </figure>
+
+    <table>
+      <thead><tr><th>选项</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td><code>--add-drop-database</code></td><td>建库前加 <code>DROP DATABASE</code>，覆盖式还原</td></tr>
+        <tr><td><code>--add-drop-table</code></td><td>建表前加 <code>DROP TABLE</code>，<strong>默认开启</strong>，关闭用 <code>--skip-add-drop-table</code></td></tr>
+        <tr><td><code>-n</code> / <code>--no-create-db</code></td><td>不包含建库语句</td></tr>
+        <tr><td><code>-t</code> / <code>--no-create-info</code></td><td>不包含表结构，只导数据</td></tr>
+        <tr><td><code>-d</code> / <code>--no-data</code></td><td>不包含数据，只导结构</td></tr>
+        <tr>
+          <td><code>-T</code> / <code>--tab=目录</code></td>
+          <td><strong>必须跟一个目录路径</strong>，不能只写 <code>-T</code>。生成 <code>表名.sql</code>（建表）+ <code>表名.txt</code>（数据，默认 TAB 分隔），分隔符可用 <code>--fields-terminated-by</code> 改</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3 id="trust">同一个限制：<code>secure_file_priv</code> 这个「信任目录」</h3>
+
+    <p><code>-T</code> 的文件是<strong>服务端写的</strong>，写到哪由 <code>secure_file_priv</code> 决定。路径不在它允许的目录里，<strong>不管目录存不存在、权限给没给，一律报 1290</strong>。这个变量同时管着 <code>LOAD DATA</code>、<code>SELECT ... INTO OUTFILE</code>、<code>LOAD_FILE()</code>，所以备份和恢复两侧都撞它。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 680 296" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <text x="340" y="18" text-anchor="middle" font-size="11.5" fill="#8a9099">三种取值，三种命运；而且默认值不是固定的</text>
+
+        <rect x="14" y="28" width="208" height="118" rx="8" fill="#f5fbf7" stroke="#cfe8d8"/>
+        <text x="28" y="52" font-size="12" font-weight="700" fill="#1a7f4b">① 一个目录</text>
+        <text x="28" y="74" font-size="10.5" fill="#4e5564">只允许在该目录内读写</text>
+        <text x="28" y="96" font-size="10" font-family="Consolas,monospace" fill="#00566b">/var/lib/mysql-files/</text>
+        <text x="28" y="116" font-size="10.5" fill="#8a9099">目录必须事先存在</text>
+        <text x="28" y="136" font-size="10" fill="#8a9099">推荐的生产配置</text>
+
+        <rect x="236" y="28" width="208" height="118" rx="8" fill="#fdf7f6" stroke="#f5d3cf"/>
+        <text x="250" y="52" font-size="12" font-weight="700" fill="#c0392b">② NULL</text>
+        <text x="250" y="74" font-size="10.5" fill="#4e5564">导入导出彻底禁用</text>
+        <text x="250" y="96" font-size="10.5" fill="#8a6535">任何路径都报 1290</text>
+        <text x="250" y="116" font-size="10.5" fill="#8a9099">源码编译 / 部分云库</text>
+        <text x="250" y="136" font-size="10" fill="#8a9099">连挪文件都没用</text>
+
+        <rect x="458" y="28" width="208" height="118" rx="8" fill="#fdf3e3" stroke="#f0d9b0"/>
+        <text x="472" y="52" font-size="12" font-weight="700" fill="#b06a00">③ 空字符串</text>
+        <text x="472" y="72" font-size="10" font-family="Consolas,monospace" fill="#8a6535">secure_file_priv=''</text>
+        <text x="472" y="92" font-size="10.5" fill="#4e5564">不做任何路径校验</text>
+        <text x="472" y="112" font-size="10.5" fill="#8a6535">mysqld 能碰的都能写</text>
+        <text x="472" y="136" font-size="10" fill="#8a9099">历史遗留配置，别用</text>
+
+        <text x="14" y="176" font-size="11.5" font-weight="700" fill="#4e5564">默认值取决于安装方式，不是固定值</text>
+        <text x="14" y="200" font-size="10.5" fill="#8a9099">官方 Linux 包 / Docker</text>
+        <text x="212" y="200" font-size="10" font-family="Consolas,monospace" fill="#00566b">/var/lib/mysql-files/</text>
+        <text x="14" y="224" font-size="10.5" fill="#8a9099">Windows 安装程序</text>
+        <text x="212" y="224" font-size="10" font-family="Consolas,monospace" fill="#00566b">C:/ProgramData/MySQL/MySQL Server 8.0/Uploads/</text>
+        <text x="14" y="248" font-size="10.5" fill="#8a9099">源码编译 / 部分云产品</text>
+        <text x="212" y="248" font-size="10" font-family="Consolas,monospace" fill="#c0392b">NULL（导入导出全禁）</text>
+
+        <text x="14" y="274" font-size="10" fill="#b06a00">所以「我这能跑、同事那报错」很正常——两台机器的这个值可能不同</text>
+      </svg>
+      <figcaption><b>图 6</b>先查值，再决定策略：路径写错、目录不存在、值是 <code>NULL</code>，三种情况报的是同一个 <code>1290</code>。</figcaption>
+    </figure>
+
+    <pre><span class="label">sql</span><code><span class="c">-- 第一步永远是查值</span>
+<span class="k">SHOW</span> <span class="k">VARIABLES</span> <span class="k">LIKE</span> <span class="s">'secure_file_priv'</span>;
+
+<span class="c">-- 想临时改？改不动：它是只读变量</span>
+<span class="k">SET</span> <span class="k">GLOBAL</span> secure_file_priv <span class="k">=</span> <span class="s">'/tmp/'</span>;
+<span class="c">-- ERROR 1238 (HY000): Variable 'secure_file_priv' is a read only variable</span></code></pre>
+
+    <table>
+      <thead><tr><th>报错</th><th>真实原因</th><th>怎么解</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>ERROR 1290 (HY000)</code><br>The MySQL server is running with the --secure-file-priv option…</td>
+          <td>路径不在信任目录内，或变量值是 <code>NULL</code></td>
+          <td>把文件挪进该目录；<code>NULL</code> 只能改配置</td>
+        </tr>
+        <tr>
+          <td><code>ERROR 1227 (42000)</code><br>Access denied; you need the FILE privilege(s)…</td>
+          <td>账号缺少 <code>FILE</code> 权限。路径对也不行</td>
+          <td><code>GRANT FILE ON *.* TO 'user'@'host';</code></td>
+        </tr>
+        <tr>
+          <td><code>ERROR 1238 (HY000)</code><br>Variable 'secure_file_priv' is a read only variable</td>
+          <td>试图用 <code>SET</code> 改它，<code>SET PERSIST</code> 同样无效</td>
+          <td>改 <code>my.cnf</code> / <code>my.ini</code> 后重启</td>
+        </tr>
+        <tr>
+          <td><code>ERROR 13 (HY000)</code><br>Can't create/write to file… (Errcode: 13)</td>
+          <td>路径合规，但 <code>mysqld</code> 这个系统用户没权限；或被 AppArmor / SELinux 挡住</td>
+          <td>给目录加属主与权限，查安全策略</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="note warn">
+      <b>要改这个值，得动配置并重启</b>
+      <p><strong>Linux</strong>：<code>/etc/my.cnf</code> 或 <code>/etc/mysql/my.cnf</code> 的 <code>[mysqld]</code> 段加 <code>secure_file_priv=/srv/mysql-files</code>；<strong>Windows</strong>：<code>C:\ProgramData\MySQL\MySQL Server 8.0\my.ini</code> 里改 <code>secure-file-priv</code>。<br>
+      改完还有两件事：<strong>目录要自己建</strong>（服务器不会替你创建，子目录不存在也报 1290），<strong>属主要给 mysql</strong>（<code>chown mysql:mysql</code>），然后重启服务。Ubuntu / RHEL 上还要确认 AppArmor 或 SELinux 放行这个新目录，否则报的是 <code>Errcode: 13</code> 而不是 1290。</p>
+    </div>
+
+    <div class="note tip">
+      <b>两个方向各有一条逃生门，但不该当成常规做法</b>
+      <p><strong>备份侧</strong>：别用 <code>-T</code>，直接 <code>mysqldump … &gt; dump.sql</code>。这样文件是<strong>客户端</strong>写的，压根不经过 <code>secure_file_priv</code>。<br>
+      <strong>恢复侧</strong>：<code>mysqlimport --local</code>，文件从客户端读，同理绕开。<br>
+      绕开的是安全检查，不是问题本身。生产环境该做的是把交换目录配好、权限收紧，而不是关掉这道闸。</p>
+    </div>
+
+    <pre><span class="label">shell</span><code><span class="c"># 备份单个库（最常用）</span>
+mysqldump -uroot -p123456 --single-transaction --default-character-set=utf8mb4 \
+  --routines --triggers --events -B itcast &gt; itcast_20261125.sql
+
+<span class="c"># 只备结构，给同事建表用</span>
+mysqldump -uroot -p123456 -d itcast &gt; itcast_schema.sql
+
+<span class="c"># 整实例：连 mysql 系统库一起导，账号权限随库走</span>
+mysqldump -uroot -p123456 -A --single-transaction --set-gtid-purged=OFF &gt; all.sql
+
+<span class="c"># -T：结构和数据分别落成两个文件，目录必须写在 secure_file_priv 里</span>
+mysqldump -uroot -p123456 itcast emp -T /var/lib/mysql-files/
+
+<span class="c"># 恢复（单库备份必须指明目标库）</span>
+mysql -uroot -p123456 itcast &lt; itcast_20261125.sql</code></pre>
+
+    <div class="note tip">
+      <b>课程没讲、但生产必备的三个参数</b>
+      <p><code>--single-transaction</code>：InnoDB 下开一致性快照，备份全程不锁表，线上库必须加。<br>
+      <code>--routines --triggers --events</code>：存储过程、触发器、定时事件<strong>默认不导</strong>，不加就静默丢失，恢复时才发现业务逻辑没了。<br>
+      <code>--set-gtid-purged=OFF</code>：导出的文件不想把 GTID 信息带过去（比如导到测试库）时用，否则导入报 GTID 冲突。</p>
+    </div>
+
+    <div class="note plain">
+      <b>mysqldump 现在还值得学吗</b>
+      <p>值得。它至今仍在维护，是中小库逻辑备份的默认答案；并行版 <code>mysqlpump</code>（8.0.34 弃用、<strong>8.4 已移除</strong>）已经退场，官方给大库的替代是 MySQL Shell 的 <code>util.dumpSchemas()</code> / <code>util.dumpInstance()</code>。<br>
+      好消息：<code>-B</code>/<code>-A</code>/<code>-d</code>/<code>-t</code>/<code>-n</code>/<code>-T</code> 这套选项在 mysqldump、mysqlpump、MySQL Shell 里含义基本一致，学一遍能迁移过去。</p>
+    </div>
+
+    <section class="quiz">
+      <p class="quiz-head">自测三问<span>先自己答一遍，再点开对答案</span></p>
+      <details>
+        <summary><span class="qno">Q1</span><span class="ask"><code>mysqldump itcast &gt; a.sql</code>，在空实例上 <code>mysql -uroot -p &lt; a.sql</code> 报 <code>No database selected</code>，为什么？</span><span class="caret" aria-hidden="true"></span></summary>
+        <div class="ans"><p>单库写法既不带 <code>CREATE DATABASE</code> 也不带 <code>USE</code>，脚本里的 <code>CREATE TABLE</code> 没有落点。要么先建库并指定（<code>mysql -uroot -p itcast &lt; a.sql</code>），要么备份时改用 <code>-B itcast</code>。</p></div>
+      </details>
+      <details>
+        <summary><span class="qno">Q2</span><span class="ask">恢复完整库后业务报「存储过程不存在」，是哪一步漏了？</span><span class="caret" aria-hidden="true"></span></summary>
+        <div class="ans"><p><code>--routines --triggers --events</code> <b>默认全都不导</b>，不加就静默丢失，恢复时才发现。备份命令里补上这三项，重新备一份。</p></div>
+      </details>
+      <details>
+        <summary><span class="qno">Q3</span><span class="ask">用 <code>-A</code> 备份的文件导到另一台机器，报 <code>SET @@GLOBAL.GTID_PURGED</code> 相关错误，怎么解？</span><span class="caret" aria-hidden="true"></span></summary>
+        <div class="ans"><p>文件头把源库的 GTID 集合一起带过去了，目标实例的 gtid_executed 非空就冲突。备份时加 <code>--set-gtid-purged=OFF</code>；如果文件已经生成，导入前把那几行注释掉或手动清空。</p></div>
+      </details>
+    </section>
+    <div class="footer">
+      <a href="07-05-mysqlshow.html">← 7.2.4 mysqlshow</a> · <a href="07-MySQL管理.html">MySQL 管理</a> · <a href="../index.html">总目录</a>
+    </div>
+
+  </main>
+</div>
+</body>
+</html>

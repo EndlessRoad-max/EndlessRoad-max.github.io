@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>02-02 成熟部署与故障切换 · MySQL 笔记</title>
+<link rel="stylesheet" href="../assets/style.css"><link rel="stylesheet" href="../assets/replication.css">
+<script src="../assets/replication.js" defer></script>
+</head>
+<body class="replication"><div class="layout">
+
+<nav class="sidebar" aria-label="本页目录">
+  <p class="side-title">本页目录</p>
+  <a href="#roles">1. 一张图看分工</a>
+  <a href="#axes">2. 三条轴，别混为一谈</a>
+  <a href="#semisync">3. 半同步：只提前一格</a>
+  <a href="#choose">4. 三种路线怎么选</a>
+  <a href="#tls">5. TLS：从加密到验身份</a>
+  <a href="#switch">6. 计划内切换：八步</a>
+  <a href="#crash">7. 非计划故障</a>
+  <a href="#accept">8. 上线验收清单</a>
+  <a href="#quiz">自测三问</a>
+  <p class="side-title" style="margin-top:22px">当前位置</p>
+  <ul class="nav-tree">
+    <li><a href="../index.html" class="root">↑ 总目录</a>
+      <ul>
+        <li><a href="01-日志.html">01 日志</a></li>
+        <li><a href="02-主从复制.html">02 主从复制</a>
+          <ul>
+            <li><a href="02-01-GTID复制.html">02-01 GTID 复制</a></li>
+            <li><span class="current">02-02 成熟部署与切换</span></li>
+            <li><a href="02-03-网络与协议.html">02-03 网络与协议细节</a></li>
+            <li><a href="02-04-已有数据与排错.html">02-04 已有数据与排错</a></li>
+          </ul>
+        </li>
+        <li><a href="03-分库分表.html">03 分库分表</a>
+          <ul>
+            <li><a href="03-01-MyCat实现.html">03-01 MyCat 实现</a></li>
+          </ul>
+        </li>
+        <li><a href="04-读写分离.html">04 读写分离</a></li>
+      </ul>
+    </li>
+  </ul>
+</nav>
+
+<main class="main">
+<div class="crumb"><a href="../index.html">总目录</a> / 运维篇 / <a href="02-主从复制.html">02 主从复制</a> / 02-02</div>
+<h1><span class="chapter-no">02-02</span>成熟部署与故障切换</h1>
+<p class="lede">能跑起来是一回事，敢放到线上是另一回事。这一页讲的是：谁负责写、谁负责读、出事谁来判、切换按什么顺序做。</p>
+<div class="meta"><span>环境：MySQL 8.0.32+</span><span>前置：<a href="02-主从复制.html">02</a> / <a href="02-01-GTID复制.html">02-01</a></span><span>整理：2026-11-26</span></div>
+
+<section class="quick">
+  <p class="quick-head">一屏速记<span>合上笔记，这 4 条要能自己说出来</span></p>
+  <ol>
+    <li><b>三个问题三个人管：</b>GTID 管「哪些事务做过」，半同步管「主库什么时候能返回成功」，故障管理管「谁是新主、流量往哪走」。<b>可以叠加，不能互相替代。</b></li>
+    <li><b>半同步不等于零丢失：</b>它只保证「至少一个副本收到了日志」，不等于表已改完，超时还会退回异步。</li>
+    <li><b>切换前必须先让旧主写不进去</b>，再提升副本。联系不上旧主，<b>不等于</b>它已经停了。</li>
+    <li><b>选型看两个数：</b>允许丢多少数据（RPO）、允许停多久（RTO）。先定这两个，再谈用哪套。</li>
+  </ol>
+</section>
+
+<h2 id="roles">1. 一张图看分工</h2>
+<figure class="diagram">
+  <a href="../assets/replication/04-production-topology.svg" data-diagram><img src="../assets/replication/04-production-topology.svg" width="1400" height="865" alt="成熟部署示意：业务应用经连接入口分流读写，主库 A 是唯一写入点，从库 B 为候选主库，从库 C 承接读请求，另有故障管理控制面与独立备份存储。"></a>
+  <figcaption><b>图 1</b>复制只是其中一条线。流量入口、故障控制、独立备份各自独立，副本数量按业务定，两个只是示意。<span class="caption-action">点击放大</span></figcaption>
+</figure>
+<p>图里能看出四件事互不替代：<b>复制</b>搬数据，<b>入口</b>决定请求去哪，<b>控制面</b>决定谁当主，<b>备份</b>负责删除之后还能回来。</p>
+
+<h2 id="axes">2. 三条轴，别混为一谈</h2>
+<table>
+  <thead><tr><th style="width:20%">轴</th><th style="width:34%">它回答的问题</th><th>它管不到的事</th></tr></thead>
+  <tbody>
+    <tr><td>事务标识</td><td>GTID：这个事务我执行过没有？换源后从哪继续？</td><td>不改变确认时机，不判断数据是否逐行一致。</td></tr>
+    <tr><td>确认时机</td><td>异步 / 半同步：主库什么时候把「成功」返回给业务？</td><td>不决定谁是主库，也不负责把流量挪走。</td></tr>
+    <tr><td>故障管理</td><td>谁来判断主库不行了、提升哪台、入口怎么改？</td><td>不修复数据，也不替代备份。</td></tr>
+  </tbody>
+</table>
+<p>所以「用了 GTID 就高可用了吗」「开了半同步就不会丢数据了吗」这类问题本身是混轴了：它们各管一段。</p>
+
+<h2 id="semisync">3. 半同步：只把确认往后挪一格</h2>
+<p>默认异步复制里，主库写完 binlog 就返回成功，从库什么时候收到、什么时候应用，主库不管。半同步把这步改成：<b>至少 N 个副本（默认 1 个）确认事件已写入并刷到 relay log，主库才返回成功</b>。</p>
+<div class="note warn"><b>三件事要说清楚</b>
+<p>① 确认的是<b>日志落地</b>，不是表数据已更新——从库还要再应用一次。<br>
+② 副本迟迟不确认会<b>超时退回异步</b>，此时保护等于没有，必须监控这个回退，而不是假设它一直生效。<br>
+③ 半同步保证「至少一个副本有」，<b>不保证你提升的就是那个副本</b>。真要接近零丢失，得让提升逻辑只挑确认过的那台。</p>
+</div>
+<p>相关参数（8.0.26 起的名字）：<code>rpl_semi_sync_source_enabled</code>、<code>rpl_semi_sync_source_timeout</code>（默认 10000 毫秒）、<code>rpl_semi_sync_replica_enabled</code>，插件要先装。TCP 的 ACK 和半同步 ACK 完全是两回事，别拿前者当后者。</p>
+
+<h2 id="choose">4. 三种路线怎么选</h2>
+<table>
+  <thead><tr><th style="width:26%">路线</th><th>组成与能力边界</th></tr></thead>
+  <tbody>
+    <tr><td>传统 GTID 主从</td><td>自己写 binlog 复制，按需加半同步，再配外部故障管理（脚本、中间件、云平台）。最灵活，也最依赖你自己的运维纪律。</td></tr>
+    <tr><td>InnoDB ReplicaSet</td><td>MySQL Shell + Router 管理的一组<b>异步 GTID 复制</b>实例。<b>没有自动故障切换</b>，切换要人发起。</td></tr>
+    <tr><td>InnoDB Cluster</td><td>Group Replication + Shell + Router，通常单主，至少 3 个实例，靠组成员与多数派做自动故障处理。一致性与网络语义和普通 binlog 复制<b>不一样</b>，不是「复制加个开关」。</td></tr>
+  </tbody>
+</table>
+<p>两个具体例子：</p>
+<ul>
+  <li><b>内部报表库</b>，丢 5 分钟、停 10 分钟都能接受 → 异步主从 + 两副本 + 手工切换就够，别上组复制。</li>
+  <li><b>订单库</b>，几乎不能丢、停 30 秒都难受 → 半同步（至少一个副本确认）+ 三节点自动故障管理 + 入口自动摘除，代价是写入延迟和运维复杂度都上一个台阶。</li>
+</ul>
+
+<h2 id="tls">5. TLS：从「加密」到「验证对面是谁」</h2>
+<p>正文里用的 <code>REQUIRE SSL</code> + <code>SOURCE_SSL=1</code> 只做到<b>加密</b>：链路看不见了，但没验证对面那台是不是真主库。证书可以自签，谁都能生成一张。</p>
+<p>正式环境要加上身份校验，连接串写全：</p>
+<pre data-copy><code>STOP REPLICA;
+
+CHANGE REPLICATION SOURCE TO
+  SOURCE_HOST = 'mysql-a.internal',      -- 用证书里的 DNS 名，不是 IP
+  SOURCE_SSL_CA = '/etc/mysql/certs/ca.pem',
+  SOURCE_SSL_VERIFY_SERVER_CERT = 1,
+  SOURCE_AUTO_POSITION = 1;
+
+START REPLICA;
+SHOW REPLICA STATUS\G</code></pre>
+<p><code>SOURCE_HOST</code> 必须和证书里的名字对得上，写 IP 通常校验失败。位点复制的环境在这里<b>不要</b>顺手重抄旧坐标——改的是连接参数，不是起点；重抄会让它从旧位置重放。</p>
+<p class="check">状态里确认 <code>Source_SSL_Allowed</code>、<code>Source_SSL_VERIFY_SERVER_CERT</code> 符合预期，并<b>写进变更记录</b>。没实际连过的配置不要写成「已验证」。</p>
+
+<h2 id="switch">6. 计划内切换：八步</h2>
+<div class="scope">
+  <p><b>适用：</b>传统 GTID 复制、主从都健康、没有复制过滤、没有手工分叉、旧主还能操作。停机维护、换机器、机房迁移都走这套。</p>
+</div>
+
+<ol class="steps">
+<li><b>停业务写入，隔离所有写入口</b>
+<p>不是「通知大家别写」，而是把写入口真的摘掉：改连接串、摘 VIP、关闭写入账号。只要还有一个入口能写，后面所有判断都不可信。</p></li>
+
+<li><b>旧主设为只读，等事务收尾</b><span class="where">旧主 · mysql 客户端</span>
+<pre data-copy><code>SET GLOBAL super_read_only = ON;
+-- 等已在跑的事务结束，再记下这一刻的集合
+SELECT @@GLOBAL.gtid_executed;</code></pre>
+<p>先只读、后记录。顺序反了会漏掉中间提交的事务。把这串集合抄下来，下一步要用。</p></li>
+
+<li><b>候选从库确认追平</b><span class="where">候选从库 · mysql 客户端</span>
+<pre data-copy><code>SELECT WAIT_FOR_EXECUTED_GTID_SET('uuid-a:1-110', 30);</code></pre>
+<p>返回 <code>0</code> 才能继续。<b>复制这时候要还在跑</b>——先 <code>STOP REPLICA</code> 再判断，你看到的就只是一个静止的旧位置。</p>
+<p>返回 <code>1</code> 说明还没追上：停下来查原因，别硬切。</p></li>
+
+<li><b>确认旧主写不进去了，再断复制</b><span class="where">候选从库 · mysql 客户端</span>
+<pre data-copy><code>STOP REPLICA;
+SHOW REPLICA STATUS\G   -- 确认没有未应用的 relay log 事件
+RESET REPLICA ALL;</code></pre>
+<p><code>RESET REPLICA ALL</code> 清的是复制通道和 relay log，防止它重启后连回旧主。<b>它不是防双写的手段</b>——防双写靠的是第 1 步真的关掉了写入口。</p></li>
+
+<li><b>新主转为可写并固化角色</b><span class="where">新主 · mysql 客户端</span>
+<pre data-copy><code>SET GLOBAL super_read_only = OFF;
+SET PERSIST read_only = OFF;</code></pre>
+<p>写进持久化配置，别让一次重启把它变回只读。</p></li>
+
+<li><b>改业务入口，做一次真实写读</b>
+<p>把连接串指向新主，然后<b>真的写一条、再从应用侧读回来</b>。只看端口通不通不算验证。</p></li>
+
+<li><b>其余副本改源</b><span class="where">其他从库 · mysql 客户端</span>
+<pre data-copy><code>STOP REPLICA;
+CHANGE REPLICATION SOURCE TO
+  SOURCE_HOST = '新主地址',
+  SOURCE_USER = 'repl',
+  SOURCE_PASSWORD = '…',
+  SOURCE_AUTO_POSITION = 1,
+  SOURCE_SSL = 1;
+START REPLICA;</code></pre>
+<p>GTID 下不用找位点，改完直接起。逐个确认两个 <code>Running</code> 为 <code>Yes</code>，再写一条数据看能不能过去。</p></li>
+
+<li><b>旧主隔离观察，再决定要不要回收</b>
+<p>先把旧主放着不管（只读、入口已摘），确认它上面没有新写入、没有分叉，再按从库重新接入；接不上就重建。<b>监控和备份要跟着改指向</b>，否则备份还在备旧主。</p></li>
+</ol>
+
+<h2 id="crash">7. 非计划故障</h2>
+<div class="note danger"><b>联系不上，不等于它停止了写入</b>
+<p>网络分区、机器假死、只挂了一半的链路，都会让旧主还活着并在接受写入。所以在提升任何副本之前，先用基础设施把它隔离：关机、断网、摘 VIP、吊销写入账号——<b>能确认它写不了，才谈提升</b>。</p>
+<p>旧主彻底读不到、拿不到它最后的 <code>gtid_executed</code> 时，就<b>无法证明零丢失</b>。这时只能拿候选副本的数据、已收到未应用的 relay log 去估损，并把这个决定写进事故记录。</p>
+<p>不存在「连不上就跳过停写、一键提升」的通用脚本。真那么做，双写和数据分叉是迟早的事。</p>
+</div>
+<p>能读到时，按第 6 节的顺序做，只是第 1、2 步要抢时间；读不到时，先隔离、再评估丢多少，最后才改路由。</p>
+
+<h2 id="accept">8. 上线验收清单</h2>
+<table>
+  <thead><tr><th style="width:30%">检查项</th><th>合格标准</th></tr></thead>
+  <tbody>
+    <tr><td>实例标识</td><td>每台 <code>server_id</code> 唯一、<code>server_uuid</code> 不重复，没有从别处整目录拷来的实例。</td></tr>
+    <tr><td>只读与复制</td><td>从库 <code>read_only</code> + <code>super_read_only</code> 都开，同时 applier 能正常写入。</td></tr>
+    <tr><td>备份</td><td>独立于副本的定期备份 + binlog 归档 + <b>做过恢复演练</b>，保留窗口覆盖复制中断的最长修复时间。</td></tr>
+    <tr><td>监控</td><td>两个线程、worker 错误、真实延迟（成对坐标）、relay log 与磁盘增长、半同步是否退回异步。</td></tr>
+    <tr><td>延迟治理</td><td>大表有主键或可用索引、事务别太大；先定位瓶颈再调并行度。</td></tr>
+    <tr><td>读一致性</td><td>写完立刻要读新值的场景走主库，或用明确的一致性策略，别默认从库马上有。</td></tr>
+    <tr><td>持久性</td><td><code>sync_binlog=1</code> 与 <code>innodb_flush_log_at_trx_commit=1</code> 能提高持久性，但不承诺任何故障下绝对不丢。</td></tr>
+  </tbody>
+</table>
+
+<section class="quiz" id="quiz">
+  <p class="quiz-head">自测三问<span>先自己答，再展开对照</span></p>
+  <details><summary><span class="qno">Q1</span><span class="ask">开了半同步，是不是就不会丢数据了？</span><span class="caret" aria-hidden="true"></span></summary>
+  <div class="ans"><p>不是。它只保证「至少一个副本收到了日志并刷盘」，而且超时会退回异步。更关键的是：如果你提升的不是那台确认过的副本，丢数据照样发生。<br>要接近零丢失，确认范围、提升规则、超时告警三件事得配套。</p></div></details>
+  <details><summary><span class="qno">Q2</span><span class="ask">主库连不上了，能不能直接把从库提升为主库？</span><span class="caret" aria-hidden="true"></span></summary>
+  <div class="ans"><p>先隔离，再提升。连不上可能是网络分区，旧主仍在接受写入；此时提升就是双写。<br>先确认它写不了（关机/断网/摘入口），再判断候选副本追到哪，之后才改路由。旧主最后的集合读不到时，只能估损并记录。</p></div></details>
+  <details><summary><span class="qno">Q3</span><span class="ask">计划内切换，为什么必须「先设只读、再记录 gtid_executed」？</span><span class="caret" aria-hidden="true"></span></summary>
+  <div class="ans"><p>顺序反了，记录之后还会有事务提交进来，候选副本按那个集合去等就永远等不到终点。<br>先让旧主写不进去，等已有事务结束，再记录，这个集合才是真正的终点。</p></div></details>
+</section>
+
+<h2 id="sources">资料</h2>
+<p class="refs">官方文档：<a href="https://dev.mysql.com/doc/refman/8.0/en/replication-semisync.html">半同步复制</a> · <a href="https://dev.mysql.com/doc/refman/8.0/en/replication-encrypted-connections.html">加密连接</a> · <a href="https://dev.mysql.com/doc/refman/8.0/en/replication-solutions-switch.html">切换与故障转移</a> · <a href="https://dev.mysql.com/doc/refman/8.0/en/mysql-innodb-replicaset-introduction.html">InnoDB ReplicaSet</a> · <a href="https://dev.mysql.com/doc/refman/8.0/en/mysql-innodb-cluster-introduction.html">InnoDB Cluster</a></p>
+<p class="source">核对日期 2026-11-26。本页是文档整理，没有在真实集群上执行过切换演练；切换流程上线前请在自己的环境里走一遍。</p>
+
+<div class="footer"><a href="02-01-GTID复制.html">← 02-01 GTID 复制</a> · <a href="../index.html">总目录</a> · <a href="02-03-网络与协议.html">02-03 网络与协议 →</a></div>
+</main>
+</div></body></html>

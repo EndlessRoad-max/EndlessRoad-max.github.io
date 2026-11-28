@@ -1,0 +1,43 @@
+/* ============================================================
+   读写分离页（04）专用
+   课程截图原生宽度约 1700px，按容器宽度等比缩小；
+   再小就点开看大图（replication.js 的 dialog）。
+   ============================================================ */
+.readwrite figure.fig img {
+  max-width: 100%;
+}
+
+/* 课程截图顶部带 PPT 标题和一段说明文字，字号极小、内容与本页正文重复。
+   不去改文件，直接用 object-fit 裁掉上半：容器比例写死，图按宽度铺满后
+   从底部对齐，顶部多出来的部分自然被裁掉。点开大图看到的仍是完整原图。 */
+.readwrite figure.fig.hero img     { aspect-ratio: 1708 / 575; }
+.readwrite figure.fig.xmlmap img   { aspect-ratio: 1739 / 645; }
+.readwrite figure.fig.topology img { aspect-ratio: 1623 / 535; }
+.readwrite figure.fig.hero img,
+.readwrite figure.fig.xmlmap img,
+.readwrite figure.fig.topology img {
+  object-fit: cover;
+  object-position: center bottom;
+}
+
+/* 五台机器那张表太宽时，允许在窄屏横向滚动，不压字 */
+.readwrite .envtable {
+  overflow-x: auto;
+}
+.readwrite .envtable table {
+  min-width: 560px;
+}
+
+/* 三条链路的对照表：第一列只放一个箭头符号，窄 */
+.readwrite table.t-link { table-layout: fixed; }
+.readwrite .t-link th:first-child,
+.readwrite .t-link td:first-child { width: 9%; }
+.readwrite .t-link th:nth-child(2),
+.readwrite .t-link td:nth-child(2) { width: 24%; }
+
+@media (max-width: 760px) {
+  .readwrite .t-link th:first-child,
+  .readwrite .t-link td:first-child { width: 22%; }
+  .readwrite .t-link th:nth-child(2),
+  .readwrite .t-link td:nth-child(2) { width: 26%; }
+}

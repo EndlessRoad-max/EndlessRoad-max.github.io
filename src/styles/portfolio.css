@@ -518,6 +518,13 @@ button {
 .note-meta a:hover {
   color: var(--text);
 }
+.note-format {
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
 .note-row h3 {
   font-size: 15px;
   font-weight: 600;

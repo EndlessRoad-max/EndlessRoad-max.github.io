@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>踩坑总表 · MySQL 笔记</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="layout">
+
+  <nav class="sidebar">
+    <p class="side-title">本页分组</p>
+    <ul class="nav-tree">
+      <li><a href="#g1">A　连不上</a></li>
+      <li><a href="#g2">B　连上但被拒</a></li>
+      <li><a href="#g3">C　语句执行失败</a></li>
+      <li><a href="#g4">D　不报错但结果是错的</a></li>
+    </ul>
+    <p class="side-title" style="margin-top:22px">当前位置</p>
+    <ul class="nav-tree">
+      <li><a href="index.html">↑ 总目录</a>
+        <ul>
+          <li><a class="group" href="踩坑总表.html">常备 · 查用</a>
+            <ul>
+              <li><span class="current">踩坑总表</span></li>
+              <li><a class="leaf" href="任务剧本.html">任务剧本</a></li>
+            </ul>
+          </li>
+        </ul>
+      </li>
+    </ul>
+  </nav>
+
+  <main class="main">
+
+    <div class="crumb">
+      <a href="index.html">总目录</a> / 常备 · 查用 /
+      踩坑总表
+    </div>
+    <h1><span class="chapter-no">常备</span>踩坑总表</h1>
+    <p class="lede">同一个错误撞第二次，说明缺的不是知识，是索引。这一页把散在各章的报错按「卡在哪一层」重新排了一遍：报错原文 → 什么场景下会撞上 → 一句话解法 → 回哪一页看细节。</p>
+
+    <div class="meta">
+      <span>跨章汇总 · 覆盖 07 章全部页面</span>
+      <span>更新：2026-11-25</span>
+      <span>环境：MySQL 8.0</span>
+    </div>
+
+    <section class="quick">
+      <p class="quick-head">一屏速记<span>出事时先想起这 5 条，再去下面查表</span></p>
+      <ol>
+        <li>排查顺序就四层：<b>能不能连上 → 能不能通过认证 → 语句能不能执行 → 结果对不对</b>。上一层没过，就别去查下一层。</li>
+        <li>真正常撞的就几个：<code>1045</code> 密码或来源主机不对、<code>1049</code> 是 <code>-p</code> 后面多了空格、<code>1290</code> 是路径不在信任目录、<code>1146</code> 是表名或库没选对。</li>
+        <li><b>最危险的不是报错，是不报错</b>：漏加 <code>--routines</code>、把 <code>TABLE_ROWS</code> 当真实行数、<code>ping</code> 返回 0、<code>mysqlshow</code> 只列出几个库——四个都是「看起来成功」。</li>
+        <li>看报错先看括号里的 SQLSTATE，再读后半句英文：MySQL 的消息是「现象 + 原因」结构，真正的原因通常在冒号后面。</li>
+        <li>同一条命令换到 Windows cmd 要多想一步：引号、行尾分号、<code>&gt;</code> 重定向的编码，都会变成新坑。</li>
+      </ol>
+    </section>
+
+    <h2 id="g0">先判断卡在哪一层</h2>
+
+    <figure class="fig">
+      <svg viewBox="0 0 680 306" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <text x="340" y="18" text-anchor="middle" font-size="11.5" fill="#8a9099">从外往里问，前一层过了才轮到怀疑后一层</text>
+
+        <rect x="40" y="34" width="600" height="52" rx="9" fill="#ffffff" stroke="#e4e7ec"/>
+        <circle cx="66" cy="60" r="13" fill="#e6f3f6"/>
+        <text x="66" y="60" text-anchor="middle" dominant-baseline="central" font-size="12" font-weight="700" fill="#00758f">1</text>
+        <text x="92" y="60" dominant-baseline="central" font-size="13" font-weight="700" fill="#1f2329">连不上：网络与服务</text>
+        <text x="620" y="60" text-anchor="end" dominant-baseline="central" font-size="11" font-family="Consolas,monospace" fill="#8a9099">2002 · 2003 · 1130 · 1129</text>
+
+        <rect x="40" y="98" width="584" height="52" rx="9" fill="#ffffff" stroke="#e4e7ec"/>
+        <circle cx="66" cy="124" r="13" fill="#e6f3f6"/>
+        <text x="66" y="124" text-anchor="middle" dominant-baseline="central" font-size="12" font-weight="700" fill="#00758f">2</text>
+        <text x="92" y="124" dominant-baseline="central" font-size="13" font-weight="700" fill="#1f2329">连上但被拒：认证与权限</text>
+        <text x="604" y="124" text-anchor="end" dominant-baseline="central" font-size="11" font-family="Consolas,monospace" fill="#8a9099">1045 · 1049 · 1410 · 1227 · 3554</text>
+
+        <rect x="40" y="162" width="568" height="52" rx="9" fill="#ffffff" stroke="#e4e7ec"/>
+        <circle cx="66" cy="188" r="13" fill="#e6f3f6"/>
+        <text x="66" y="188" text-anchor="middle" dominant-baseline="central" font-size="12" font-weight="700" fill="#00758f">3</text>
+        <text x="92" y="188" dominant-baseline="central" font-size="13" font-weight="700" fill="#1f2329">语句执行失败：路径与对象</text>
+        <text x="588" y="188" text-anchor="end" dominant-baseline="central" font-size="11" font-family="Consolas,monospace" fill="#8a9099">1290 · 1238 · 3950 · 1146</text>
+
+        <rect x="40" y="226" width="552" height="52" rx="9" fill="#fdf3e3" stroke="#f0d9b0"/>
+        <circle cx="66" cy="252" r="13" fill="#ffffff"/>
+        <text x="66" y="252" text-anchor="middle" dominant-baseline="central" font-size="12" font-weight="700" fill="#b06a00">4</text>
+        <text x="92" y="252" dominant-baseline="central" font-size="13" font-weight="700" fill="#8a5200">不报错，但结果是错的</text>
+        <text x="572" y="252" text-anchor="end" dominant-baseline="central" font-size="11" fill="#b06a00">最容易漏掉的一层</text>
+      </svg>
+      <figcaption><b>图 1</b>四层归因。前三层会直接抛 <code>ERROR</code>，第四层什么都不抛，只给你一个错误的结果。</figcaption>
+    </figure>
+
+    <h2 id="g1">A　连不上：网络与服务</h2>
+    <table class="t-err">
+      <colgroup><col style="width:31%"><col style="width:29%"><col style="width:30%"><col style="width:10%"></colgroup>
+      <thead>
+        <tr><th>报错原文</th><th>什么场景会撞上</th><th>一句话解法</th><th>出处</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>ERROR 2002 (HY000): Can't connect through socket '/tmp/mysql.sock' (2)</code></td>
+          <td class="scene">本机连接走 socket，但服务没起，或客户端和服务端找的 socket 路径不一致</td>
+          <td class="fix">先 <code>mysqladmin ping</code> 看服务活着没；再 <code>mysql_config --socket</code> 核对客户端用的路径</td>
+          <td class="src"><a href="进阶篇/07-02-mysql.html#s7">7.2.1</a></td>
+        </tr>
+        <tr>
+          <td><code>ERROR 2003 (HY000): Can't connect to MySQL server on '127.0.0.1' (10061)</code></td>
+          <td class="scene">走 TCP，但 3306 没在监听，或被防火墙/安全组挡住</td>
+          <td class="fix">查 <code>bind-address</code> 与 <code>port</code>；<code>telnet 127.0.0.1 3306</code> 验证端口通不通</td>
+          <td class="src"><a href="进阶篇/07-02-mysql.html#s7">7.2.1</a></td>
+        </tr>
+        <tr>
+          <td><code>ERROR 1130 (HY000): Host '192.168.1.20' is not allowed to connect to this MySQL server</code></td>
+          <td class="scene">账号在这个来源主机上没有授权记录，被直接挡在认证之前</td>
+          <td class="fix">建 <code>'user'@'192.168.1.20'</code>；<code>'%'</code> 能用但要清楚代价</td>
+          <td class="src"><a href="进阶篇/07-01-系统数据库.html#s2">7.1</a></td>
+        </tr>
+        <tr>
+          <td><code>ERROR 1129 (HY000): Host '192.168.1.20' is blocked because of many connection errors</code></td>
+          <td class="scene">该 IP 连续握手失败次数超过 <code>max_connect_errors</code>（默认 100），被临时拉黑</td>
+          <td class="fix"><code>mysqladmin flush-hosts</code> 解封，再查它为什么一直失败（多半是密码错在重试）</td>
+          <td class="src"><a href="进阶篇/07-03-mysqladmin.html#s8">7.2.2</a></td>
+        </tr>
+        <tr>
+          <td><code>connect to server at 'localhost' failed</code></td>
+          <td class="scene">mysqladmin / mysql 都报这句，服务确实没起来</td>
+          <td class="fix">与 2002 同类：先 <code>systemctl status mysqld</code>，再看错误日志</td>
+          <td class="src"><a href="进阶篇/07-03-mysqladmin.html#s8">7.2.2</a></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2 id="g2">B　连上了但被拒：认证与权限</h2>
+    <table class="t-err">
+      <colgroup><col style="width:31%"><col style="width:29%"><col style="width:30%"><col style="width:10%"></colgroup>
+      <thead>
+        <tr><th>报错原文</th><th>什么场景会撞上</th><th>一句话解法</th><th>出处</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>ERROR 1045 (28000): Access denied for user 'root'@'localhost' (using password: YES)</code></td>
+          <td class="scene">密码错、账号不存在，或实际匹配到了另一条 host 记录</td>
+          <td class="fix">先分清走的是 localhost 还是 127.0.0.1——这是两条独立记录；再 <code>SELECT user,host FROM mysql.user</code></td>
+          <td class="src"><a href="进阶篇/07-02-mysql.html#s4">7.2.1</a></td>
+        </tr>
+        <tr>
+          <td><code>ERROR 1049 (42000): Unknown database '123456'</code></td>
+          <td class="scene"><code>-p</code> 与密码之间多了空格，密码被当成库名</td>
+          <td class="fix">写成 <code>-p123456</code>，中间不留空格</td>
+          <td class="src"><a href="进阶篇/07-02-mysql.html#s3">7.2.1</a></td>
+        </tr>
+        <tr>
+          <td><code>ERROR 1410 (42000): You are not allowed to create a user with GRANT</code></td>
+          <td class="scene">8.0 起 <code>GRANT</code> 不再隐式建用户，老教程的写法直接失效</td>
+          <td class="fix">先 <code>CREATE USER</code>，再 <code>GRANT</code></td>
+          <td class="src"><a href="进阶篇/07-01-系统数据库.html#s2">7.1</a></td>
+        </tr>
+        <tr>
+          <td><code>ERROR 1227 (42000): Access denied; you need ... the SYSTEM_VARIABLES_ADMIN privilege(s)</code></td>
+          <td class="scene">8.0 把 <code>SUPER</code> 拆成了一堆细粒度动态权限，老账号不够用了</td>
+          <td class="fix">授具体的那个动态权限，别图省事直接给 <code>SUPER</code></td>
+          <td class="src"><a href="进阶篇/07-01-系统数据库.html#s2">7.1</a></td>
+        </tr>
+        <tr>
+          <td><code>ERROR 3554 (HY000): Access to data dictionary table 'mysql.xxx' is rejected</code></td>
+          <td class="scene">直接 SELECT 数据字典隐藏表</td>
+          <td class="fix">改查 <code>information_schema</code>，或走 <code>SHOW</code></td>
+          <td class="src"><a href="进阶篇/07-01-系统数据库.html#s2">7.1</a></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2 id="g3">C　语句执行失败：路径、对象、模式</h2>
+    <table class="t-err">
+      <colgroup><col style="width:31%"><col style="width:29%"><col style="width:30%"><col style="width:10%"></colgroup>
+      <thead>
+        <tr><th>报错原文</th><th>什么场景会撞上</th><th>一句话解法</th><th>出处</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>ERROR 1290 (HY000): The MySQL server is running with the --secure-file-priv option so it cannot execute this statement</code></td>
+          <td class="scene"><code>mysqldump -T 目录</code> 的目录不在信任目录里；文件是服务端写的</td>
+          <td class="fix">换到 <code>secure_file_priv</code> 目录下；或改用 <code>mysqldump &gt; 文件</code>（客户端写，不受限）</td>
+          <td class="src"><a href="进阶篇/07-06-mysqldump.html#trust">7.2.5</a></td>
+        </tr>
+        <tr>
+          <td><code>ERROR 1238 (HY000): Variable 'secure_file_priv' is a read only variable</code></td>
+          <td class="scene">想在会话里 <code>SET</code> 掉这个限制</td>
+          <td class="fix">它只能改 my.cnf 后重启；不想重启就用客户端写文件绕开</td>
+          <td class="src"><a href="进阶篇/07-06-mysqldump.html#trust">7.2.5</a></td>
+        </tr>
+        <tr>
+          <td><code>ERROR 3950 (42000): Loading local data is disabled</code></td>
+          <td class="scene">mysqlimport <code>--local</code>，但服务端 <code>local_infile=OFF</code>（8.0 默认）</td>
+          <td class="fix"><code>SET GLOBAL local_infile=ON</code>，要长期生效就写进 my.cnf</td>
+          <td class="src"><a href="进阶篇/07-07-mysqlimport.html#s3">7.2.6</a></td>
+        </tr>
+        <tr>
+          <td><code>ERROR 1146 (42S02): Table 'test.city' doesn't exist</code></td>
+          <td class="scene">mysqlimport 的表名取文件名，而且它从不建表</td>
+          <td class="fix">先 <code>CREATE TABLE city</code>，并确认库选对了</td>
+          <td class="src"><a href="进阶篇/07-07-mysqlimport.html#s2">7.2.6</a></td>
+        </tr>
+        <tr>
+          <td><code>ERROR 1175 (HY000): You are using safe update mode</code></td>
+          <td class="scene">客户端开了 <code>--safe-updates</code>，UPDATE/DELETE 的 WHERE 没带主键或索引</td>
+          <td class="fix">WHERE 里带上主键；或临时 <code>SET SQL_SAFE_UPDATES=0</code>，但别在线上图省事</td>
+          <td class="src"><a href="进阶篇/07-02-mysql.html#s5">7.2.1</a></td>
+        </tr>
+        <tr>
+          <td><code>ERROR 1046 (3D000): No database selected</code></td>
+          <td class="scene">单库 dump 文件里既没有 <code>CREATE DATABASE</code> 也没有 <code>USE</code></td>
+          <td class="fix">导入时指定库：<code>mysql 库名 &lt; dump.sql</code>；或备份时改用 <code>-B</code></td>
+          <td class="src"><a href="进阶篇/07-06-mysqldump.html#s2">7.2.5</a></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2 id="g4">D　不报错，但结果是错的</h2>
+    <p>这一组最贵：命令返回 0、屏幕上一片绿，你以为成了。它们不会进任何错误日志，只能靠「知道有这么回事」提前防。</p>
+    <table class="t-err">
+      <colgroup><col style="width:31%"><col style="width:29%"><col style="width:30%"><col style="width:10%"></colgroup>
+      <thead>
+        <tr><th>表面现象</th><th>真实原因</th><th>怎么确认 / 怎么防</th><th>出处</th></tr>
+      </thead>
+      <tbody>
+        <tr class="silent">
+          <td><code>导入成功，但业务报「存储过程不存在」</code></td>
+          <td class="scene">备份漏了 <code>--routines --triggers --events</code>，这三类对象默认不导</td>
+          <td class="fix">备份命令里补上；恢复后 <code>SELECT COUNT(*) FROM information_schema.ROUTINES</code> 对数</td>
+          <td class="src"><a href="进阶篇/07-06-mysqldump.html#s4">7.2.5</a></td>
+        </tr>
+        <tr class="silent">
+          <td><code>TABLE_ROWS 显示 1200，实际 38000</code></td>
+          <td class="scene">InnoDB 的 <code>TABLE_ROWS</code> 是采样估算，还被 <code>information_schema_stats_expiry</code> 缓存（默认 86400 秒）</td>
+          <td class="fix">要精确就 <code>SELECT COUNT(*)</code>；或先 <code>SET SESSION information_schema_stats_expiry=0</code></td>
+          <td class="src"><a href="进阶篇/07-01-系统数据库.html#s3">7.1</a></td>
+        </tr>
+        <tr class="silent">
+          <td><code>mysqladmin ping 返回 0，以为账号没问题</code></td>
+          <td class="scene">ping 证明的是「服务端能应答」，认证被拒也返回 0</td>
+          <td class="fix">验证账号用 <code>mysql -e "SELECT 1"</code> 看退出码</td>
+          <td class="src"><a href="进阶篇/07-03-mysqladmin.html#s5">7.2.2</a></td>
+        </tr>
+        <tr class="silent">
+          <td><code>mysqlshow 只列出 3 个库，以为实例就这 3 个</code></td>
+          <td class="scene">输出按当前账号的权限过滤，没权限的对象根本不出现</td>
+          <td class="fix">不能当清点工具；全量统计查 <code>information_schema.SCHEMATA</code></td>
+          <td class="src"><a href="进阶篇/07-05-mysqlshow.html#s5">7.2.4</a></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="note tip">
+      <b>这张表怎么用</b>
+      <p>出事时别从头读：先认出自己在第几层，只看那一组；找到报错原文后，右列链接直接跳回原页面看细节。<b>遇到新坑先按「报错原文 / 场景 / 解法」三行记下来，再回来补一行</b>——总表的价值不在全，在于下次不用再想一遍。</p>
+    </div>
+
+    <div class="footer">
+      <a href="index.html">← 总目录</a> · <a href="任务剧本.html">任务剧本 →</a>
+    </div>
+
+  </main>
+</div>
+</body>
+</html>

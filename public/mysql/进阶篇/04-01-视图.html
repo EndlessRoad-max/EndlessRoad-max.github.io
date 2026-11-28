@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>4.1 视图 · MySQL 笔记</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="../assets/view.css">
+<script src="../assets/view.js" defer></script>
+</head>
+<body class="view-page">
+<div class="layout">
+
+  <nav class="sidebar">
+    <p class="side-title">本页目录</p>
+    <ul class="nav-tree">
+      <li><a class="leaf" href="#what">1. 它到底是什么</a></li>
+      <li><a class="leaf" href="#syntax">2. 四个动作</a></li>
+      <li><a class="leaf" href="#updatable">3. 什么情况下能改</a>
+        <ul>
+          <li><a class="leaf" href="#join">3.1 多表视图的规矩</a></li>
+        </ul>
+      </li>
+      <li><a class="leaf" href="#check">4. WITH CHECK OPTION</a></li>
+      <li><a class="leaf" href="#why">5. 为什么要有视图</a></li>
+      <li><a class="leaf" href="#mine">6. 我的理解（含两处纠正）</a></li>
+      <li><a class="leaf" href="#cases">7. 两个案例</a></li>
+      <li><a class="leaf" href="#quiz">自测三问</a></li>
+    </ul>
+
+    <p class="side-title" style="margin-top:22px">当前位置</p>
+    <ul class="nav-tree">
+      <li><a href="../index.html" class="root">↑ 总目录</a>
+        <ul>
+          <li><a class="group" href="04-01-视图.html">04 视图 / 存储过程 / 触发器</a>
+            <ul>
+              <li><span class="current">4.1 视图</span></li>
+              <li><span class="leaf pending">4.2 存储过程</span></li>
+              <li><span class="leaf pending">4.3 触发器</span></li>
+            </ul>
+          </li>
+          <li><a class="leaf" href="07-MySQL管理.html">07 MySQL 管理</a></li>
+        </ul>
+      </li>
+    </ul>
+  </nav>
+
+  <main class="main">
+
+    <div class="crumb"><a href="../index.html">总目录</a> / 进阶篇 / 4.1</div>
+    <h1><span class="chapter-no">4.1</span>视图</h1>
+    <p class="lede">视图不存结果，只存一句 SELECT。这一页回答四件事：它存在哪、怎么写、什么情况下能改、为什么要有。<b>最后一节是我自己的理解</b>——照着它去想，比背语法有用；里面有两处我原来的说法不准，已经改过来。</p>
+
+    <div class="meta">
+      <span>进阶篇 · 4.1</span>
+      <span>更新：2026-11-28</span>
+      <span>环境：MySQL 8.0</span>
+    </div>
+
+    <section class="quick">
+      <p class="quick-head">一屏速记<span>合上笔记，这 5 条要能自己说出来</span></p>
+      <ol>
+        <li>视图 = <b>一条起了名字的 SELECT</b>。定义进数据字典，数据一条都不存；每次查视图，那句 SQL 都真跑一遍——<b>所以视图不提速</b>，MySQL 也没有物化视图。</li>
+        <li>定义在哪看：<code>information_schema.VIEWS</code>（<code>VIEW_DEFINITION</code> / <code>CHECK_OPTION</code> / <code>IS_UPDATABLE</code> / <code>DEFINER</code>）或 <code>SHOW CREATE VIEW</code>。8.0 没有 <code>.frm</code> 文件了。</li>
+        <li>能不能改<b>数据</b>，看<b>行是否一一对应</b>：出现聚合/窗口函数、<code>DISTINCT</code>、<code>GROUP BY</code>、<code>HAVING</code>、<code>UNION</code> 就不能 <code>UPDATE</code> / <code>DELETE</code>。查 <code>IS_UPDATABLE</code> 最快。</li>
+        <li><code>WITH CHECK OPTION</code> 管的是「改完这行还看不看得见」，默认 <code>CASCADED</code>，越界报 <b>1369</b>。它和「能不能改」是两道闸，别混。</li>
+        <li>视图解决的是<b>权限边界</b>和<b>重复查询的固化</b>：简化、安全、数据独立。它是接口，不是缓存。</li>
+      </ol>
+    </section>
+
+    <h2 id="what">1. 它到底是什么</h2>
+    <p>视图（View）是一种虚拟存在的表。行和列来自定义视图时那句查询用到的表，并且是<b>在使用时动态生成</b>的。通俗说：视图只保存查询的 SQL 逻辑，不保存查询结果——所以「创建视图」这件事，实质就是把那条 SELECT 写对。</p>
+
+    <figure class="fig">
+      <div class="fig-scroll">
+      <svg viewBox="0 0 680 300" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <rect x="6" y="6" width="668" height="288" rx="12" fill="#ffffff" stroke="#e4e7ec"/>
+        <text x="24" y="32" font-size="13" font-weight="600" fill="#4e5564">三层：定义在字典，数据在基表，客户端只认名字</text>
+
+        <rect x="24" y="62" width="154" height="88" rx="8" fill="#f7f9fa" stroke="#e4e7ec"/>
+        <text x="40" y="86" font-size="12.5" font-weight="700" fill="#1f2329">客户端</text>
+        <text x="40" y="106" font-size="10" fill="#4e5564">SELECT * FROM stu_v_1</text>
+        <text x="40" y="122" font-size="10" fill="#4e5564">UPDATE stu_v_1 SET ...</text>
+        <text x="40" y="140" font-size="10" fill="#8a9099">以为在操作一张表</text>
+
+        <rect x="242" y="46" width="196" height="120" rx="8" fill="#e6f3f6" stroke="#00758f" stroke-width="1.5"/>
+        <text x="258" y="70" font-size="12.5" font-weight="700" fill="#00566b">视图 stu_v_1</text>
+        <text x="258" y="90" font-size="10" fill="#4e5564">只有定义，没有数据</text>
+        <text x="258" y="108" font-size="9.6" fill="#8a9099">SELECT id,name FROM student</text>
+        <text x="258" y="122" font-size="9.6" fill="#8a9099">WHERE id &lt;= 10</text>
+        <text x="258" y="144" font-size="9.6" fill="#00566b">存于数据字典 / IS.VIEWS</text>
+
+        <rect x="502" y="62" width="154" height="88" rx="8" fill="#f4f8f5" stroke="#d8e6dc"/>
+        <text x="518" y="86" font-size="12.5" font-weight="700" fill="#277448">基表 student</text>
+        <text x="518" y="106" font-size="10" fill="#4e5564">行数据在 .ibd 里</text>
+        <text x="518" y="122" font-size="10" fill="#4e5564">有索引、有锁、有事务</text>
+        <text x="518" y="140" font-size="10" fill="#8a9099">数据只在这里</text>
+
+        <path d="M178 106 L236 106" stroke="#9aa6b1" stroke-width="1.5"/>
+        <path d="M231 101.5 L238 106 L231 110.5 Z" fill="#9aa6b1"/>
+        <text x="182" y="98" font-size="9.4" fill="#8a9099">按名字</text>
+
+        <path d="M438 106 L496 106" stroke="#9aa6b1" stroke-width="1.5"/>
+        <path d="M491 101.5 L498 106 L491 110.5 Z" fill="#9aa6b1"/>
+        <text x="440" y="98" font-size="9.4" fill="#8a9099">展开成查询</text>
+
+        <path d="M100 150 C 100 196, 579 196, 579 156" fill="none" stroke="#f29111" stroke-width="1.5" stroke-dasharray="5 3"/>
+        <path d="M574.2 160.5 L579 152 L583.8 160.5 Z" fill="#f29111"/>
+        <text x="286" y="196" font-size="9.6" fill="#b06a00">增删改走这条：直接落到基表，字典不动</text>
+
+        <text x="24" y="232" font-size="10.2" fill="#4e5564">① 查视图 → 定义被展开，读的是基表；基表变了，视图立刻跟着变（没有缓存）</text>
+        <text x="24" y="252" font-size="10.2" fill="#4e5564">② 改视图数据 → 写基表，能不能写由 §3 的规则决定</text>
+        <text x="24" y="272" font-size="10.2" fill="#4e5564">③ 建 / 改 / 删视图 → 只动字典，一个业务行都不碰</text>
+      </svg>
+      </div>
+      <figcaption><b>图 1</b>把「视图」这个词拆成三件事：字典里的<b>定义</b>、基表里的<b>数据</b>、客户端看到的<b>名字</b>。混在一起想，才会以为「操作视图 = 操作系统库」。<span class="fig-hint">窄屏可左右滑动</span></figcaption>
+    </figure>
+
+    <p>顺着这张图能推出三条，后面所有规则都从它们来：</p>
+    <ol>
+      <li><b>查视图 = 查基表。</b>视图不缓存结果，基表一变立刻可见；基表被锁，视图查询一起等。</li>
+      <li><b>改视图数据 = 改基表。</b><code>UPDATE stu_v_1 SET name='x'</code> 改的是 <code>student</code> 的行，不是字典里那行文字。</li>
+      <li><b>建 / 改 / 删视图 = 改字典。</b>这类 DDL 不碰业务数据，但会锁元数据，业务高峰别做。</li>
+    </ol>
+
+    <p>想确认自己库里有哪些视图、能不能改，直接查这张表：</p>
+    <pre data-copy><code>SELECT TABLE_SCHEMA, TABLE_NAME, IS_UPDATABLE, CHECK_OPTION, DEFINER,
+       VIEW_DEFINITION
+FROM information_schema.VIEWS
+WHERE TABLE_SCHEMA = 'itcast';</code></pre>
+    <p class="check"><code>VIEW_DEFINITION</code> 是被重写过的文本：库名会带上反引号，<code>SELECT *</code> 已经展开成具体列。别拿它跟源码逐字对比，看逻辑对不对就行。</p>
+
+    <p><code>information_schema</code> 是内置的<b>系统库</b>（与 <code>mysql</code>、<code>performance_schema</code>、<code>sys</code> 并列），但它里面的「表」不存数据，是每次查询时按数据字典现算的。所以<b>不用 <code>USE</code></b>——表名前面已经带了库名，<code>USE</code> 只负责给<b>不带库名</b>的表指认默认库；连默认库都没有（<code>SELECT DATABASE()</code> 返回 <code>NULL</code>）时，这句照样跑。<br>两个坑：① 查这张表要 <code>SHOW VIEW</code> 权限，权限不够不报错，而是<b>行数悄悄变少</b>；② 手滑执行过 <code>USE information_schema;</code> 又忘了切回来，之后查业务表全是 <code>1146</code>——先 <code>SELECT DATABASE();</code> 看自己在哪。</p>
+
+    <div class="note warn"><b>视图不加速，这一点必须先钉死</b>
+    <p>它不物化、不建索引、不缓存结果。查询时那句 SELECT 照跑，改视图不改变执行计划。少数情况下 <code>ALGORITHM=TEMPTABLE</code> 还要先建临时表，比直接查更慢。<b>把视图当「优化手段」是最常见的误用。</b></p>
+    </div>
+
+    <h2 id="syntax">2. 四个动作</h2>
+    <table class="t-auto">
+      <thead><tr><th style="width:12%">动作</th><th style="width:46%">语句</th><th>要点</th></tr></thead>
+      <tbody>
+        <tr><td><b>建</b></td><td><code>CREATE [OR REPLACE] VIEW v(列名) AS SELECT ... [WITH CHECK OPTION]</code></td><td>列名列表可省，省了就用 SELECT 的列名。</td></tr>
+        <tr><td><b>改</b></td><td><code>ALTER VIEW v AS SELECT ...</code> / <code>CREATE OR REPLACE VIEW ...</code></td><td>视图不存在时 <code>ALTER</code> 报错，<code>OR REPLACE</code> 直接建。</td></tr>
+        <tr><td><b>查</b></td><td><code>SHOW CREATE VIEW v;</code> / <code>SELECT * FROM v;</code></td><td>前者看定义和算法，后者看数据。</td></tr>
+        <tr><td><b>删</b></td><td><code>DROP VIEW [IF EXISTS] v1, v2;</code></td><td>一次可以删多个；不加 <code>IF EXISTS</code> 时不存在就报错。</td></tr>
+      </tbody>
+    </table>
+
+    <pre data-copy><code>-- 建：id 不超过 10 的学生，只取两列
+CREATE OR REPLACE VIEW stu_v_1 AS
+SELECT id, name FROM student WHERE id &lt;= 10;
+
+-- 查：一条看定义，一条看数据
+SHOW CREATE VIEW stu_v_1;
+SELECT * FROM stu_v_1;
+
+-- 改：两种写法效果一样，差别只在视图不存在时
+ALTER VIEW stu_v_1 AS SELECT id, name, no FROM student WHERE id &lt;= 10;
+CREATE OR REPLACE VIEW stu_v_1 AS SELECT id, name, no FROM student WHERE id &lt;= 10;
+
+-- 删：可一次删多个
+DROP VIEW IF EXISTS stu_v_1;</code></pre>
+
+    <p><code>SHOW CREATE VIEW</code> 的输出里有两处别跳过：</p>
+    <ul>
+      <li><code>ALGORITHM=MERGE</code>：默认值。<code>MERGE</code> 把定义合并进外层查询（能改）；<code>TEMPTABLE</code> 先落临时表（<b>一定不能改</b>）。</li>
+      <li><code>DEFINER=`root`@`%`</code> + <code>SQL SECURITY DEFINER</code>：查视图时用<b>定义者</b>的权限，不是你的。这是「用视图做权限」能成立的原因，也是定义者被删后视图直接报 1449 / 1356 的原因。</li>
+    </ul>
+    <p class="check">列名重复会报 <code>1060 Duplicate column name</code>；视图名和表名共用一个命名空间，同库重名报 <code>1050 Table already exists</code>。这两条在多表联查建视图时最容易撞上——用 <code>AS</code> 给同名列起别名。</p>
+
+    <h2 id="updatable">3. 什么情况下能改</h2>
+    <p>总闸只有一句：<b>视图里的行，和基表里的行，必须一一对应</b>。一行视图如果是由多行基表算出来的、或者根本找不到对应的基表行，就没法把改动写回去。</p>
+
+    <table class="t-auto">
+      <thead><tr><th style="width:34%">视图里出现</th><th>为什么不能改</th></tr></thead>
+      <tbody>
+        <tr><td>聚合函数 / 窗口函数（<code>SUM()</code> <code>MIN()</code> <code>MAX()</code> <code>COUNT()</code>、<code>ROW_NUMBER()</code> 等）</td><td>一行视图是多行基表算出来的，反向拆不回去。</td></tr>
+        <tr><td><code>DISTINCT</code></td><td>去重之后，不知道要改哪一行。</td></tr>
+        <tr><td><code>GROUP BY</code></td><td>同上，行已经变成组。</td></tr>
+        <tr><td><code>HAVING</code></td><td>条件架在分组结果上，没有对应的行。</td></tr>
+        <tr><td><code>UNION</code> / <code>UNION ALL</code></td><td>一行可能来自任意一个分支。</td></tr>
+      </tbody>
+    </table>
+
+    <p>上表是课程列的 5 条。8.0 官方文档还多几条，遇到了别以为是 bug：</p>
+    <ul>
+      <li>SELECT 列表里有<b>子查询</b>；WHERE 里的子查询引用了 FROM 中的表。</li>
+      <li>只引用常量（没有基表可写）。</li>
+      <li><code>ALGORITHM=TEMPTABLE</code>。</li>
+      <li>同一基表列被引用多次（只挡 INSERT，不挡 UPDATE / DELETE）。</li>
+    </ul>
+
+    <p>不想背，直接问服务器：</p>
+    <pre data-copy><code>SELECT TABLE_NAME, IS_UPDATABLE
+FROM information_schema.VIEWS
+WHERE TABLE_SCHEMA = 'itcast';</code></pre>
+    <p class="check"><code>IS_UPDATABLE=NO</code> 时，<code>UPDATE</code> / <code>DELETE</code> 直接报 <code>1288 The target table ... is not updatable</code>。<code>YES</code> 也只代表<b>语法上</b>可改，改出来是不是你要的，还得自己看数据。</p>
+
+    <h3 id="join">3.1 多表视图的规矩</h3>
+    <p><b>「多表视图一律不能增删改」这句是错的。</b>至少 UPDATE 可以。三条语句规矩不同：</p>
+
+    <table class="t-auto">
+      <thead><tr><th style="width:16%">语句</th><th style="width:20%">多表（内连接）视图</th><th>条件</th></tr></thead>
+      <tbody>
+        <tr><td><code>UPDATE</code></td><td><b>可以</b></td><td><code>SET</code> 里只能出现<b>同一张</b>基表的列；改别的表那一半直接拒绝。</td></tr>
+        <tr><td><code>DELETE</code></td><td><b>不行</b></td><td>join 视图不允许 DELETE，报 <code>Can not delete from join view</code>。</td></tr>
+        <tr><td><code>INSERT</code></td><td><b>基本不行</b></td><td>只有单表视图才可插入；join 视图要插，必须所有分支都可合并、且只插一张表。</td></tr>
+      </tbody>
+    </table>
+
+    <p>能用 UPDATE 的前提是视图走 <code>MERGE</code>：内连接（不是外连接、不是 UNION）、没有上面那五种东西。外连接视图一律只读。</p>
+
+    <div class="note plain"><b>就算 UPDATE 成功，也别拿多表视图当更新入口</b>
+    <p>一个学生选了三门课，三表联查的视图里他就是三行。你 <code>UPDATE ... WHERE student_no='20190101'</code> 会同时改三行——改的是同一张基表的同一行，改三次。逻辑上没错，但「一行视图 = 一行基表」的直觉在这里不成立，写业务代码时特别容易算错行数。</p>
+    </div>
+
+    <h2 id="check">4. WITH CHECK OPTION</h2>
+    <p>它解决一个很具体的问题：<b>视图本身是个筛子，往里插一条筛不中的行，插入会成功，但插完就看不见。</b>数据进了基表，视图里查不到——这类「黑洞数据」最难排查。加上检查选项，就是让服务器在写入时把这行拦住。</p>
+
+    <figure class="fig">
+      <div class="fig-scroll">
+      <svg viewBox="0 0 680 300" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <rect x="6" y="6" width="668" height="288" rx="12" fill="#ffffff" stroke="#e4e7ec"/>
+        <text x="24" y="32" font-size="13" font-weight="600" fill="#4e5564">同一句 INSERT ... VALUES (11,'Tom')，两种结局（视图条件 id &lt;= 10）</text>
+
+        <text x="24" y="62" font-size="11" font-weight="700" fill="#8a6535">没写 WITH CHECK OPTION</text>
+        <rect x="24" y="72" width="176" height="46" rx="7" fill="#f7f9fa" stroke="#e4e7ec"/>
+        <text x="38" y="92" font-size="10" fill="#1f2329">INSERT INTO stu_v_1</text>
+        <text x="38" y="108" font-size="10" fill="#8a9099">VALUES (11,'Tom')</text>
+        <path d="M206 95 L244 95" stroke="#9aa6b1" stroke-width="1.4"/>
+        <path d="M240 91 L246 95 L240 99 Z" fill="#9aa6b1"/>
+        <rect x="250" y="72" width="180" height="46" rx="7" fill="#fdf3e3" stroke="#f0d9b0"/>
+        <text x="264" y="92" font-size="10" fill="#b06a00">写入成功</text>
+        <text x="264" y="108" font-size="10" fill="#8a6535">但视图里永远查不到这行</text>
+        <path d="M436 95 L474 95" stroke="#9aa6b1" stroke-width="1.4"/>
+        <path d="M470 91 L476 95 L470 99 Z" fill="#9aa6b1"/>
+        <rect x="480" y="72" width="176" height="46" rx="7" fill="#fdecea" stroke="#f5c6c2"/>
+        <text x="494" y="92" font-size="10" fill="#9a3b32">客户端以为写进去了</text>
+        <text x="494" y="108" font-size="10" fill="#9a3b32">排查时对不上账</text>
+
+        <line x1="24" y1="136" x2="656" y2="136" stroke="#eef1f5"/>
+
+        <text x="24" y="164" font-size="11" font-weight="700" fill="#216a43">写了 WITH CHECK OPTION</text>
+        <rect x="24" y="174" width="176" height="46" rx="7" fill="#f7f9fa" stroke="#e4e7ec"/>
+        <text x="38" y="194" font-size="10" fill="#1f2329">INSERT INTO stu_v_1</text>
+        <text x="38" y="210" font-size="10" fill="#8a9099">VALUES (11,'Tom')</text>
+        <path d="M206 197 L244 197" stroke="#9aa6b1" stroke-width="1.4"/>
+        <path d="M240 193 L246 197 L240 201 Z" fill="#9aa6b1"/>
+        <rect x="250" y="174" width="180" height="46" rx="7" fill="#eef7fa" stroke="#cfe3ea"/>
+        <text x="264" y="194" font-size="10" fill="#00566b">先检查 WHERE id &lt;= 10</text>
+        <text x="264" y="210" font-size="10" fill="#8a9099">11 不满足 → 整条语句失败</text>
+        <path d="M436 197 L474 197" stroke="#9aa6b1" stroke-width="1.4"/>
+        <path d="M470 193 L476 197 L470 201 Z" fill="#9aa6b1"/>
+        <rect x="480" y="174" width="176" height="46" rx="7" fill="#fdecea" stroke="#f5c6c2"/>
+        <text x="494" y="194" font-size="10" font-weight="700" fill="#9a3b32">ERROR 1369</text>
+        <text x="494" y="210" font-size="10" fill="#9a3b32">CHECK OPTION failed</text>
+
+        <text x="24" y="252" font-size="10.2" fill="#4e5564">它检查的是「写入之后这行还符不符合 WHERE」，不是「写入前帮你过滤掉」——</text>
+        <text x="24" y="270" font-size="10.2" fill="#4e5564">所以失败的是整条语句，一行都不会写进去。</text>
+      </svg>
+      </div>
+      <figcaption><b>图 2</b>没有检查选项时插入成功但查不到；有了它，越界写入直接 <code>1369</code> 整条失败。前者是静默的坑，后者是当场报错——这就是它存在的全部意义。<span class="fig-hint">窄屏可左右滑动</span></figcaption>
+    </figure>
+
+    <p>下面用同一张表把两种结局跑一遍（假设 <code>student</code> 其余列可空或有默认值，否则插入会先撞 <code>1364</code>，那是另一回事）：</p>
+    <pre data-copy><code>-- 看不见 id &gt; 10 的行
+CREATE VIEW stu_v_1 AS SELECT id, name FROM student WHERE id &lt;= 10;
+INSERT INTO stu_v_1(id, name) VALUES (11, 'Tom');   -- 成功
+SELECT * FROM stu_v_1;                              -- 查不到 11，但基表里有
+
+-- 加上检查选项
+CREATE OR REPLACE VIEW stu_v_1 AS
+SELECT id, name FROM student WHERE id &lt;= 10
+WITH CHECK OPTION;
+
+INSERT INTO stu_v_1(id, name) VALUES (11, 'Tom');   -- ERROR 1369
+UPDATE stu_v_1 SET id = 11 WHERE id = 10;           -- 同样 1369：改完就看不见了</code></pre>
+
+    <p>检查范围有三个取值，差别只在「视图套视图」时才显现：</p>
+    <table class="t-auto">
+      <thead><tr><th style="width:38%">写法</th><th>检查谁</th></tr></thead>
+      <tbody>
+        <tr><td>不写</td><td>自己的 WHERE <b>不检查</b>；但如果下层视图写了检查选项，下层的照样检查。</td></tr>
+        <tr><td><code>WITH LOCAL CHECK OPTION</code></td><td>自己的 WHERE + 下层<b>写了</b>检查选项的那些视图的 WHERE。</td></tr>
+        <tr><td><code>WITH CASCADED CHECK OPTION</code>（<b>默认</b>）</td><td>自己的 WHERE + 一路往下<b>所有</b>视图的 WHERE，不管下层写没写。</td></tr>
+      </tbody>
+    </table>
+
+    <pre data-copy><code>CREATE TABLE t1 (a INT);
+CREATE VIEW v1 AS SELECT * FROM t1 WHERE a &lt; 2;                 -- 没写检查选项
+CREATE VIEW v2 AS SELECT * FROM v1 WHERE a &gt; 0 WITH LOCAL CHECK OPTION;
+CREATE VIEW v3 AS SELECT * FROM v1 WHERE a &gt; 0 WITH CASCADED CHECK OPTION;
+
+INSERT INTO v2 VALUES (5);   -- 成功：LOCAL 只管 v2 自己（5&gt;0），v1 没写检查就不管
+INSERT INTO v3 VALUES (5);   -- ERROR 1369：CASCADED 把 v1 的 a&lt;2 也算上</code></pre>
+    <p class="check">同一组视图，换成 <code>v1</code> 也写了 <code>WITH CHECK OPTION</code> 之后，<code>LOCAL</code> 和 <code>CASCADED</code> 结果就一样了——差别只在「下层没写」的时候冒出来。</p>
+
+    <div class="note warn"><b>DELETE 不受它约束，别把它想成万能的写保护</b>
+    <p>能通过视图删掉的行，本来就是视图里看得见的行，删完不存在「还符不符合条件」的问题。它约束的是 <code>INSERT</code> 和 <code>UPDATE</code>。<br>另外：<code>WITH CHECK OPTION</code> 不等于权限控制——它拦的是「不符合条件的数据」，不拦「不该改的人」。</p>
+    </div>
+
+    <h2 id="why">5. 为什么要有视图</h2>
+    <p>课程给了三个词：<b>简单、安全、数据独立</b>。每个词背后都对应一个具体的麻烦。</p>
+
+    <table class="t-auto">
+      <thead><tr><th style="width:14%">作用</th><th style="width:43%">解决的麻烦</th><th>怎么用</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>简单</b></td>
+          <td>三表联查的业务每天要写十几遍，条件还总变。</td>
+          <td>定义成视图，应用只写 <code>SELECT * FROM v WHERE ...</code>；口径变了改视图，不改代码。</td>
+        </tr>
+        <tr>
+          <td><b>安全</b></td>
+          <td>外包/运营要查用户表，但不能看到手机号、邮箱，更不能看到别人的行。</td>
+          <td>建视图只放需要的列 + <code>WHERE</code> 限定行，只把这一个视图的 <code>SELECT</code> 授给账号，<b>基表权限一点都不给</b>。</td>
+        </tr>
+        <tr>
+          <td><b>数据独立</b></td>
+          <td>表要拆、要改名、要加一列，应用里几十处 SQL 全得跟着改。</td>
+          <td>应用只认视图；底层改结构时改视图定义，应用不动。</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="note plain"><b>「安全」这条要说得更准一点</b>
+    <p>课程原话是「数据库可以授权，但不能授权到特定行和特定列」。<b>列级授权 MySQL 是支持的</b>：<code>GRANT SELECT(id,name) ON itcast.tb_user TO 'u'@'%';</code> 就能只给两列。<br>所以视图真正不可替代的是<b>行级范围</b>（<code>WHERE</code> 挑行，GRANT 做不到）和<b>把多表逻辑收成一个名字</b>。别把「只能看几列」当成必须用视图的理由。</p>
+    </div>
+
+    <div class="note warn"><b>「数据独立」是有限的</b>
+    <p>视图在查询时才解析，不是编译期绑定。基表删了一列，视图立刻失效，报 <code>1356 View ... references invalid table(s) or column(s)</code>，所有依赖它的查询一起挂。<br>所以「独立」的准确含义是：<b>表结构变化的影响被收敛到视图这一处</b>，不是「表怎么变视图都不受影响」。</p>
+    </div>
+
+    <h2 id="mine">6. 我的理解（含两处纠正）</h2>
+    <p>下面是我自己捋的那套说法。对着图 1 一条条过，比背语法记得住。标「半步对」和「要改」的地方，是我想当然了的。</p>
+
+    <ol class="steps">
+      <li><b>「视图本质就是一句 SQL 查询」<span class="verdict ok">对</span></b>
+      <p>再补三个附件就完整了：一个<b>名字</b>、一个<b>执行身份</b>（<code>DEFINER</code>）、一组<b>可见性规则</b>（<code>WITH CHECK OPTION</code>）。这三样才是视图比「把 SQL 存在记事本里」多出来的东西。<br>所以创建视图时真正要写对的只有 SELECT；名字和选项是外壳。</p></li>
+
+      <li><b>「底层系统库里有一张表记着视图的元数据」<span class="verdict part">方向对，位置要改</span></b>
+      <p>5.7 是磁盘上的 <code>.frm</code> 文件；<b>8.0 换成了数据字典</b>（藏在 <code>mysql</code> 库里的隐藏表，直接 SELECT 会被拒）。<br>对外统一从 <code>information_schema.VIEWS</code> 看：<code>VIEW_DEFINITION</code> 存那句 SELECT，<code>CHECK_OPTION</code> 存检查选项，<code>IS_UPDATABLE</code> 存能不能改，<code>DEFINER</code> 存执行身份。想改这些值只有一条路——<code>ALTER VIEW</code>，别去动字典表。</p></li>
+
+      <li><b>「操作视图就是操作系统库数据或它依赖的真实表」<span class="verdict part">要拆成三件事</span></b>
+      <p>混在一起就会得出「改视图会改字典」这种错结论：</p>
+      <p><b>查</b>（SELECT）→ 读基表；<b>增删改</b>（DML）→ 写基表，字典一个字节都不动；<b>建/改/删视图</b>（DDL）→ 只动字典，业务数据不动。<br>把这三条分清楚，后面「能不能改」「为什么插入查不到」就都顺了。</p></li>
+
+      <li><b>「增删改的前提是视图的行和基表的行一一对应」<span class="verdict ok">对，这是总闸</span></b>
+      <p>聚合、<code>DISTINCT</code>、<code>GROUP BY</code>、<code>HAVING</code>、<code>UNION</code> 之所以被禁，全是因为它们破坏了「一行对一行」。记住理由比记住清单管用——清单会长，理由不会。</p></li>
+
+      <li><b>「涉及多表的视图，增删改直接不允许」<span class="verdict no">要说错一半</span></b>
+      <p><code>UPDATE</code> 是<b>可以</b>的：内连接、走 <code>MERGE</code>、<code>SET</code> 只涉及一张基表的列。<code>DELETE</code> 不行，<code>INSERT</code> 基本不行。<br>但「能改」不等于「该改」：一对多联查里一行视图对应多行基表，按视图行数去更新会算错影响行数（见 §3.1）。</p></li>
+
+      <li><b>「WITH CHECK OPTION 校验增删改影响的行是否还能被视图包含」<span class="verdict part">基本对，补两点</span></b>
+      <p>第一，它检查的是<b>写入后</b>的行，不是写入前帮你筛掉；不通过是<b>整条语句失败</b>（<code>1369</code>），不是「跳过这一行」。<br>第二，它管 <code>INSERT</code> 和 <code>UPDATE</code>，<b>不管 DELETE</b>。<br>还有一层容易混：「能不能改」和「改完看不看得见」是两道闸，前者决定语句允不允许执行，后者决定数据落不落得进去。</p></li>
+
+      <li><b>「视图的优势说明了这个功能为什么被造出来」<span class="verdict ok">对，而且这是最该记的一层</span></b>
+      <p>技术不会凭空出现。视图出现是因为三个真实痛点：<b>重复查询没法复用</b>（SQL 只能复制粘贴）、<b>权限只能到表/列、到不了行</b>、<b>表结构一变应用全崩</b>。<br>它没解决「查询慢」——那不是它的目标，别指望。</p></li>
+    </ol>
+
+    <div class="note tip"><b>一句话版本</b>
+    <p>视图 = <b>存在字典里的一句 SELECT</b> + <b>一套可见性规则</b> + <b>一个执行身份</b>；数据始终在基表，视图只决定「你看到哪些行、哪些列、能不能写回、写完还看不看得见」。</p>
+    </div>
+
+    <h2 id="cases">7. 两个案例</h2>
+
+    <h3>案例一：屏蔽敏感列（安全）</h3>
+    <p>开发要查用户，但手机号和邮箱不能给。建一个只含基本字段的视图，只把视图的查询权限授出去：</p>
+    <pre data-copy><code>CREATE VIEW tb_user_view AS
+SELECT id, name, profession, age, gender, status, createtime
+FROM tb_user;
+
+SELECT * FROM tb_user_view;
+
+-- 关键一步：只授视图，并确认基表没给过
+GRANT SELECT ON itcast.tb_user_view TO 'reader'@'%';
+SHOW GRANTS FOR 'reader'@'%';</code></pre>
+    <p class="check"><code>SHOW GRANTS</code> 里<b>不该出现</b> <code>itcast.tb_user</code>。出现过就用 <code>REVOKE ... ON itcast.tb_user</code> 撤掉（没授过就撤会报 1141）。只建视图不收回基表权限，等于白做——账号照样能 <code>SELECT phone, email FROM tb_user</code>。视图能当权限边界，前提是<b>基表权限本来就没给</b>。</p>
+
+    <h3>案例二：固化三表联查（简化）</h3>
+    <pre data-copy><code>CREATE VIEW tb_stu_course_view AS
+SELECT s.name AS student_name,
+       s.no   AS student_no,
+       c.name AS course_name
+FROM student s, student_course sc, course c
+WHERE s.id = sc.studentid
+  AND sc.courseid = c.id;
+
+SELECT * FROM tb_stu_course_view WHERE student_no = '20190101';</code></pre>
+    <p>三个表连起来、列名还重了（<code>student.name</code> 与 <code>course.name</code>），所以必须起别名，否则 <code>1060</code>。这类视图<b>只当查询入口</b>：一个学生多门课，行不一一对应，别拿它做更新。</p>
+
+    <div class="note plain"><b>案例二还有个隐性代价</b>
+    <p>视图把「口径」藏起来了。哪天有人改了视图定义，所有依赖它的业务一起变，而代码里看不出来。所以：视图定义要进版本管理，改之前先 <code>SHOW CREATE VIEW</code> 存一份。<b>视图降低重复，也隐藏了变化。</b></p>
+    </div>
+
+    <section class="quiz" id="quiz">
+      <p class="quiz-head">自测三问<span>先自己答，再展开对照</span></p>
+      <details><summary><span class="qno">Q1</span><span class="ask">视图里的数据存在哪？为什么基表一改，视图里立刻就变了？</span><span class="caret" aria-hidden="true"></span></summary>
+      <div class="ans"><p><b>一条都不存。</b>字典里只有那句 SELECT 的文本、检查选项和执行身份。<br>查视图时服务器把定义展开成对基表的查询，所以读到的永远是基表当下的数据——没有缓存，也就没有「刷新视图」这回事。</p></div></details>
+      <details><summary><span class="qno">Q2</span><span class="ask"><code>SELECT dept, COUNT(*) FROM emp GROUP BY dept</code> 做成视图，能 <code>UPDATE</code> 吗？</span><span class="caret" aria-hidden="true"></span></summary>
+      <div class="ans"><p>不能。<code>GROUP BY</code> 加聚合函数，一行视图是多行基表算出来的，<code>IS_UPDATABLE</code> 是 <code>NO</code>，<code>UPDATE</code> 直接报 <code>1288 The target table ... is not updatable</code>。<br>想看这类统计只能查，要改就回基表改。</p></div></details>
+      <details><summary><span class="qno">Q3</span><span class="ask">视图条件是 <code>id &lt;= 10</code> 但没写 <code>WITH CHECK OPTION</code>，<code>INSERT ... (11,'Tom')</code> 会怎样？</span><span class="caret" aria-hidden="true"></span></summary>
+      <div class="ans"><p><b>插入成功，但视图里查不到这行。</b>数据在基表里，等于给自己埋了个「黑洞」。<br>加上 <code>WITH CHECK OPTION</code> 后同样的语句报 <code>1369 CHECK OPTION failed</code>，整条失败、一行不写。线上建视图，除非你很确定不需要，否则都加上。</p></div></details>
+    </section>
+
+    <h2 id="sources">资料</h2>
+    <p class="refs">官方文档：<a href="https://dev.mysql.com/doc/refman/8.0/en/create-view.html">CREATE VIEW</a> · <a href="https://dev.mysql.com/doc/refman/8.0/en/view-updatability.html">Updatable and Insertable Views</a> · <a href="https://dev.mysql.com/doc/refman/8.0/en/view-check-option.html">WITH CHECK OPTION</a> · <a href="https://dev.mysql.com/doc/refman/8.0/en/information-schema-views-table.html">INFORMATION_SCHEMA.VIEWS</a></p>
+    <p class="source">核对日期 2026-11-28。内容按课程「视图」章编排（概念 → 语法 → 检查选项 → 更新及作用 → 案例），§3 的补充条数、§3.1 的多表规矩、§5 的列级授权说明来自 MySQL 8.0 官方文档；<b>命令没有在真实实例上逐条执行</b>，第一次跑时以每步的验收输出为准。</p>
+
+    <div class="footer"><a href="../index.html">← 总目录</a> · 4.1 视图 · 下一篇：4.2 存储过程（待写）</div>
+  </main>
+</div>
+</body>
+</html>

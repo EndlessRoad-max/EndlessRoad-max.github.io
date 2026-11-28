@@ -41,11 +41,14 @@ for (const file of files.filter((f) => /\.(html|xml|json)$/.test(f))) {
   pages++;
   const canonical = text.match(/rel="canonical" href="([^"]+)"/);
   assert(canonical, `Missing canonical: ${file}`);
-  for (const [, target] of text.matchAll(
-    /(?:href|src)="(\/[^"#?]*)(?:[?#][^"]*)?"/g,
-  )) {
-    assert(target.startsWith(base), `Link escapes base: ${target} in ${file}`);
-    const relative = decodeURI(target.slice(base.length));
+  const markup = text.replace(/<link\b[^>]*rel=["']canonical["'][^>]*>/gi, "");
+  for (const [, target] of markup.matchAll(/(?:href|src)=["']([^"']+)["']/g)) {
+    if (target.startsWith("#") || /^(?:mailto:|tel:|data:)/i.test(target)) continue;
+    assert(!/^(?:file:|[a-z]:\\)/i.test(target), `Local computer path in ${file}`);
+    const link = new URL(target.replaceAll("&amp;", "&"), canonical[1]);
+    if (link.origin !== new URL(canonical[1]).origin) continue;
+    assert(link.pathname.startsWith(base), `Link escapes base: ${target} in ${file}`);
+    const relative = decodeURIComponent(link.pathname.slice(base.length));
     const resolved = path.join(
       root,
       relative.endsWith("/") || !relative ? `${relative}index.html` : relative,
@@ -55,6 +58,18 @@ for (const file of files.filter((f) => /\.(html|xml|json)$/.test(f))) {
     );
   }
 }
+const mysqlFiles = files.filter(file => file.startsWith(path.join(root, "mysql") + path.sep));
+assert(mysqlFiles.some(file => file.endsWith("index.html")), "Missing MySQL topic");
+for (const file of mysqlFiles) {
+  assert(!/[\\/]\.[^\\/]+|_template\.html|\.py$/.test(path.relative(root, file)), `Working file published: ${file}`);
+  if (!file.endsWith(".html")) continue;
+  const html = await readFile(file, "utf8");
+  assert(html.includes("data-pagefind-body"), `HTML note excluded from search: ${file}`);
+  assert(html.includes('aria-label="个人网站导航"'), `Missing return navigation: ${file}`);
+}
+const notes = await readFile(path.join(root, "notes/index.html"), "utf8");
+assert(notes.includes(`href="${base}mysql/"`), "HTML topic missing from note list");
+assert(!notes.includes(`${base}posts/mysql-notes/`), "HTML note links to a Markdown route");
 console.log(
   `Verified ${pages} HTML pages: routes, local links, assets, canonical URLs, and draft exclusion.`,
 );

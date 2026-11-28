@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>07 MySQL 管理 · MySQL 笔记</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="layout">
+
+  <nav class="sidebar">
+    <p class="side-title">本章目录</p>
+    <ul class="nav-tree">
+      <li><a href="#s1">7.1 系统数据库</a>
+        <ul>
+          <li><a class="leaf" href="07-01-系统数据库.html">四个库详解</a></li>
+        </ul>
+      </li>
+      <li><a href="#s2">7.2 常用客户端工具</a>
+        <ul>
+          <li><a class="leaf" href="07-02-mysql.html">mysql 客户端</a></li>
+          <li><a class="leaf" href="07-03-mysqladmin.html">mysqladmin</a></li>
+          <li><a class="leaf" href="07-04-mysqlbinlog.html">mysqlbinlog</a></li>
+          <li><a class="leaf" href="07-05-mysqlshow.html">mysqlshow</a></li>
+          <li><a class="leaf" href="07-06-mysqldump.html">mysqldump</a></li>
+          <li><a class="leaf" href="07-07-mysqlimport.html">mysqlimport / source</a></li>
+          <li><span class="pending">其余工具 · 待补</span></li>
+        </ul>
+      </li>
+      <li><a href="#s3">7.3 学完之后：查与用</a>
+        <ul>
+          <li><a class="leaf" href="../踩坑总表.html">踩坑总表</a></li>
+          <li><a class="leaf" href="../任务剧本.html">任务剧本</a></li>
+        </ul>
+      </li>
+    </ul>
+    <p class="side-title" style="margin-top:22px">当前位置</p>
+    <ul class="nav-tree">
+      <li><a href="../index.html">↑ 总目录</a>
+        <ul>
+          <li><span class="current">07 MySQL 管理</span></li>
+        </ul>
+      </li>
+    </ul>
+  </nav>
+
+  <main class="main">
+
+    <div class="crumb"><a href="../index.html">总目录</a> / 进阶篇</div>
+    <h1><span class="chapter-no">07</span>MySQL 管理</h1>
+    <p class="lede">这一章管的是「数据库之外」：MySQL 自带的四个系统库，和服务器端那批命令行工具。每个工具单独一页，从下面的工具地图进去。</p>
+
+    <div class="meta">
+      <span>进阶篇 · 第 7 章</span>
+      <span>更新：2026-11-25</span>
+      <span>环境：MySQL 8.0</span>
+    </div>
+
+    <h2 id="s1">7.1 系统数据库</h2>
+    <p>装完就有四个库：<code>mysql</code>、<code>information_schema</code>、<code>performance_schema</code>、<code>sys</code>。它们不是四个平级的数据库，而是四层不同的东西——一层存真相，一层做翻译，一层记运行时，一层把前两层包成人话。这一节拆成了独立页面，内容比较多：</p>
+
+    <div class="grid3">
+      <a class="tile" href="07-01-系统数据库.html#s2">
+        <div class="t-kicker">存数据</div>
+        <h3>mysql</h3>
+        <p>37 张可见系统表：权限 10、复制 8、优化器 4、日志 2、帮助 4、时区 5、其他 4。另有约 30 张隐藏的数据字典表。</p>
+      </a>
+      <a class="tile" href="07-01-系统数据库.html#s3">
+        <div class="t-kicker">查结构</div>
+        <h3>information_schema</h3>
+        <p>库、表、列、索引、触发器、视图、存储过程的元数据。8.0 里是数据字典的窗口，元数据本体反而不让直读。</p>
+      </a>
+      <a class="tile" href="07-01-系统数据库.html#s4">
+        <div class="t-kicker">查运行</div>
+        <h3>performance_schema / sys</h3>
+        <p>前者是内存里的原始事件（皮秒、重启清零），后者把它包成 <code>sys.session</code> 这类能直接读的视图。</p>
+      </a>
+    </div>
+
+    <div class="note tip">
+      <b>完整的 7.1 在独立页</b>
+      <p><a href="07-01-系统数据库.html">→ 打开「7.1 系统数据库」</a>。里面有四库依赖图、37 张表的分组图、权限四层收窄图，以及几个实际会咬人的点：<code>mysql.tables</code> 直查报 3554、<code>TABLE_ROWS</code> 缓存 24 小时、时区表默认是空的、复制表名没跟着 <code>source/replica</code> 改名。</p>
+      <p>一句话边界：<strong>只有 <code>mysql</code> 需要备份</strong>，另外三个是启动时重建出来的。所以「只备份业务库」会连账号一起丢掉。</p>
+    </div>
+
+    <h2 id="s2">7.2 常用客户端工具</h2>
+    <p>按用途分三组。蓝色实心的是已经整理好的，点名字进去看；灰色虚线的是还没写，等课程讲到那里再补。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 680 230" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <rect x="8" y="8" width="204" height="214" rx="10" fill="#f4fafb" stroke="#b9dde5"/>
+        <text x="24" y="38" font-size="12.5" font-weight="700" fill="#00758f">日常操作</text>
+
+        <a href="07-02-mysql.html">
+          <rect x="20" y="52" width="180" height="32" rx="16" fill="#00758f"/>
+          <text x="110" y="73" text-anchor="middle" font-size="11.5" font-family="Consolas,monospace" fill="#ffffff" font-weight="600">mysql →</text>
+        </a>
+
+        <a href="07-03-mysqladmin.html">
+          <rect x="20" y="90" width="180" height="32" rx="16" fill="#00758f"/>
+          <text x="110" y="111" text-anchor="middle" font-size="11.5" font-family="Consolas,monospace" fill="#ffffff" font-weight="600">mysqladmin →</text>
+        </a>
+
+        <a href="07-05-mysqlshow.html">
+          <rect x="20" y="128" width="180" height="32" rx="16" fill="#00758f"/>
+          <text x="110" y="149" text-anchor="middle" font-size="11.5" font-family="Consolas,monospace" fill="#ffffff" font-weight="600">mysqlshow →</text>
+        </a>
+
+        <text x="24" y="180" font-size="10.5" fill="#8a9099">登录、跑 SQL、-e 批处理</text>
+        <text x="24" y="195" font-size="10.5" fill="#8a9099">看状态、关服务、看结构</text>
+        <text x="24" y="212" font-size="10" fill="#00758f">已整理 3 个</text>
+
+        <rect x="236" y="8" width="204" height="214" rx="10" fill="#f4fafb" stroke="#b9dde5"/>
+        <text x="252" y="38" font-size="12.5" font-weight="700" fill="#00758f">备份 / 导入</text>
+
+        <a href="07-06-mysqldump.html">
+          <rect x="248" y="58" width="180" height="36" rx="18" fill="#00758f"/>
+          <text x="330" y="81" text-anchor="middle" font-size="12.5" font-family="Consolas,monospace" fill="#ffffff" font-weight="600">mysqldump →</text>
+        </a>
+
+        <a href="07-07-mysqlimport.html">
+          <rect x="248" y="104" width="180" height="36" rx="18" fill="#00758f"/>
+          <text x="330" y="127" text-anchor="middle" font-size="12.5" font-family="Consolas,monospace" fill="#ffffff" font-weight="600">mysqlimport →</text>
+        </a>
+
+        <text x="252" y="170" font-size="10.5" fill="#8a9099">一个备、一个灌</text>
+        <text x="252" y="187" font-size="10.5" fill="#8a9099">与 -T 的 .sql / .txt 配套</text>
+        <text x="252" y="208" font-size="10" fill="#00758f">已整理 2 个</text>
+
+        <rect x="464" y="8" width="204" height="214" rx="10" fill="#fbfcfd" stroke="#e4e7ec"/>
+        <text x="480" y="38" font-size="12.5" font-weight="700" fill="#4e5564">日志与恢复点</text>
+
+        <a href="07-04-mysqlbinlog.html">
+          <rect x="476" y="58" width="180" height="36" rx="18" fill="#00758f"/>
+          <text x="566" y="81" text-anchor="middle" font-size="12.5" font-family="Consolas,monospace" fill="#ffffff" font-weight="600">mysqlbinlog →</text>
+        </a>
+
+        <text x="480" y="126" font-size="10.5" fill="#8a9099">把 binlog 翻译成 SQL，</text>
+        <text x="480" y="143" font-size="10.5" fill="#8a9099">配合全量备份做</text>
+        <text x="480" y="160" font-size="10.5" fill="#8a9099">按时间点恢复</text>
+        <text x="480" y="208" font-size="10" fill="#00758f">已整理 1 个</text>
+      </svg>
+      <figcaption><b>图 2</b>工具地图。蓝色实心胶囊可以直接点进去，三个分组共 6 个工具，已全部整理。</figcaption>
+    </figure>
+
+    <table>
+      <thead>
+        <tr><th>工具</th><th>作用</th><th>一句话</th><th>笔记</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>mysql</code></td><td>命令行客户端，登录、跑 SQL、<code>-e</code> 批处理、<code>source</code> 导入脚本</td><td>平时敲的就是它</td>
+          <td><a href="07-02-mysql.html" style="color:#00758f;text-decoration:none;font-weight:600">已整理 →</a></td>
+        </tr>
+        <tr>
+          <td><code>mysqladmin</code></td><td>看状态、探活、刷日志、关服务、建/删库</td><td>不进 SQL 就能干的活</td>
+          <td><a href="07-03-mysqladmin.html" style="color:#00758f;text-decoration:none;font-weight:600">已整理 →</a></td>
+        </tr>
+        <tr>
+          <td><code>mysqldump</code></td><td>逻辑备份，单线程，最通用</td><td>备份工具的主力</td>
+          <td><a href="07-06-mysqldump.html" style="color:#00758f;text-decoration:none;font-weight:600">已整理 →</a></td>
+        </tr>
+        <tr>
+          <td><code>mysqlbinlog</code></td><td>把二进制日志翻译成可读 SQL，做按时间点恢复</td><td>binlog 的翻译器</td>
+          <td><a href="07-04-mysqlbinlog.html" style="color:#00758f;text-decoration:none;font-weight:600">已整理 →</a></td>
+        </tr>
+        <tr>
+          <td><code>mysqlshow</code></td><td>一条命令看库 / 表 / 列 / 索引，<code>SHOW</code> 语句的壳</td><td>不看会话就能查结构</td>
+          <td><a href="07-05-mysqlshow.html" style="color:#00758f;text-decoration:none;font-weight:600">已整理 →</a></td>
+        </tr>
+        <tr>
+          <td><code>mysqlimport</code></td><td>把文本数据文件灌进表里；<code>source</code> 导 SQL 脚本也记在这一页</td><td>恢复时的搬运工</td>
+          <td><a href="07-07-mysqlimport.html" style="color:#00758f;text-decoration:none;font-weight:600">已整理 →</a></td>
+        </tr>
+        <tr>
+          <td><code>mysqlpump</code></td><td>mysqldump 的并行版，8.0.34 弃用、<strong>8.4 已移除</strong></td><td>别在新版本上依赖它</td>
+          <td><span class="tag">旁注</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="note warn">
+      <b>两个工具共用一个限制：<code>secure_file_priv</code></b>
+      <p><code>mysqldump -T</code> 写文件、<code>mysqlimport</code>（不带 <code>--local</code>）读文件，动作都在<strong>服务端</strong>完成，所以路径必须落在 <code>secure_file_priv</code> 指定的目录里，否则报 <code>ERROR 1290</code>。这不是「权限没给」，是「这个目录不被信任」。三种取值、各平台默认值和改法，见 <a href="07-06-mysqldump.html#trust">mysqldump · secure_file_priv 信任目录</a>。</p>
+    </div>
+
+    <div class="note plain">
+      <b>这一章的阅读方式</b>
+      <p>每个工具单独一个 HTML 文件，命名 <code>07-NN-工具名.html</code>，从本页和总目录都能跳进去。目前完成六个：<a href="07-02-mysql.html">mysql</a>（客户端）、<a href="07-03-mysqladmin.html">mysqladmin</a>（状态与关停）、<a href="07-04-mysqlbinlog.html">mysqlbinlog</a>（日志解析与 PITR）、<a href="07-05-mysqlshow.html">mysqlshow</a>（对象查找）、<a href="07-06-mysqldump.html">mysqldump</a>（备份）、<a href="07-07-mysqlimport.html">mysqlimport / source</a>（导入恢复），其余按课程进度补。</p>
+    </div>
+
+    <h2 id="s3">7.3 学完之后：查与用</h2>
+    <p>这七个工具单独看都是一条命令，合起来是三条真实流程。正文按工具排，这两页按「你现在的处境」重排了一遍——出事的时候翻这两页，比按目录找快得多。</p>
+
+    <div class="grid2">
+      <a class="tile" href="../踩坑总表.html">
+        <div class="t-kicker">出错时查</div>
+        <h3>踩坑总表</h3>
+        <p>本章所有报错按四层归因汇总：连不上 / 被拒 / 执行失败 / 不报错但结果错。每条都链回原页面。</p>
+      </a>
+      <a class="tile" href="../任务剧本.html">
+        <div class="t-kicker">动手时看</div>
+        <h3>任务剧本</h3>
+        <p>备份、恢复到某一秒、换机器迁移三条端到端流程，把本章工具串成能照着做的顺序。</p>
+      </a>
+    </div>
+
+    <div class="footer">
+      <a href="../index.html">← 总目录</a>
+    </div>
+
+  </main>
+</div>
+</body>
+</html>

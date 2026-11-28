@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>7.1 系统数据库 · MySQL 笔记</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="layout">
+
+  <nav class="sidebar">
+    <p class="side-title">本页目录</p>
+    <ul class="nav-tree">
+      <li><a class="leaf" href="#s1">1. 四个库不是平级</a></li>
+      <li><a class="leaf" href="#s2">2. mysql：37 张表</a>
+        <ul>
+          <li><a class="leaf" href="#s2-1">2.1 权限表</a></li>
+          <li><a class="leaf" href="#s2-2">2.2 复制表</a></li>
+          <li><a class="leaf" href="#s2-3">2.3 统计与优化器</a></li>
+          <li><a class="leaf" href="#s2-4">2.4 日志 / 帮助 / 时区</a></li>
+        </ul>
+      </li>
+      <li><a class="leaf" href="#s3">3. information_schema</a></li>
+      <li><a class="leaf" href="#s4">4. performance_schema</a></li>
+      <li><a class="leaf" href="#s5">5. sys</a></li>
+      <li><a class="leaf" href="#s6">6. 查什么去哪</a></li>
+    </ul>
+
+    <p class="side-title" style="margin-top:22px">当前位置</p>
+    <ul class="nav-tree">
+      <li><a href="../index.html">↑ 总目录</a>
+        <ul>
+          <li><a class="group" href="07-MySQL管理.html">07 MySQL 管理</a>
+            <ul>
+              <li><span class="current">7.1 系统数据库</span></li>
+              <li><a class="leaf" href="07-02-mysql.html">7.2.1 mysql</a></li>
+              <li><a class="leaf" href="07-03-mysqladmin.html">7.2.2 mysqladmin</a></li>
+              <li><a class="leaf" href="07-04-mysqlbinlog.html">7.2.3 mysqlbinlog</a></li>
+              <li><a class="leaf" href="07-05-mysqlshow.html">7.2.4 mysqlshow</a></li>
+              <li><a class="leaf" href="07-06-mysqldump.html">7.2.5 mysqldump</a></li>
+              <li><a class="leaf" href="07-07-mysqlimport.html">7.2.6 mysqlimport</a></li>
+            </ul>
+          </li>
+        </ul>
+      </li>
+    </ul>
+  </nav>
+
+  <main class="main">
+
+    <div class="crumb"><a href="../index.html">总目录</a> / <a href="07-MySQL管理.html">07 MySQL 管理</a> / 7.1</div>
+    <h1><span class="chapter-no">7.1</span>系统数据库</h1>
+    <p class="lede">装完就有四个库。它们不是「四个普通数据库」，而是四层不同的东西：一层存真相，一层做翻译，一层记运行时，一层把前两层包成人话。分不清就会做两件错事——备份时把系统库当业务库，或者出问题时不知道去哪查。</p>
+
+    <div class="meta">
+      <span>进阶篇 · 7.1</span>
+      <span>更新：2026-11-25</span>
+      <span>环境：MySQL 8.0</span>
+    </div>
+
+    <section class="quick">
+      <p class="quick-head">一屏速记<span>合上笔记，这 5 条要能自己说出来</span></p>
+      <ol>
+        <li>四个库不是平级：<code>mysql</code> 是账本（账号、权限、复制位点、统计），<code>information_schema</code> 是元数据视图，<code>performance_schema</code> 是运行时计数器，<code>sys</code> 只是前两者的易读外衣——<b>sys 依赖前两者，前两者互不依赖</b>。</li>
+        <li><code>mysql</code> 库 <b>37 张可见表</b>，分成「可以改的账本表」和「别手改的状态表」两类；另有约 30 张数据字典隐藏表，直接 SELECT 会报 <code>ERROR 3554</code>。</li>
+        <li>8.0 里 5.7 的 <code>mysql.event</code>、<code>mysql.proc</code> 已不存在（搬进了数据字典），但复制表<b>仍叫</b> <code>slave_master_info</code> 这些旧名，没跟着 SOURCE / REPLICA 术语改名。</li>
+        <li>时区 5 张表默认是空的，没导时区数据前 <code>CONVERT_TZ()</code> 返回 <code>NULL</code>；<code>information_schema.TABLES.TABLE_ROWS</code> 是估算值，还被 <code>information_schema_stats_expiry</code>（默认 86400 秒）缓存。</li>
+        <li>查之前先分清「元数据还是运行时」：结构 / 权限 / 统计去 <code>information_schema</code>，计数器与等待事件去 <code>performance_schema</code>，想要人话查 <code>sys</code>。</li>
+      </ol>
+    </section>
+
+    <h2 id="s1">1. 四个库不是平级</h2>
+
+    <figure class="fig">
+      <svg viewBox="0 0 680 300" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <rect x="8" y="8" width="664" height="284" rx="12" fill="#ffffff" stroke="#e4e7ec"/>
+        <text x="28" y="34" font-size="13" font-weight="600" fill="#4e5564">一个 mysqld 进程里的四个系统库</text>
+
+        <rect x="24" y="48" width="196" height="84" rx="8" fill="#e6f3f6" stroke="#00758f" stroke-width="1.5"/>
+        <text x="40" y="72" font-size="14" font-weight="700" fill="#00566b">mysql</text>
+        <text x="40" y="94" font-size="10.5" fill="#4e5564">账号 / 权限 / 复制 / 统计</text>
+        <text x="40" y="114" font-size="10" fill="#8a9099">落盘 mysql.ibd，要备份</text>
+
+        <rect x="242" y="48" width="196" height="84" rx="8" fill="#f7f9fa" stroke="#e4e7ec"/>
+        <text x="258" y="72" font-size="11.5" font-weight="700" fill="#1f2329">information_schema</text>
+        <text x="258" y="94" font-size="10.5" fill="#4e5564">库表列 / 引擎 / 触发器</text>
+        <text x="258" y="114" font-size="10" fill="#8a9099">全是视图，不占磁盘</text>
+
+        <rect x="460" y="48" width="196" height="84" rx="8" fill="#f7f9fa" stroke="#e4e7ec"/>
+        <text x="476" y="72" font-size="11.5" font-weight="700" fill="#1f2329">performance_schema</text>
+        <text x="476" y="94" font-size="10.5" fill="#4e5564">等待 / 锁 / SQL / 内存</text>
+        <text x="476" y="114" font-size="10" fill="#8a9099">内存表，重启清零</text>
+
+        <path d="M558 132 L558 168" stroke="#f29111" stroke-width="1.6"/>
+        <path d="M553.5 162 L558 169 L562.5 162 Z" fill="#f29111"/>
+
+        <rect x="460" y="172" width="196" height="56" rx="8" fill="#fdf3e3" stroke="#f0d9b0"/>
+        <text x="476" y="196" font-size="13" font-weight="700" fill="#b06a00">sys</text>
+        <text x="476" y="214" font-size="10" fill="#8a6535">把上面两层的表翻成人话</text>
+
+        <rect x="24" y="172" width="420" height="56" rx="8" fill="#fbfcfd" stroke="#dfe3e9" stroke-dasharray="4 3"/>
+        <text x="40" y="194" font-size="10.5" fill="#4e5564">数据字典表藏在 mysql 库里，直接 SELECT 会被拒绝</text>
+        <text x="40" y="212" font-size="10.5" fill="#4e5564">只能通过 information_schema 里的同名表去看</text>
+
+        <text x="28" y="256" font-size="10.5" fill="#8a9099">读的顺序：mysql 看真相 → is 看结构 → ps 看运行 → sys 看结论</text>
+        <text x="28" y="276" font-size="10.5" fill="#b06a00">只有 mysql 需要备份；另外三个是启动时重建出来的</text>
+      </svg>
+      <figcaption><b>图 1</b>四层的依赖方向。<code>sys</code> 不产生新数据，只是把 <code>performance_schema</code>（和部分 <code>information_schema</code>）包成能直接读的视图。</figcaption>
+    </figure>
+
+    <table>
+      <thead>
+        <tr><th>库</th><th>存什么</th><th>落盘</th><th>能不能写</th><th>备份要吗</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>mysql</code></td>
+          <td>账号与权限、复制位点、持久化统计、时区、帮助文本、日志表</td>
+          <td><strong>是</strong>，全在 <code>mysql.ibd</code></td>
+          <td>通过 <code>ALTER USER</code> / <code>GRANT</code> 间接改</td>
+          <td><strong>要</strong></td>
+        </tr>
+        <tr>
+          <td><code>information_schema</code></td>
+          <td>库、表、列、索引、约束、视图、触发器、存储过程、存储引擎</td>
+          <td>否，数据来自数据字典</td>
+          <td>不能，<code>INSERT</code> 直接报错</td>
+          <td>不要</td>
+        </tr>
+        <tr>
+          <td><code>performance_schema</code></td>
+          <td>运行时事件：SQL 耗时、锁等待、IO、内存分配</td>
+          <td>否，全在内存</td>
+          <td>只能改 <code>setup_*</code> 配置表</td>
+          <td>不要</td>
+        </tr>
+        <tr>
+          <td><code>sys</code></td>
+          <td>面向 DBA 的诊断视图</td>
+          <td>只有 <code>sys_config</code> 一张表</td>
+          <td>只能改 <code>sys_config</code></td>
+          <td>不要</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="note tip">
+      <b>一句话记住边界</b>
+      <p>业务数据在你自己建的库里；<strong>账号和权限在 <code>mysql</code> 库</strong>。所以「只备份业务库」等于不备份账号——这条在 <a href="07-06-mysqldump.html#s2">mysqldump 的粒度</a>那一节已经踩过一次，这里是从库的角度解释原因。</p>
+    </div>
+
+    <h2 id="s2">2. mysql 库：37 张表，但有两类东西</h2>
+
+    <p>课程里说「mysql 库存时区、主从、用户、权限」，这只是概括。8.0 的 <code>mysql</code> 库实际有 <strong>37 张可见的系统表</strong>，按用途能分成七组：</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 680 286" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <text x="340" y="20" text-anchor="middle" font-size="11.5" fill="#8a9099">SHOW TABLES FROM mysql 看到的 37 张，按用途分组</text>
+
+        <rect x="24" y="34" width="150" height="76" rx="8" fill="#e6f3f6" stroke="#00758f"/>
+        <text x="38" y="60" font-size="18" font-weight="700" fill="#00758f">10</text>
+        <text x="72" y="60" font-size="12" font-weight="700" fill="#00566b">权限</text>
+        <text x="38" y="80" font-size="9.5" font-family="Consolas,monospace" fill="#4e5564">user · db</text>
+        <text x="38" y="98" font-size="9.5" font-family="Consolas,monospace" fill="#8a9099">tables_priv 等</text>
+
+        <rect x="186" y="34" width="150" height="76" rx="8" fill="#e6f3f6" stroke="#00758f"/>
+        <text x="200" y="60" font-size="18" font-weight="700" fill="#00758f">8</text>
+        <text x="224" y="60" font-size="12" font-weight="700" fill="#00566b">复制</text>
+        <text x="200" y="80" font-size="9.5" font-family="Consolas,monospace" fill="#4e5564">gtid_executed</text>
+        <text x="200" y="98" font-size="9.5" font-family="Consolas,monospace" fill="#8a9099">slave_*_info</text>
+
+        <rect x="348" y="34" width="150" height="76" rx="8" fill="#fdf3e3" stroke="#f0d9b0"/>
+        <text x="362" y="60" font-size="18" font-weight="700" fill="#b06a00">4</text>
+        <text x="386" y="60" font-size="12" font-weight="700" fill="#8a6535">优化器统计</text>
+        <text x="362" y="80" font-size="9.5" font-family="Consolas,monospace" fill="#4e5564">innodb_*_stats</text>
+        <text x="362" y="98" font-size="9.5" font-family="Consolas,monospace" fill="#8a9099">server_cost</text>
+
+        <rect x="510" y="34" width="150" height="76" rx="8" fill="#f7f9fa" stroke="#e4e7ec"/>
+        <text x="524" y="60" font-size="18" font-weight="700" fill="#4e5564">2</text>
+        <text x="542" y="60" font-size="12" font-weight="700" fill="#4e5564">日志</text>
+        <text x="524" y="80" font-size="9.5" font-family="Consolas,monospace" fill="#4e5564">general_log</text>
+        <text x="524" y="98" font-size="9.5" font-family="Consolas,monospace" fill="#8a9099">slow_log（CSV）</text>
+
+        <rect x="24" y="124" width="150" height="76" rx="8" fill="#f7f9fa" stroke="#e4e7ec"/>
+        <text x="38" y="150" font-size="18" font-weight="700" fill="#4e5564">4</text>
+        <text x="62" y="150" font-size="12" font-weight="700" fill="#4e5564">帮助</text>
+        <text x="38" y="170" font-size="9.5" font-family="Consolas,monospace" fill="#4e5564">help_topic 等</text>
+        <text x="38" y="188" font-size="9.5" fill="#8a9099">HELP 命令靠它</text>
+
+        <rect x="186" y="124" width="150" height="76" rx="8" fill="#f7f9fa" stroke="#e4e7ec"/>
+        <text x="200" y="150" font-size="18" font-weight="700" fill="#4e5564">5</text>
+        <text x="224" y="150" font-size="12" font-weight="700" fill="#4e5564">时区</text>
+        <text x="200" y="170" font-size="9.5" font-family="Consolas,monospace" fill="#4e5564">time_zone*</text>
+        <text x="200" y="188" font-size="9.5" fill="#c0392b">默认是空的</text>
+
+        <rect x="348" y="124" width="150" height="76" rx="8" fill="#f7f9fa" stroke="#e4e7ec"/>
+        <text x="362" y="150" font-size="18" font-weight="700" fill="#4e5564">4</text>
+        <text x="386" y="150" font-size="12" font-weight="700" fill="#4e5564">其他</text>
+        <text x="362" y="170" font-size="9.5" font-family="Consolas,monospace" fill="#4e5564">plugin · func</text>
+        <text x="362" y="188" font-size="9.5" font-family="Consolas,monospace" fill="#8a9099">servers</text>
+
+        <rect x="510" y="124" width="150" height="76" rx="8" fill="#ffffff" stroke="#00758f" stroke-width="1.5"/>
+        <text x="524" y="150" font-size="18" font-weight="700" fill="#00758f">37</text>
+        <text x="556" y="150" font-size="11" font-weight="700" fill="#00566b">合计</text>
+        <text x="524" y="170" font-size="9.5" fill="#4e5564">另有约 30 张</text>
+        <text x="524" y="188" font-size="9.5" fill="#4e5564">隐藏的数据字典表</text>
+
+        <text x="28" y="230" font-size="10.5" fill="#8a9099">10 + 8 + 4 + 2 + 4 + 5 + 4 = 37，这个数在不同 8.0 小版本间会有 ±1 的浮动</text>
+        <text x="28" y="250" font-size="10.5" fill="#b06a00">隐藏的那批才是元数据本体，它们不出现在 SHOW TABLES 里</text>
+      </svg>
+      <figcaption><b>图 2</b><code>mysql</code> 库 37 张表的分布。权限和复制占了将近一半，这也是它不能当业务库用的原因。</figcaption>
+    </figure>
+
+    <div class="note danger">
+      <b>8.0 的坑：37 张只是「看得见的」</b>
+      <p>MySQL 8.0 把元数据搬进了<strong>数据字典</strong>，这些表（<code>mysql.tables</code>、<code>mysql.columns</code>、<code>mysql.indexes</code>、<code>mysql.schemata</code> 等约 30 张）被标记为隐藏：</p>
+      <pre style="margin:10px 0 0"><code><span class="c">-- 37 行，看不到 tables / columns / indexes 这些</span>
+<span class="k">SHOW TABLES FROM</span> mysql;
+
+<span class="c">-- 直接从库里查，被拒</span>
+<span class="k">SELECT</span> * <span class="k">FROM</span> mysql.tables;
+<span class="c">-- ERROR 3554 (HY000): Access to data dictionary table 'mysql.tables' is rejected.</span></code></pre>
+      <p style="margin-top:10px">想看元数据只能走 <code>information_schema</code>：<code>SELECT * FROM information_schema.tables</code>。另外 5.7 里的 <code>mysql.event</code>、<code>mysql.proc</code> 在 8.0 <strong>已经不存在</strong>，对应内容进了数据字典的 <code>events</code> 和 <code>routines</code>。网上大量「查 <code>mysql.proc</code> 看存储过程」的脚本，在 8.0 上会直接报 1146。</p>
+    </div>
+
+    <h3 id="s2-1">2.1 权限表：账号存在哪</h3>
+
+    <p>「用户」不是一串字符，是 <code>User@Host</code> 二元组。<code>'root'@'localhost'</code> 和 <code>'root'@'%'</code> 是两个完全不同的账号，权限互不相干。权限按作用范围分层存放，越往下越具体：</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 680 268" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <text x="340" y="20" text-anchor="middle" font-size="11.5" fill="#8a9099">权限从上往下收窄；同名权限出现在多层时，合并生效（不是覆盖）</text>
+
+        <rect x="40" y="38" width="600" height="34" rx="6" fill="#00758f"/>
+        <text x="340" y="60" text-anchor="middle" font-size="12" fill="#ffffff">mysql.user　——　账号本身 + 全局权限（一行 = 一个 User@Host）</text>
+
+        <rect x="95" y="80" width="490" height="34" rx="6" fill="#2f8ea3"/>
+        <text x="340" y="102" text-anchor="middle" font-size="12" fill="#ffffff">mysql.db　——　某个库上的权限</text>
+
+        <rect x="150" y="122" width="380" height="34" rx="6" fill="#62aebb"/>
+        <text x="340" y="144" text-anchor="middle" font-size="12" fill="#ffffff">mysql.tables_priv　——　某张表上的权限</text>
+
+        <rect x="205" y="164" width="270" height="34" rx="6" fill="#a8d4dd"/>
+        <text x="340" y="186" text-anchor="middle" font-size="12" fill="#00566b">mysql.columns_priv　——　某列上的权限</text>
+
+        <text x="28" y="222" font-size="10.5" fill="#4e5564">角色：role_edges（谁被授予了哪个角色）、default_roles（登录后自动激活哪些）</text>
+        <text x="28" y="240" font-size="10.5" fill="#4e5564">动态权限：global_grants（8.0 新增，SYSTEM_VARIABLES_ADMIN 这类）</text>
+        <text x="28" y="258" font-size="10.5" fill="#4e5564">其他：procs_priv（存储过程）、proxies_priv（代理）、password_history（改密历史）</text>
+      </svg>
+      <figcaption><b>图 3</b>权限的四个层级。日常只需要记住 <code>user</code> 和 <code>db</code>，其余三张是为精细授权准备的。</figcaption>
+    </figure>
+
+    <table>
+      <thead>
+        <tr><th>表</th><th>一行代表</th><th>什么时候会查它</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>user</code></td><td>一个账号：认证插件、密码哈希、全局权限、锁定状态</td><td>确认某账号能不能连、插件是不是 <code>caching_sha2_password</code></td></tr>
+        <tr><td><code>db</code></td><td>「某账号在某库上」的权限</td><td>账号能连进来、却报 <code>SELECT command denied</code></td></tr>
+        <tr><td><code>tables_priv</code></td><td>表级权限</td><td>只授了单表权限，排查为什么读别的表失败</td></tr>
+        <tr><td><code>columns_priv</code></td><td>列级权限</td><td>隐藏手机号、身份证列这类需求</td></tr>
+        <tr><td><code>global_grants</code></td><td>动态全局权限（8.0 新增）</td><td><code>SHOW GRANTS</code> 里出现看不懂的 <code>_ADMIN</code> 权限</td></tr>
+        <tr><td><code>role_edges</code></td><td>角色授予关系</td><td>用角色管权限，查谁通过角色拿到了什么</td></tr>
+        <tr><td><code>password_history</code></td><td>历史密码哈希</td><td>启用了密码复用策略，禁止改回旧密码</td></tr>
+      </tbody>
+    </table>
+
+    <pre><span class="label">sql</span><code><span class="c">-- 看有哪些账号、用什么认证插件、是否被锁</span>
+<span class="k">SELECT</span> user, host, plugin, account_locked <span class="k">FROM</span> mysql.user;
+
+<span class="c">-- 别读表拼权限，用 SHOW GRANTS，它会把多层权限合并后展示</span>
+<span class="k">SHOW GRANTS FOR</span> <span class="s">'itcast'</span>@<span class="s">'%'</span>;
+
+<span class="c">-- 手工改过权限表（不推荐）之后必须刷缓存</span>
+<span class="k">FLUSH PRIVILEGES</span>;</code></pre>
+
+    <div class="note warn">
+      <b>三个容易踩的点</b>
+      <p><strong>1. 内置账号别删。</strong><code>mysql.sys</code> 是 <code>sys</code> 库所有视图的 DEFINER，<code>mysql.session</code> 供插件内部连接，<code>mysql.infoschema</code> 读 <code>information_schema</code>。它们的 <code>account_locked</code> 都是 <code>Y</code>，删掉会导致 <code>sys</code> 库直接不可用。</p>
+      <p><strong>2. 8.0 的 <code>GRANT</code> 不再顺便建用户。</strong>5.7 里 <code>GRANT ... TO 'x'@'%'</code> 会自动创建账号，8.0 必须先 <code>CREATE USER</code>，否则报 <code>ERROR 1410</code>。从旧项目搬过来的授权脚本常在这里断。</p>
+      <p><strong>3. 权限表在 8.0 换成了 InnoDB。</strong>5.7 是 MyISAM，多用户授权中途失败会留下半截数据；8.0 有事务，要么全成要么全回滚。这也是为什么「直接 UPDATE <code>mysql.user</code>」在 8.0 更容易出问题——缓存不会自动刷新。</p>
+    </div>
+
+    <h3 id="s2-2">2.2 复制表：主从的位点存在哪</h3>
+
+    <p>主从断开后，<code>SHOW REPLICA STATUS</code> 能看到位点，但这些位点同时会落进 <code>mysql</code> 库的几张表——它们是监控采集和崩溃恢复的依据：</p>
+
+    <table>
+      <thead>
+        <tr><th>表</th><th>存什么</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>slave_master_info</code></td><td>连源库的信息：主机、端口、复制账号、读到哪个 binlog 位置</td></tr>
+        <tr><td><code>slave_relay_log_info</code></td><td>SQL 线程回放到哪：relay log 文件名与位置</td></tr>
+        <tr><td><code>slave_worker_info</code></td><td>并行复制时每个 worker 各自的位置</td></tr>
+        <tr><td><code>gtid_executed</code></td><td>本实例已执行过的 GTID 集合</td></tr>
+        <tr><td><code>replication_asynchronous_connection_failover</code></td><td>8.0.23+ 的源列表，配合自动故障转移</td></tr>
+      </tbody>
+    </table>
+
+    <pre><span class="label">sql</span><code><span class="c">-- 主从延迟、断在哪，先看这个</span>
+<span class="k">SHOW REPLICA STATUS</span>\G
+
+<span class="c">-- 只有用表存位点时才有的内容（8.0 默认就是表）</span>
+<span class="k">SELECT</span> * <span class="k">FROM</span> mysql.slave_master_info\G
+
+<span class="c">-- GTID 模式下比对差集：源库有、从库没有的事务</span>
+<span class="k">SELECT</span> gtid_subtract(
+  (<span class="k">SELECT</span> @@global.gtid_executed), <span class="s">'源库的 gtid_executed'</span>);</code></pre>
+
+    <div class="note warn">
+      <b>表名没跟着术语改，别被搜索结果绕晕</b>
+      <p>MySQL 8.0.26 起，命令和系统变量里的 master / slave 改成了 source / replica：<code>CHANGE REPLICATION SOURCE TO</code>、<code>SHOW REPLICA STATUS</code>、<code>SOURCE_HOST</code>。但 <strong><code>mysql</code> 库里这几张表的表名仍然是 <code>slave_master_info</code>、<code>slave_relay_log_info</code>、<code>slave_worker_info</code></strong>，官方 8.4 文档也还是这么写。照着「新名词」去 <code>SELECT * FROM mysql.replica_master_info</code> 会直接报表不存在。</p>
+      <p>另外，8.0.23 起 <code>master_info_repository</code> 已弃用，位点只能存表（之前可以选 FILE，写成 <code>master.info</code> 文本）。所以老教程里「删掉 master.info 重启」的做法在 8.0 不再适用。</p>
+    </div>
+
+    <h3 id="s2-3">2.3 统计信息与优化器表：执行计划为什么这么选</h3>
+
+    <p>这四张表决定优化器怎么估行数、怎么算成本。执行计划突然变差，很多时候是这里的统计过期了：</p>
+
+    <table>
+      <thead>
+        <tr><th>表</th><th>作用</th><th>怎么动它</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>innodb_table_stats</code></td><td>表的行数、聚簇索引页数等持久化统计</td><td><code>ANALYZE TABLE</code> 会重写这里</td></tr>
+        <tr><td><code>innodb_index_stats</code></td><td>每个索引的选择性、页数</td><td>同上</td></tr>
+        <tr><td><code>server_cost</code></td><td>通用操作的成本常量，如 <code>row_evaluate_cost</code></td><td><code>UPDATE</code> 后 <code>FLUSH OPTIMIZER_COSTS</code></td></tr>
+        <tr><td><code>engine_cost</code></td><td>特定存储引擎的成本，如一次页读取</td><td>同上</td></tr>
+      </tbody>
+    </table>
+
+    <pre><span class="label">sql</span><code><span class="c">-- 统计信息是什么时候采的、采了多少行</span>
+<span class="k">SELECT</span> table_name, n_rows, clustered_index_size, last_update
+<span class="k">FROM</span> mysql.innodb_table_stats
+<span class="k">WHERE</span> database_name = <span class="s">'itcast'</span>;
+
+<span class="c">-- 觉得统计不准就重采（InnoDB 会更新上面两张表）</span>
+<span class="k">ANALYZE TABLE</span> itcast.emp;
+
+<span class="c">-- 改完成本常量必须刷，否则当前会话仍用旧值</span>
+<span class="k">FLUSH OPTIMIZER_COSTS</span>;</code></pre>
+
+    <div class="note plain">
+      <b>为什么改了统计表没反应</b>
+      <p>统计信息被缓存在内存里。<code>ANALYZE TABLE</code> 会同时刷新缓存，但如果你是手工 <code>UPDATE mysql.innodb_table_stats</code>，必须再 <code>FLUSH TABLE 表名</code> 才会重新加载。改成本表同理，靠 <code>FLUSH OPTIMIZER_COSTS</code>。</p>
+    </div>
+
+    <h3 id="s2-4">2.4 日志、帮助、时区：三个不常碰但会咬人的</h3>
+
+    <table>
+      <thead>
+        <tr><th>表</th><th>说明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>general_log</code> / <code>slow_log</code></td><td>日志写表时的落点（<strong>CSV 引擎</strong>）。可以直接 <code>SELECT</code>、<code>TRUNCATE</code>，也可以当成普通表查</td></tr>
+        <tr><td><code>help_topic</code> 等 4 张</td><td><code>HELP 'SELECT'</code> 命令的数据来源。8.0.16 起升级会自动补，更早版本要跑 <code>mysql_upgrade</code></td></tr>
+        <tr><td><code>time_zone</code> 等 5 张</td><td>时区定义。<strong>默认是空的</strong>，需要手工导入</td></tr>
+      </tbody>
+    </table>
+
+    <div class="note danger">
+      <b>时区表是空的，所以 <code>CONVERT_TZ</code> 返回 NULL</b>
+      <p>新装的 MySQL 里，<code>time_zone</code> 系列 5 张表一行数据都没有。表现是：</p>
+      <pre style="margin:10px 0"><code><span class="k">SELECT</span> <span class="f">CONVERT_TZ</span>(<span class="s">'2026-11-25 10:00:00'</span>, <span class="s">'UTC'</span>, <span class="s">'Asia/Shanghai'</span>);
+<span class="c">-- 返回 NULL，不报错，最难查</span>
+
+<span class="c">-- 用偏移量则不受影响，因为不需要查表</span>
+<span class="k">SELECT</span> <span class="f">CONVERT_TZ</span>(<span class="s">'2026-11-25 10:00:00'</span>, <span class="s">'+00:00'</span>, <span class="s">'+08:00'</span>);</code></pre>
+      <p style="margin-top:10px">补数据（Linux）：<code>mysql_tzinfo_to_sql /usr/share/zoneinfo | mysql -uroot -p mysql</code>。Windows 没有 zoneinfo 目录，需要从带时区数据的实例导出后导入。</p>
+    </div>
+
+    <h2 id="s3">3. information_schema：元数据的唯一入口</h2>
+
+    <p>它不存数据，是<strong>数据字典的一扇窗</strong>。8.0 之后这扇窗几乎是必需的——因为数据字典表本身不让你读。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 680 240" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <rect x="24" y="34" width="250" height="164" rx="8" fill="#f7f9fa" stroke="#e4e7ec"/>
+        <text x="40" y="58" font-size="11.5" font-weight="700" fill="#1f2329">mysql 库（真数据）</text>
+        <text x="40" y="84" font-size="10.5" fill="#00758f">可见：37 张系统表</text>
+        <text x="40" y="101" font-size="9.5" font-family="Consolas,monospace" fill="#8a9099">user / db / plugin …</text>
+        <rect x="40" y="112" width="218" height="66" rx="6" fill="#ffffff" stroke="#dfe3e9" stroke-dasharray="4 3"/>
+        <text x="52" y="132" font-size="10" fill="#c0392b">隐藏：约 30 张数据字典表</text>
+        <text x="52" y="150" font-size="9.5" font-family="Consolas,monospace" fill="#8a9099">tables / columns / indexes</text>
+        <text x="52" y="168" font-size="9.5" fill="#8a9099">SELECT 直接被拒绝</text>
+
+        <path d="M286 116 L396 116" stroke="#1a7f4b" stroke-width="1.4"/>
+        <path d="M390 111.5 L397 116 L390 120.5 Z" fill="#1a7f4b"/>
+        <text x="341" y="104" text-anchor="middle" font-size="9.5" fill="#1a7f4b">这里能查</text>
+
+        <path d="M286 166 L396 166" stroke="#c0392b" stroke-width="1.2" stroke-dasharray="4 3"/>
+        <text x="341" y="160" text-anchor="middle" font-size="10" fill="#c0392b">✗</text>
+        <text x="341" y="184" text-anchor="middle" font-size="9.5" fill="#c0392b">直查 3554</text>
+
+        <rect x="404" y="34" width="252" height="164" rx="8" fill="#e6f3f6" stroke="#00758f" stroke-width="1.5"/>
+        <text x="420" y="58" font-size="11.5" font-weight="700" fill="#00566b">information_schema（窗口）</text>
+        <text x="420" y="84" font-size="9.5" font-family="Consolas,monospace" fill="#00566b">SCHEMATA</text>
+        <text x="540" y="84" font-size="9.5" font-family="Consolas,monospace" fill="#00566b">TABLES</text>
+        <text x="420" y="104" font-size="9.5" font-family="Consolas,monospace" fill="#00566b">COLUMNS</text>
+        <text x="540" y="104" font-size="9.5" font-family="Consolas,monospace" fill="#00566b">STATISTICS</text>
+        <text x="420" y="124" font-size="9.5" font-family="Consolas,monospace" fill="#00566b">ENGINES</text>
+        <text x="540" y="124" font-size="9.5" font-family="Consolas,monospace" fill="#00566b">TRIGGERS</text>
+        <text x="420" y="144" font-size="9.5" font-family="Consolas,monospace" fill="#00566b">VIEWS</text>
+        <text x="540" y="144" font-size="9.5" font-family="Consolas,monospace" fill="#00566b">ROUTINES</text>
+        <text x="420" y="164" font-size="9.5" font-family="Consolas,monospace" fill="#00566b">PARTITIONS</text>
+        <text x="540" y="164" font-size="9.5" font-family="Consolas,monospace" fill="#00566b">EVENTS</text>
+        <text x="420" y="186" font-size="9.5" fill="#8a9099">8.0 里多数是数据字典的视图</text>
+
+        <text x="28" y="222" font-size="10.5" fill="#8a9099">视图化的好处：不再每次查询都建临时表，查表结构比 5.7 快很多</text>
+      </svg>
+      <figcaption><b>图 4</b>数据字典与 <code>information_schema</code> 的关系。同一个事实只有一份，<code>information_schema</code> 是允许你看的那一侧。</figcaption>
+    </figure>
+
+    <p>日常用的表就那么几张，而且基本都能对应回一条 <code>SHOW</code> 命令：</p>
+
+    <table>
+      <thead>
+        <tr><th>表</th><th>查什么</th><th>等价命令</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>SCHEMATA</code></td><td>有哪些库、默认字符集</td><td><code>SHOW DATABASES</code></td></tr>
+        <tr><td><code>TABLES</code></td><td>表名、引擎、行数估算、大小、注释</td><td><code>SHOW TABLES</code></td></tr>
+        <tr><td><code>COLUMNS</code></td><td>字段类型、是否可空、默认值、注释</td><td><code>SHOW COLUMNS</code></td></tr>
+        <tr><td><code>STATISTICS</code></td><td>索引的列顺序、基数（<code>CARDINALITY</code>）</td><td><code>SHOW INDEX</code></td></tr>
+        <tr><td><code>ENGINES</code></td><td>支持哪些存储引擎、哪个是默认</td><td><code>SHOW ENGINES</code></td></tr>
+        <tr><td><code>TRIGGERS</code> / <code>VIEWS</code> / <code>ROUTINES</code> / <code>EVENTS</code></td><td>触发器、视图、存储过程与函数、定时事件的定义</td><td><code>SHOW TRIGGERS</code> 等</td></tr>
+        <tr><td><code>PARTITIONS</code></td><td>分区表的分区边界、每个分区的行数</td><td><code>SHOW CREATE TABLE</code></td></tr>
+        <tr><td><code>COLUMN_STATISTICS</code></td><td>列直方图（8.0 新增）</td><td>无</td></tr>
+        <tr><td><code>PROCESSLIST</code></td><td>当前连接与正在执行的 SQL</td><td><code>SHOW PROCESSLIST</code></td></tr>
+      </tbody>
+    </table>
+
+    <pre><span class="label">sql</span><code><span class="c">-- 哪个库最大（按数据 + 索引字节数排）</span>
+<span class="k">SELECT</span> table_schema,
+       <span class="f">ROUND</span>(<span class="f">SUM</span>(data_length + index_length) / 1024 / 1024, 1) <span class="k">AS</span> mb
+<span class="k">FROM</span> information_schema.tables
+<span class="k">GROUP BY</span> table_schema
+<span class="k">ORDER BY</span> mb <span class="k">DESC</span>;
+
+<span class="c">-- 找没有主键的表：主从、在线 DDL 都怕这个</span>
+<span class="k">SELECT</span> t.table_schema, t.table_name
+<span class="k">FROM</span> information_schema.tables t
+<span class="k">LEFT JOIN</span> information_schema.statistics s
+       <span class="k">ON</span> s.table_schema = t.table_schema
+      <span class="k">AND</span> s.table_name   = t.table_name
+      <span class="k">AND</span> s.index_name   = <span class="s">'PRIMARY'</span>
+<span class="k">WHERE</span> t.table_schema <span class="k">NOT IN</span> (<span class="s">'mysql'</span>, <span class="s">'sys'</span>, <span class="s">'information_schema'</span>, <span class="s">'performance_schema'</span>)
+  <span class="k">AND</span> t.table_type = <span class="s">'BASE TABLE'</span>
+  <span class="k">AND</span> s.index_name <span class="k">IS NULL</span>;</code></pre>
+
+    <div class="note danger">
+      <b><code>TABLE_ROWS</code> 是估算值，还默认缓存 24 小时</b>
+      <p>看到「这张表 300 万行」先别信。InnoDB 的行数是采样估算；更麻烦的是 8.0 会缓存统计信息，<code>information_schema_stats_expiry</code> 默认 <strong>86400 秒</strong>，一天内都返回同一份旧值。大批量删除之后，页面上的行数可能还停在删之前。</p>
+      <pre style="margin:10px 0 0"><code><span class="c">-- 要实时值：本次会话不缓存</span>
+<span class="k">SET SESSION</span> information_schema_stats_expiry = 0;
+<span class="c">-- 或者让 InnoDB 重新采样（大表有成本）</span>
+<span class="k">ANALYZE TABLE</span> itcast.emp;</code></pre>
+      <p style="margin-top:10px">真要精确行数只能 <code>SELECT COUNT(*)</code>。业务上做分页总数时，这一点尤其要注意。</p>
+    </div>
+
+    <h2 id="s4">4. performance_schema：运行时数据</h2>
+
+    <p>前面两个库回答「结构是什么」，它回答「现在在干什么」。100 多张表，全在内存，<strong>重启 mysqld 就清零</strong>——这是它和慢日志最大的区别：慢日志能留档，它只能看当下。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 680 240" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <text x="340" y="20" text-anchor="middle" font-size="11.5" fill="#8a9099">数据流：代码里的埋点 → 指定的消费者 → 汇总表 → 可读视图</text>
+
+        <rect x="24" y="40" width="176" height="100" rx="8" fill="#f7f9fa" stroke="#e4e7ec"/>
+        <text x="40" y="62" font-size="12" font-weight="700" fill="#4e5564">① 埋点</text>
+        <text x="40" y="82" font-size="9.5" font-family="Consolas,monospace" fill="#8a9099">wait/io/file</text>
+        <text x="40" y="100" font-size="9.5" font-family="Consolas,monospace" fill="#8a9099">statement/sql</text>
+        <text x="40" y="118" font-size="9.5" font-family="Consolas,monospace" fill="#8a9099">memory/…</text>
+        <text x="40" y="134" font-size="9.5" fill="#c0392b">setup_instruments 控制</text>
+
+        <path d="M204 90 L244 90" stroke="#00758f" stroke-width="1.4"/>
+        <path d="M238 85.5 L245 90 L238 94.5 Z" fill="#00758f"/>
+
+        <rect x="248" y="40" width="200" height="100" rx="8" fill="#e6f3f6" stroke="#00758f"/>
+        <text x="264" y="62" font-size="12" font-weight="700" fill="#00566b">② 表</text>
+        <text x="264" y="82" font-size="9" font-family="Consolas,monospace" fill="#4e5564">events_statements_</text>
+        <text x="264" y="96" font-size="9" font-family="Consolas,monospace" fill="#4e5564">  summary_by_digest</text>
+        <text x="264" y="114" font-size="9" font-family="Consolas,monospace" fill="#4e5564">data_locks</text>
+        <text x="264" y="132" font-size="9.5" fill="#c0392b">setup_consumers 控制</text>
+
+        <path d="M452 90 L492 90" stroke="#00758f" stroke-width="1.4"/>
+        <path d="M486 85.5 L493 90 L486 94.5 Z" fill="#00758f"/>
+
+        <rect x="496" y="40" width="160" height="100" rx="8" fill="#fdf3e3" stroke="#f0d9b0"/>
+        <text x="512" y="62" font-size="12" font-weight="700" fill="#b06a00">③ 视图</text>
+        <text x="512" y="84" font-size="9" font-family="Consolas,monospace" fill="#8a6535">sys.statement_</text>
+        <text x="512" y="98" font-size="9" font-family="Consolas,monospace" fill="#8a6535">  analysis</text>
+        <text x="512" y="118" font-size="9" font-family="Consolas,monospace" fill="#8a6535">sys.innodb_lock_waits</text>
+
+        <text x="28" y="176" font-size="10.5" fill="#4e5564">全在内存，重启清零；默认 <tspan font-family="Consolas,monospace">performance_schema=ON</tspan>，但部分 consumer 是关的</text>
+        <text x="28" y="196" font-size="10.5" fill="#b06a00">时间单位是皮秒：TIMER_WAIT / 1e12 = 秒，/ 1e9 = 毫秒（最容易看错的地方）</text>
+        <text x="28" y="216" font-size="10.5" fill="#8a9099">改 setup_* 表只对本次运行有效，重启回到 my.cnf 的设置</text>
+      </svg>
+      <figcaption><b>图 5</b>埋点 → 表 → 视图。<code>sys</code> 就是在第三段上做文章。</figcaption>
+    </figure>
+
+    <pre><span class="label">sql</span><code><span class="c">-- 总耗时最高的 SQL（按 digest 归一化，"where id=1" 和 "where id=2" 算同一条）</span>
+<span class="k">SELECT</span> digest_text,
+       count_star <span class="k">AS</span> exec_count,
+       <span class="f">ROUND</span>(sum_timer_wait / 1e12, 2) <span class="k">AS</span> total_s,
+       <span class="f">ROUND</span>(avg_timer_wait / 1e9, 2)  <span class="k">AS</span> avg_ms
+<span class="k">FROM</span> performance_schema.events_statements_summary_by_digest
+<span class="k">ORDER BY</span> sum_timer_wait <span class="k">DESC</span>
+<span class="k">LIMIT</span> 10;
+
+<span class="c">-- 谁在等锁、被谁挡着（8.0 用这两张表，老的 INNODB_LOCKS 已移除）</span>
+<span class="k">SELECT</span> w.requesting_thread_id <span class="k">AS</span> 等待线程,
+       w.blocking_thread_id   <span class="k">AS</span> 阻塞线程,
+       l.object_name          <span class="k">AS</span> 表,
+       l.lock_type, l.lock_mode
+<span class="k">FROM</span> performance_schema.data_lock_waits w
+<span class="k">JOIN</span> performance_schema.data_locks l
+  <span class="k">ON</span> l.engine_lock_id = w.blocking_engine_lock_id;</code></pre>
+
+    <div class="note warn">
+      <b>它和慢日志不是一回事</b>
+      <p>慢日志要有 <code>long_query_time</code> 阈值、写文件、能留档；<code>performance_schema</code> 是<strong>全量采样 + 聚合</strong>，不设阈值，但重启即失。查「历史某天为什么慢」要靠慢日志，查「现在谁在拖」用这里。</p>
+    </div>
+
+    <h2 id="s5">5. sys：把上面两张表翻成人话</h2>
+
+    <p><code>sys</code> 库里除了 <code>sys_config</code> 一张真表，其余 100 多个对象<strong>全是视图</strong>，数据来自 <code>performance_schema</code> 和 <code>information_schema</code>。它最大的价值是把皮秒、把 event_name 换成毫秒和中文语义。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 680 258" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <text x="28" y="22" font-size="11.5" fill="#8a9099">命名规律：带 x$ 的是原料，不带的是成品</text>
+
+        <rect x="24" y="38" width="300" height="46" rx="6" fill="#f7f9fa" stroke="#e4e7ec"/>
+        <text x="38" y="58" font-size="10.5" font-family="Consolas,monospace" fill="#4e5564">x$statement_analysis</text>
+        <text x="38" y="75" font-size="9.5" fill="#8a9099">皮秒整数、列多，给程序解析</text>
+
+        <path d="M174 86 L174 102" stroke="#00758f" stroke-width="1.3"/>
+        <path d="M170 96 L174 103 L178 96 Z" fill="#00758f"/>
+        <text x="186" y="100" font-size="9.5" fill="#00758f">格式化</text>
+
+        <rect x="24" y="108" width="300" height="46" rx="6" fill="#e6f3f6" stroke="#00758f"/>
+        <text x="38" y="128" font-size="10.5" font-family="Consolas,monospace" fill="#00566b">statement_analysis</text>
+        <text x="38" y="145" font-size="9.5" fill="#4e5564">带单位（ms / s），直接看</text>
+
+        <rect x="348" y="38" width="308" height="180" rx="8" fill="#ffffff" stroke="#e4e7ec"/>
+        <text x="364" y="60" font-size="11.5" font-weight="700" fill="#1f2329">常用的就这几个</text>
+
+        <text x="364" y="84" font-size="9" font-family="Consolas,monospace" fill="#00758f">sys.session</text>
+        <text x="364" y="99" font-size="9.5" fill="#8a9099">当前连接在跑什么，带耗时</text>
+
+        <text x="364" y="120" font-size="9" font-family="Consolas,monospace" fill="#00758f">sys.schema_table_statistics</text>
+        <text x="364" y="135" font-size="9.5" fill="#8a9099">每张表的读写次数与耗时</text>
+
+        <text x="364" y="156" font-size="9" font-family="Consolas,monospace" fill="#00758f">sys.statements_with_full_table_scans</text>
+        <text x="364" y="171" font-size="9.5" fill="#8a9099">哪些 SQL 在全表扫描（加索引线索）</text>
+
+        <text x="364" y="192" font-size="9" font-family="Consolas,monospace" fill="#00758f">sys.innodb_lock_waits</text>
+        <text x="364" y="207" font-size="9.5" fill="#8a9099">谁在等锁、被谁挡着</text>
+
+        <text x="28" y="182" font-size="10.5" fill="#4e5564">唯一能改的是 <tspan font-family="Consolas,monospace">sys_config</tspan>，里面存视图自己的参数</text>
+        <text x="28" y="200" font-size="10.5" fill="#8a9099">改它不用重启，但只影响读取它的视图</text>
+        <text x="28" y="240" font-size="10.5" fill="#b06a00">sys 本身不产生数据，删了可以用 mysql_upgrade 或官方脚本重建</text>
+      </svg>
+      <figcaption><b>图 6</b><code>sys</code> 的两种命名。<code>x$</code> 前缀给监控程序，无前缀给人看，内容是同一份。</figcaption>
+    </figure>
+
+    <pre><span class="label">sql</span><code><span class="c">-- 谁在跑：比 SHOW PROCESSLIST 多出耗时、扫描行数</span>
+<span class="k">SELECT</span> thd_id, conn_id, user, db, command, time, state, <span class="k">LEFT</span>(sql_text, 60) <span class="k">AS</span> sql_text
+<span class="k">FROM</span> sys.session
+<span class="k">WHERE</span> command <span class="k">&lt;&gt;</span> <span class="s">'Sleep'</span>
+<span class="k">ORDER BY</span> time <span class="k">DESC</span>;
+
+<span class="c">-- 全表扫描最多的 SQL：加索引的第一手线索</span>
+<span class="k">SELECT</span> query, exec_count, no_index_used_count, rows_examined_avg
+<span class="k">FROM</span> sys.statements_with_full_table_scans
+<span class="k">ORDER BY</span> no_index_used_count <span class="k">DESC</span>
+<span class="k">LIMIT</span> 10;
+
+<span class="c">-- 建了却没人用的索引：清理候选</span>
+<span class="k">SELECT</span> * <span class="k">FROM</span> sys.schema_unused_indexes;</code></pre>
+
+    <h2 id="s6">6. 查什么去哪：一张决策表</h2>
+
+    <table>
+      <thead>
+        <tr><th>你想知道</th><th>去哪查</th><th>别去哪</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>某个账号有什么权限</td><td><code>SHOW GRANTS FOR 'u'@'h'</code></td><td>别手工拼 <code>mysql.user</code> + <code>db</code> + <code>tables_priv</code>，会漏</td></tr>
+        <tr><td>库/表/索引的结构</td><td><code>information_schema</code></td><td><code>mysql.tables</code>（3554 拒绝）</td></tr>
+        <tr><td>表现在多大、多少行</td><td><code>information_schema.tables</code>（估）或 <code>COUNT(*)</code>（准）</td><td>别信缓存的行数</td></tr>
+        <tr><td>现在谁在跑、谁在等锁</td><td><code>sys.session</code> / <code>sys.innodb_lock_waits</code></td><td><code>SHOW PROCESSLIST</code> 看不到锁等待关系</td></tr>
+        <tr><td>哪条 SQL 最耗时间</td><td><code>sys.statement_analysis</code></td><td>慢日志（只覆盖超阈值的）</td></tr>
+        <tr><td>执行计划为什么选错索引</td><td><code>mysql.innodb_table_stats</code> + <code>EXPLAIN</code></td><td>猜</td></tr>
+        <tr><td>主从断在哪</td><td><code>SHOW REPLICA STATUS</code></td><td><code>mysql.slave_master_info</code>（要自己解读）</td></tr>
+      </tbody>
+    </table>
+
+    <div class="note tip">
+      <b>这一节真正要带走的三句</b>
+      <p>1. 只有 <code>mysql</code> 需要备份，另外三个是重建出来的——所以「备份整个实例」和「备份业务库」差的不只是数据量。<br>
+      2. 8.0 的 <code>mysql</code> 库有 37 张看得见的表，<strong>元数据本体是隐藏的</strong>，必须经 <code>information_schema</code> 看。<br>
+      3. 查现状用 <code>performance_schema</code> / <code>sys</code>，查结构用 <code>information_schema</code>，查账号用 <code>mysql</code>。</p>
+    </div>
+
+    <section class="quiz">
+      <p class="quiz-head">自测三问<span>先自己答一遍，再点开对答案</span></p>
+      <details>
+        <summary><span class="qno">Q1</span><span class="ask">为什么直接 <code>SELECT * FROM mysql.tables</code> 会报 ERROR 3554，而 <code>SHOW TABLES FROM mysql</code> 里也看不到它？</span><span class="caret" aria-hidden="true"></span></summary>
+        <div class="ans"><p>这是 8.0 的<b>数据字典隐藏表</b>。数据字典被搬进 InnoDB 内部表后，只允许通过 <code>information_schema</code> 和 <code>SHOW</code> 访问，直查会被拦住（3554 就是这个含义）。要查表信息，走 <code>information_schema.TABLES</code>。</p></div>
+      </details>
+      <details>
+        <summary><span class="qno">Q2</span><span class="ask">想知道一张 InnoDB 表到底有多少行，查 <code>information_schema.TABLES.TABLE_ROWS</code> 靠谱吗？</span><span class="caret" aria-hidden="true"></span></summary>
+        <div class="ans"><p>不靠谱。这个值是<b>采样估算</b>，InnoDB 不会为它去数全表；而且结果会被 <code>information_schema_stats_expiry</code> 缓存（默认 86400 秒），可能一天都不变。要精确就 <code>SELECT COUNT(*)</code>，或先把该变量设为 0 再查。</p></div>
+      </details>
+      <details>
+        <summary><span class="qno">Q3</span><span class="ask">线上卡住了，想确认「谁在等谁的锁」，该查哪里？</span><span class="caret" aria-hidden="true"></span></summary>
+        <div class="ans"><p>查 <code>performance_schema.data_locks</code> 与 <code>data_lock_waits</code>——8.0 起它们取代了 5.7 的 <code>INFORMATION_SCHEMA.INNODB_LOCKS</code> / <code>INNODB_LOCK_WAITS</code>。懒得拼表就直接看视图 <code>sys.innodb_lock_waits</code>。</p></div>
+      </details>
+    </section>
+    <div class="footer">
+      <a href="07-MySQL管理.html">← 返回 07 MySQL 管理</a> · <a href="../index.html">总目录</a>
+    </div>
+
+  </main>
+</div>
+</body>
+</html>

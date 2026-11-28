@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>7.2.2 mysqladmin · MySQL 笔记</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="layout">
+
+  <nav class="sidebar">
+    <p class="side-title">本页目录</p>
+    <ul class="nav-tree">
+      <li><a class="leaf" href="#s1">1. 一次连接只干一件事</a></li>
+      <li><a class="leaf" href="#s2">2. 语法：命令是位置参数</a></li>
+      <li><a class="leaf" href="#s3">3. 二十多条命令分四组</a></li>
+      <li><a class="leaf" href="#s4">4. status 那八个字段</a></li>
+      <li><a class="leaf" href="#s5">5. ping 的退出码</a></li>
+      <li><a class="leaf" href="#s6">6. create / drop / kill</a></li>
+      <li><a class="leaf" href="#s7">7. 截图里四条要打补丁</a></li>
+      <li><a class="leaf" href="#s8">8. 报错对照</a></li>
+    </ul>
+
+    <p class="side-title" style="margin-top:22px">当前位置</p>
+    <ul class="nav-tree">
+      <li><a href="../index.html">↑ 总目录</a>
+        <ul>
+          <li><a class="group" href="07-MySQL管理.html">07 MySQL 管理</a>
+            <ul>
+              <li><a class="leaf" href="07-01-系统数据库.html">7.1 系统数据库</a></li>
+              <li><a class="leaf" href="07-02-mysql.html">7.2.1 mysql</a></li>
+              <li><span class="current">7.2.2 mysqladmin</span></li>
+              <li><a class="leaf" href="07-04-mysqlbinlog.html">7.2.3 mysqlbinlog</a></li>
+              <li><a class="leaf" href="07-05-mysqlshow.html">7.2.4 mysqlshow</a></li>
+              <li><a class="leaf" href="07-06-mysqldump.html">7.2.5 mysqldump</a></li>
+              <li><a class="leaf" href="07-07-mysqlimport.html">7.2.6 mysqlimport</a></li>
+            </ul>
+          </li>
+        </ul>
+      </li>
+    </ul>
+  </nav>
+
+  <main class="main">
+
+    <div class="crumb"><a href="../index.html">总目录</a> / <a href="07-MySQL管理.html">07 MySQL 管理</a> / 7.2.2</div>
+    <h1><span class="chapter-no">7.2.2</span>mysqladmin</h1>
+    <p class="lede">截图第一句是「一个执行管理操作的客户端程序」。这句话里最要紧的是「管理」两个字：它<strong>不跑 SELECT，也不进交互界面</strong>，每次只连上去干一件事然后断开。所以它的所有奇怪行为——没有当前库、不用 quit、退出码当返回值用——都是从这个前提推出来的。</p>
+
+    <div class="meta">
+      <span>进阶篇 · 7.2.2</span>
+      <span>更新：2026-11-25</span>
+      <span>环境：MySQL 8.0</span>
+    </div>
+
+    <section class="quick">
+      <p class="quick-head">一屏速记<span>合上笔记，这 5 条要能自己说出来</span></p>
+      <ol>
+        <li>命令是<b>位置参数，不是选项</b>：<code>mysqladmin status ping</code> 会连着执行两个动作，一次连接做完多件事。</li>
+        <li>二十多条命令分四组：探活（ping / status / processlist）、改状态（shutdown / reload / refresh / flush-*）、建删库（create / drop）、复制（start / stop-replica）。</li>
+        <li><code>ping</code> 只证明「服务端能应答」：<b>认证失败时退出码仍然是 0</b>，不能拿它判断账号密码对不对。</li>
+        <li><code>status</code> 里的 <code>Queries per second avg</code> = Questions ÷ Uptime，是<b>开机以来的平均值</b>，不是此刻的 QPS。</li>
+        <li>8.0 的变化：<code>debug</code> 已移除、<code>password</code> 已弃用、<code>start/stop-slave</code> 改名为 <code>start/stop-replica</code>；<code>FLUSH HOSTS</code> 这条 SQL 在 8.4 移除，但 <code>mysqladmin flush-hosts</code> 还在。</li>
+      </ol>
+    </section>
+
+    <h2 id="s1">1. 一次连接只干一件事</h2>
+
+    <p><code>mysql</code> 和 <code>mysqladmin</code> 都是客户端，但工作模式相反：前者开一次连接后一直保持会话，后者每条命令单独连一次。<strong>这不是实现细节，而是它会带来一串后果</strong>——没有「当前库」，<code>USE</code> 对它无效；不保存会话变量；也不需要 <code>quit</code>。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 680 226" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <text x="340" y="20" text-anchor="middle" font-size="11.5" fill="#8a9099">一个是「挂着的会话」，一个是「用完就走的请求」</text>
+
+        <rect x="24" y="32" width="300" height="150" rx="8" fill="#f4fafb" stroke="#b9dde5"/>
+        <text x="40" y="54" font-size="12" font-weight="700" font-family="Consolas,monospace" fill="#00566b">mysql</text>
+        <text x="40" y="72" font-size="10" fill="#4e5564">连上后保持会话，直到你退出</text>
+
+        <rect x="40" y="84" width="62" height="32" rx="5" fill="#ffffff" stroke="#00758f"/>
+        <text x="71" y="105" text-anchor="middle" font-size="10.5" font-family="Consolas,monospace" fill="#00566b">连接</text>
+
+        <path d="M106 100 L118 100" stroke="#00758f" stroke-width="1.2"/>
+        <path d="M113 96.5 L119 100 L113 103.5 Z" fill="#00758f"/>
+
+        <rect x="122" y="84" width="112" height="32" rx="5" fill="#e6f3f6" stroke="#00758f"/>
+        <text x="178" y="105" text-anchor="middle" font-size="10.5" fill="#00566b">会话 · 多条 SQL</text>
+
+        <path d="M238 100 L250 100" stroke="#00758f" stroke-width="1.2"/>
+        <path d="M245 96.5 L251 100 L245 103.5 Z" fill="#00758f"/>
+
+        <rect x="254" y="84" width="54" height="32" rx="5" fill="#ffffff" stroke="#00758f"/>
+        <text x="281" y="105" text-anchor="middle" font-size="10.5" font-family="Consolas,monospace" fill="#00566b">断开</text>
+
+        <text x="40" y="142" font-size="10" fill="#4e5564">中间可以连续敲几十条，状态一直累积</text>
+        <text x="40" y="162" font-size="10" fill="#8a9099">当前库、字符集、事务、临时表都活在会话里</text>
+
+        <rect x="348" y="32" width="308" height="150" rx="8" fill="#fbfcfd" stroke="#e4e7ec"/>
+        <text x="364" y="54" font-size="12" font-weight="700" font-family="Consolas,monospace" fill="#4e5564">mysqladmin</text>
+        <text x="364" y="72" font-size="10" fill="#8a9099">一条命令 = 连一次 + 干一件 + 断开</text>
+
+        <circle cx="370" cy="90" r="3" fill="#00758f"/>
+        <text x="382" y="94" font-size="10.5" font-family="Consolas,monospace" fill="#00566b">status</text>
+        <text x="470" y="94" font-size="9.5" fill="#8a9099">看一眼就走</text>
+
+        <circle cx="370" cy="116" r="3" fill="#00758f"/>
+        <text x="382" y="120" font-size="10.5" font-family="Consolas,monospace" fill="#00566b">ping</text>
+        <text x="470" y="120" font-size="9.5" fill="#8a9099">探活，给脚本用</text>
+
+        <circle cx="370" cy="142" r="3" fill="#c0392b"/>
+        <text x="382" y="146" font-size="10.5" font-family="Consolas,monospace" fill="#a93226">shutdown</text>
+        <text x="470" y="146" font-size="9.5" fill="#8a9099">关服务，不再回来</text>
+
+        <text x="364" y="170" font-size="9.5" fill="#b06a00">每次都是新连接 → 上一次的结果不会带到下一次</text>
+
+        <text x="28" y="202" font-size="10.5" fill="#4e5564">所以它没有「当前库」的概念，<tspan font-family="Consolas,monospace">USE</tspan> 和会话变量对它都没意义</text>
+        <text x="28" y="220" font-size="10.5" fill="#8a9099"><tspan font-family="Consolas,monospace">mysql -e</tspan> 是「跑一条就退出」，而 mysqladmin 整个工具都是这个模式</text>
+      </svg>
+      <figcaption><b>图 1</b>两种客户端模型。左边一次连接承载多条语句，右边每条命令自建连接、执行完即断。</figcaption>
+    </figure>
+
+    <table>
+      <thead>
+        <tr><th></th><th><code>mysql</code></th><th><code>mysqladmin</code></th></tr>
+      </thead>
+      <tbody>
+        <tr><td>典型用途</td><td>跑 SQL、看数据、导脚本</td><td>看状态、刷日志、关服务、建/删库</td></tr>
+        <tr><td>连接</td><td>保持，直到 <code>quit</code></td><td>每条命令独立一次</td></tr>
+        <tr><td>位置参数</td><td>库名</td><td><strong>命令名</strong>（<code>status</code>、<code>ping</code>…）</td></tr>
+        <tr><td>结果怎么用</td><td>人眼看，或管道给脚本</td><td>打印文本 + <strong>退出码</strong></td></tr>
+      </tbody>
+    </table>
+
+    <div class="note plain">
+      <b>为什么「关服务」要用它而不是 <code>systemctl stop</code></b>
+      <p>本机运维用 <code>systemctl</code> 更规范；<code>mysqladmin shutdown</code> 的价值在<strong>远程</strong>和<strong>没有系统权限</strong>的场景——只要有 <code>SHUTDOWN</code> 权限的账号，从任何一台能连到 3306 的机器都能正常停库，不用登服务器。它走的是 MySQL 自己的停机流程：等当前语句结束、刷盘、关闭连接，不是直接杀进程。</p>
+    </div>
+
+    <h2 id="s2">2. 语法：命令是位置参数</h2>
+
+    <p>截图语法是 <code>mysqladmin [options] command [command-arg] [command [command-arg]] ...</code>。最后这段要注意：<strong>一条命令行可以挂多个命令</strong>，它们共用一次连接，按顺序执行。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 680 222" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <text x="340" y="20" text-anchor="middle" font-size="11.5" fill="#8a9099">带横杠的是选项，不带横杠的是命令；命令可以并列多个</text>
+
+        <rect x="24" y="38" width="88" height="34" rx="5" fill="#00758f"/>
+        <text x="68" y="60" text-anchor="middle" font-size="11.5" font-family="Consolas,monospace" fill="#ffffff">mysqladmin</text>
+
+        <rect x="120" y="38" width="150" height="34" rx="5" fill="#eef1f4"/>
+        <text x="195" y="60" text-anchor="middle" font-size="11" font-family="Consolas,monospace" fill="#4e5564">-uroot -p -h…</text>
+
+        <rect x="278" y="38" width="112" height="34" rx="5" fill="#fdf3e3" stroke="#f0d9b0"/>
+        <text x="334" y="60" text-anchor="middle" font-size="11.5" font-family="Consolas,monospace" fill="#8a6535">status</text>
+
+        <rect x="398" y="38" width="140" height="34" rx="5" fill="#fdf3e3" stroke="#f0d9b0"/>
+        <text x="468" y="60" text-anchor="middle" font-size="11" font-family="Consolas,monospace" fill="#8a6535">extended-status</text>
+
+        <rect x="546" y="38" width="22" height="34" rx="5" fill="#f7f9fa" stroke="#e4e7ec"/>
+        <text x="557" y="60" text-anchor="middle" font-size="12" fill="#b9bfc8">…</text>
+
+        <text x="68" y="90" text-anchor="middle" font-size="9.5" fill="#8a9099">程序</text>
+        <text x="195" y="90" text-anchor="middle" font-size="9.5" fill="#8a9099">连接参数（跟 mysql 一样）</text>
+        <text x="340" y="90" text-anchor="middle" font-size="9.5" fill="#b06a00">命令 1</text>
+        <text x="468" y="90" text-anchor="middle" font-size="9.5" fill="#b06a00">命令 2</text>
+
+        <line x1="278" y1="100" x2="568" y2="100" stroke="#f0d9b0" stroke-width="1"/>
+        <text x="423" y="116" text-anchor="middle" font-size="9.5" fill="#b06a00">同一次连接里依次执行</text>
+
+        <text x="28" y="146" font-size="10.5" fill="#4e5564">命令可以缩写成任意唯一前缀：<tspan font-family="Consolas,monospace" fill="#00758f">stat</tspan> / <tspan font-family="Consolas,monospace" fill="#00758f">proc</tspan> / <tspan font-family="Consolas,monospace" fill="#00758f">ver</tspan></text>
+        <text x="28" y="166" font-size="10.5" fill="#4e5564">例如 <tspan font-family="Consolas,monospace" fill="#00758f">mysqladmin -uroot -p proc stat</tspan>，一次看进程列表加状态</text>
+        <text x="28" y="186" font-size="10.5" fill="#c0392b">缩写别写 <tspan font-family="Consolas,monospace">st</tspan>：status / start-replica / stop-replica 都以 st 开头，不唯一，会报错</text>
+        <text x="28" y="206" font-size="10.5" fill="#8a9099">它没有库名位置参数，所以 <tspan font-family="Consolas,monospace">-p status</tspan> 不会像 mysql 那样把下一个词当库名</text>
+      </svg>
+      <figcaption><b>图 2</b>命令拆解。与 <code>mysql</code> 最大的结构差异：位置参数是命令，不是库名，而且可以有多个。</figcaption>
+    </figure>
+
+    <table>
+      <thead>
+        <tr><th>选项</th><th>作用</th><th>什么时候用</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>-h -P -u -p -S</code></td><td>与 <code>mysql</code> 完全一致</td><td>连远程、连非默认端口</td></tr>
+        <tr><td><code>-i 秒</code> / <code>--sleep</code></td><td>每隔 N 秒重复执行命令</td><td>盯状态、做轮询</td></tr>
+        <tr><td><code>-c 次数</code> / <code>--count</code></td><td>配合 <code>-i</code>，重复几次</td><td>采 5 个点就退出，不写死循环</td></tr>
+        <tr><td><code>-r</code> / <code>--relative</code></td><td>只对 <code>extended-status</code> 有效，显示与上次的差值</td><td>看每秒增长量，而不是累计值</td></tr>
+        <tr><td><code>-f</code> / <code>--force</code></td><td><code>drop</code> 不再询问；多命令时出错继续</td><td>脚本里删测试库</td></tr>
+        <tr><td><code>-w [次数]</code> / <code>--wait</code></td><td>连不上时等待重试</td><td>开机脚本里等服务起来</td></tr>
+        <tr><td><code>-v</code> / <code>--verbose</code></td><td><code>processlist</code> 变成 <code>SHOW FULL PROCESSLIST</code></td><td>要看完整 SQL 而不是前 100 字符</td></tr>
+        <tr><td><code>-E</code> / <code>--vertical</code></td><td>竖排输出，一列一行</td><td><code>variables</code> 值太长被截断</td></tr>
+        <tr><td><code>-s</code> / <code>--silent</code></td><td>连不上时静默退出，不打印错误</td><td>脚本探活只看退出码</td></tr>
+        <tr><td><code>--shutdown-timeout</code></td><td>等停机的最长秒数，默认 3600</td><td>大事务没结束时别急着判定失败</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="s3">3. 二十多条命令分四组</h2>
+
+    <p>截图把 <code>--help</code> 的输出整段贴了出来，二十多行按字母序排，看不出重点。按「会不会改东西」重新分组，记起来快得多——<strong>真正会改状态的只有第二、四组，其余都是读或刷</strong>。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 680 300" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <text x="340" y="20" text-anchor="middle" font-size="11.5" fill="#8a9099">青色只读，橙色会改数据，红色会中断服务</text>
+
+        <rect x="24" y="32" width="306" height="124" rx="8" fill="#f4fafb" stroke="#b9dde5"/>
+        <text x="40" y="52" font-size="11.5" font-weight="700" fill="#00758f">看：只读，最常用</text>
+        <text x="40" y="76" font-size="10" font-family="Consolas,monospace" fill="#00566b">status</text>
+        <text x="40" y="94" font-size="10" font-family="Consolas,monospace" fill="#00566b">extended-status</text>
+        <text x="40" y="112" font-size="10" font-family="Consolas,monospace" fill="#00566b">variables</text>
+        <text x="186" y="76" font-size="10" font-family="Consolas,monospace" fill="#00566b">processlist</text>
+        <text x="186" y="94" font-size="10" font-family="Consolas,monospace" fill="#00566b">version</text>
+        <text x="186" y="112" font-size="10" font-family="Consolas,monospace" fill="#00566b">ping</text>
+        <text x="40" y="140" font-size="9.5" fill="#8a9099">6 个。status 是摘要，extended-status 是几百个变量</text>
+
+        <rect x="350" y="32" width="306" height="124" rx="8" fill="#fdf8ef" stroke="#f0d9b0"/>
+        <text x="366" y="52" font-size="11.5" font-weight="700" fill="#b06a00">改：动数据或连接</text>
+        <text x="366" y="76" font-size="10" font-family="Consolas,monospace" fill="#8a6535">create</text>
+        <text x="366" y="94" font-size="10" font-family="Consolas,monospace" fill="#8a6535">drop</text>
+        <text x="366" y="112" font-size="10" font-family="Consolas,monospace" fill="#8a6535">kill</text>
+        <text x="512" y="76" font-size="10" font-family="Consolas,monospace" fill="#8a6535">password</text>
+        <text x="366" y="140" font-size="9.5" fill="#8a9099">4 个。kill 和 drop 是不可逆的，先看清 ID / 库名</text>
+
+        <rect x="24" y="170" width="306" height="118" rx="8" fill="#fbfcfd" stroke="#e4e7ec"/>
+        <text x="40" y="190" font-size="11.5" font-weight="700" fill="#4e5564">刷：让缓存和日志重新落地</text>
+        <text x="40" y="214" font-size="10" font-family="Consolas,monospace" fill="#4e5564">flush-hosts</text>
+        <text x="40" y="232" font-size="10" font-family="Consolas,monospace" fill="#4e5564">flush-logs</text>
+        <text x="40" y="250" font-size="10" font-family="Consolas,monospace" fill="#4e5564">flush-status</text>
+        <text x="40" y="268" font-size="10" font-family="Consolas,monospace" fill="#4e5564">flush-tables</text>
+        <text x="186" y="214" font-size="10" font-family="Consolas,monospace" fill="#4e5564">flush-threads</text>
+        <text x="186" y="232" font-size="10" font-family="Consolas,monospace" fill="#4e5564">flush-privileges</text>
+        <text x="186" y="250" font-size="10" font-family="Consolas,monospace" fill="#4e5564">reload</text>
+        <text x="186" y="268" font-size="10" font-family="Consolas,monospace" fill="#4e5564">refresh</text>
+        <text x="300" y="278" font-size="9.5" fill="#8a9099">8 个</text>
+
+        <rect x="350" y="170" width="306" height="118" rx="8" fill="#fdecea" stroke="#f5c6c2"/>
+        <text x="366" y="190" font-size="11.5" font-weight="700" fill="#a93226">停与复制：改了服务状态</text>
+        <text x="366" y="214" font-size="10" font-family="Consolas,monospace" fill="#a93226">shutdown</text>
+        <text x="366" y="232" font-size="10" font-family="Consolas,monospace" fill="#a93226">start-replica</text>
+        <text x="366" y="250" font-size="10" font-family="Consolas,monospace" fill="#a93226">stop-replica</text>
+        <text x="366" y="268" font-size="9.5" font-family="Consolas,monospace" fill="#b9bfc8">start-slave / stop-slave（旧名）</text>
+        <text x="560" y="214" font-size="9.5" fill="#8a9099">8.0.26 起用</text>
+      </svg>
+      <figcaption><b>图 3</b>按后果分组。<code>debug</code> 没放进图里——它在 8.0.20 之后已经没有效果，见第 7 节。</figcaption>
+    </figure>
+
+    <table>
+      <thead>
+        <tr><th>命令</th><th>等价 SQL / 实际动作</th><th>要注意</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>status</code></td><td>服务器状态摘要（一行八项）</td><td>字段含义见下一节</td></tr>
+        <tr><td><code>extended-status</code></td><td><code>SHOW GLOBAL STATUS</code></td><td>几百个变量，配 <code>grep</code> 用</td></tr>
+        <tr><td><code>variables</code></td><td><code>SHOW GLOBAL VARIABLES</code></td><td>看的是<strong>全局</strong>值，不是当前会话</td></tr>
+        <tr><td><code>processlist</code></td><td><code>SHOW PROCESSLIST</code>；加 <code>-v</code> 变 FULL</td><td>只看到自己线程时，是缺 <code>PROCESS</code> 权限</td></tr>
+        <tr><td><code>version</code></td><td>客户端与服务端版本、运行时长</td><td>确认连的是哪个实例</td></tr>
+        <tr><td><code>create db_name</code></td><td><code>CREATE DATABASE db_name</code></td><td><code>db_name</code> 是占位符，别照抄</td></tr>
+        <tr><td><code>drop db_name</code></td><td><code>DROP DATABASE db_name</code></td><td>交互确认；<code>-f</code> 跳过</td></tr>
+        <tr><td><code>kill id,id</code></td><td><code>KILL id</code></td><td>逗号之间<strong>不能有空格</strong></td></tr>
+        <tr><td><code>flush-logs [类型]</code></td><td><code>FLUSH LOGS</code></td><td>类型：binary / engine / error / general / relay / slow</td></tr>
+        <tr><td><code>flush-hosts</code></td><td>清空主机缓存，解封被拉黑的 IP</td><td>解 <code>ERROR 1129</code> 的常规手段</td></tr>
+        <tr><td><code>flush-status</code></td><td>把状态计数器清零</td><td>清完再看 <code>status</code>，数字从 0 开始</td></tr>
+        <tr><td><code>flush-tables</code></td><td><code>FLUSH TABLES</code></td><td>让表缓存失效，重新打开表文件</td></tr>
+        <tr><td><code>flush-threads</code></td><td>清空线程缓存</td><td>连接数抖动时偶尔用</td></tr>
+        <tr><td><code>flush-privileges</code> / <code>reload</code></td><td><code>FLUSH PRIVILEGES</code></td><td>只有手工改过授权表才需要；<code>GRANT</code> 本身立即生效</td></tr>
+        <tr><td><code>refresh</code></td><td><code>flush-tables</code> + <code>flush-logs</code></td><td>老脚本里常见，新脚本写两个更清楚</td></tr>
+        <tr><td><code>shutdown</code></td><td>正常停库</td><td>需 <code>SHUTDOWN</code> 权限</td></tr>
+        <tr><td><code>start-replica</code> / <code>stop-replica</code></td><td><code>START REPLICA</code> / <code>STOP REPLICA</code></td><td>8.0.26 之前叫 <code>start-slave</code> / <code>stop-slave</code></td></tr>
+        <tr><td><code>password 新密码</code></td><td>改<strong>当前连接账号</strong>自己的密码</td><td>不推荐，见第 7 节</td></tr>
+        <tr><td><code>debug</code></td><td>8.0.20 之前往 error log 写调试信息</td><td>现在执行也不会有输出</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="s4">4. <code>status</code> 那八个字段</h2>
+
+    <p>截图只写了「Gives a short status message from the server」，实际这一行信息量不小。八个字段里<strong>有一个被中文教程广泛讲错</strong>，就是最后那个 <code>Queries per second avg</code>。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 680 304" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <rect x="24" y="30" width="632" height="62" rx="6" fill="#f7f9fa" stroke="#e4e7ec"/>
+        <text x="40" y="54" font-size="10" font-family="Consolas,monospace" fill="#1f2329">Uptime: 1473624  Threads: 1  Questions: 39487  Slow queries: 0</text>
+        <text x="40" y="78" font-size="10" font-family="Consolas,monospace" fill="#1f2329">Opens: 541  Flush tables: 1  Open tables: 19  Queries per second avg: 0.0268</text>
+
+        <text x="32" y="118" font-size="10.5" font-weight="700" fill="#00758f">Uptime</text>
+        <text x="32" y="134" font-size="9.5" fill="#4e5564">启动到现在的秒数，重启归零</text>
+
+        <text x="252" y="118" font-size="10.5" font-weight="700" fill="#00758f">Threads</text>
+        <text x="252" y="134" font-size="9.5" fill="#4e5564">当前连接的客户端线程数</text>
+
+        <text x="470" y="118" font-size="10.5" font-weight="700" fill="#00758f">Questions</text>
+        <text x="470" y="134" font-size="9.5" fill="#4e5564">客户端发来的语句总条数</text>
+
+        <text x="32" y="166" font-size="10.5" font-weight="700" fill="#00758f">Slow queries</text>
+        <text x="32" y="182" font-size="9.5" fill="#4e5564">超过 long_query_time 的条数</text>
+
+        <text x="252" y="166" font-size="10.5" font-weight="700" fill="#00758f">Opens</text>
+        <text x="252" y="182" font-size="9.5" fill="#4e5564">服务端累计打开表的次数</text>
+
+        <text x="470" y="166" font-size="10.5" font-weight="700" fill="#00758f">Flush tables</text>
+        <text x="470" y="182" font-size="9.5" fill="#4e5564">flush / reload 的执行次数</text>
+
+        <text x="32" y="214" font-size="10.5" font-weight="700" fill="#00758f">Open tables</text>
+        <text x="32" y="230" font-size="9.5" fill="#4e5564">此刻处于打开状态的表数量</text>
+
+        <text x="252" y="214" font-size="10.5" font-weight="700" fill="#b06a00">QPS avg</text>
+        <text x="252" y="230" font-size="9.5" fill="#4e5564">Questions ÷ Uptime，平均每秒语句数</text>
+
+        <rect x="24" y="248" width="632" height="44" rx="6" fill="#fdecea" stroke="#f5c6c2"/>
+        <text x="40" y="266" font-size="10" fill="#a93226">它<b>不是</b>「平均查询耗时」。耗时得看慢日志，或 performance_schema 里的 TIMER_WAIT。</text>
+        <text x="40" y="284" font-size="10" fill="#a93226">另外 <tspan font-family="Consolas,monospace">Questions</tspan> 不含存储过程内部语句，<tspan font-family="Consolas,monospace">SHOW STATUS</tspan> 里的 <tspan font-family="Consolas,monospace">Queries</tspan> 才含。</text>
+      </svg>
+      <figcaption><b>图 4</b>一行 <code>status</code> 的八个字段。最后一项是增速指标，不是延迟指标——这个区别决定了你会不会拿它去判断「数据库慢」。</figcaption>
+    </figure>
+
+    <p>这八个字段都是 <code>SHOW GLOBAL STATUS</code> 的子集。要更细，直接查那几个变量：</p>
+
+    <pre><span class="label">sql</span><code><span class="c">-- 连接与并发</span>
+<span class="k">SHOW GLOBAL STATUS LIKE</span> <span class="s">'Threads_%'</span>;
+<span class="k">SHOW GLOBAL STATUS LIKE</span> <span class="s">'Max_used_connections'</span>;
+
+<span class="c">-- 连接失败（握手阶段就断的）</span>
+<span class="k">SHOW GLOBAL STATUS LIKE</span> <span class="s">'Aborted_%'</span>;
+
+<span class="c">-- 慢查询与全表扫描</span>
+<span class="k">SHOW GLOBAL STATUS LIKE</span> <span class="s">'Slow_queries'</span>;
+<span class="k">SHOW GLOBAL STATUS LIKE</span> <span class="s">'Select_full_join'</span>;</code></pre>
+
+    <h2 id="s5">5. <code>ping</code> 的退出码，和你想的不一样</h2>
+
+    <p><code>ping</code> 是脚本里最常用的命令，因为它的<strong>退出码</strong>就是结论。但官方文档里有一句很反直觉的话：即使用户名密码错了，只要服务在，它<strong>照样返回 0</strong>。理由是「服务活着但拒绝了你」和「服务根本不在了」是两件事。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 680 252" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <text x="340" y="20" text-anchor="middle" font-size="11.5" fill="#8a9099">退出码只回答一个问题：mysqld 还在不在</text>
+
+        <rect x="24" y="34" width="632" height="52" rx="6" fill="#eef7f1" stroke="#b7ddc4"/>
+        <text x="40" y="56" font-size="10.5" font-family="Consolas,monospace" fill="#1a7f4b">mysqld is alive</text>
+        <text x="40" y="74" font-size="9.5" fill="#4e5564">服务在，认证也通过</text>
+        <text x="640" y="64" text-anchor="end" font-size="12" font-weight="700" fill="#1a7f4b">exit 0</text>
+
+        <rect x="24" y="96" width="632" height="52" rx="6" fill="#fdf8ef" stroke="#f0d9b0"/>
+        <text x="40" y="118" font-size="10.5" font-family="Consolas,monospace" fill="#8a6535">Access denied for user 'root'@'localhost'</text>
+        <text x="40" y="136" font-size="9.5" fill="#4e5564">服务在，只是不让你进 —— 依然算「活着」</text>
+        <text x="640" y="126" text-anchor="end" font-size="12" font-weight="700" fill="#b06a00">exit 0</text>
+
+        <rect x="24" y="158" width="632" height="52" rx="6" fill="#fdecea" stroke="#f5c6c2"/>
+        <text x="40" y="180" font-size="10.5" font-family="Consolas,monospace" fill="#a93226">mysqladmin: connect to server at 'localhost' failed</text>
+        <text x="40" y="198" font-size="9.5" fill="#4e5564">端口没开、服务没起、socket 路径不对</text>
+        <text x="640" y="188" text-anchor="end" font-size="12" font-weight="700" fill="#a93226">exit 1</text>
+
+        <text x="28" y="232" font-size="10.5" fill="#4e5564">所以 <tspan font-family="Consolas,monospace">ping</tspan> 只能用来判断「服务在不在」，不能用来判断「账号能不能用」</text>
+        <text x="28" y="248" font-size="10.5" fill="#8a9099">要连账号一起验，得跑一条真语句，例如 <tspan font-family="Consolas,monospace">mysql -e "SELECT 1"</tspan></text>
+      </svg>
+      <figcaption><b>图 5</b>三种结局。中间那行是坑：监控脚本只看退出码，会把「密码错」当成「服务正常」。</figcaption>
+    </figure>
+
+    <pre><span class="label">shell</span><code><span class="c"># 课程示例：探活</span>
+mysqladmin -uroot -p ping
+
+<span class="c"># 脚本里用：静默 + 只看退出码</span>
+<span class="k">if</span> mysqladmin -uroot -p<span class="s">"$PASS"</span> -h127.0.0.1 --silent ping; <span class="k">then</span>
+  echo <span class="s">"mysqld 在"</span>
+<span class="k">else</span>
+  echo <span class="s">"mysqld 不在"</span>
+<span class="k">fi</span>
+
+<span class="c"># 每 2 秒采一次状态，共 5 次，结果落文件</span>
+mysqladmin -uroot -p -i 2 -c 5 status &gt;&gt; status.log
+
+<span class="c"># 看“每秒增长量”而不是累计值，必须用 extended-status</span>
+mysqladmin -uroot -p -i 2 -r extended-status | grep -E <span class="s">'Queries|Com_select|Com_insert'</span>
+
+<span class="c"># 从别的机器关掉这台库</span>
+mysqladmin -h192.168.1.10 -uroot -p shutdown</code></pre>
+
+    <div class="note tip">
+      <b><code>-i</code> 不加 <code>-c</code> 就是死循环</b>
+      <p>官方文档写得很明确：只给 <code>--sleep</code> 不给 <code>--count</code>，会一直执行到被中断。放在 crontab 或 CI 里忘了加 <code>-c</code>，会留下一个永远不退出的进程。</p>
+      <p><code>-r</code> 只对 <code>extended-status</code> 起作用，对 <code>status</code> 无效——这也是为什么盯增长量时要换命令。</p>
+    </div>
+
+    <h2 id="s6">6. <code>create</code> / <code>drop</code> / <code>kill</code></h2>
+
+    <p>这三个是真正会改东西的。它们的共同点是：<strong>参数不是选项，而是紧跟其后的位置参数</strong>，所以写错一个词，动作就落到别处了。</p>
+
+    <pre><span class="label">shell</span><code><span class="c"># 建库 / 删库（课程示例）</span>
+mysqladmin -uroot -p123456 create test01
+mysqladmin -uroot -p123456 drop test01
+
+<span class="c"># 删库不想被问，加 -f</span>
+mysqladmin -uroot -p -f drop test01
+
+<span class="c"># 杀线程：ID 用逗号隔开，不能有空格</span>
+mysqladmin -uroot -p processlist
+mysqladmin -uroot -p kill 12,15</code></pre>
+
+    <div class="note danger">
+      <b><code>create databasename</code> 里的 <code>databasename</code> 是占位符</b>
+      <p>截图里的帮助文本写作 <code>create databasename  Create a new database</code>，那个词是「库名」的占位符，不是关键字。真敲 <code>mysqladmin create database</code>，MySQL 会老老实实建一个<strong>名字叫 <code>database</code></strong> 的库，然后你对着一个空库发呆。正确写法是直接跟库名：<code>mysqladmin create test01</code>。</p>
+      <p>同理 <code>drop databasename</code>，写成 <code>drop database</code> 就是去删那个叫 <code>database</code> 的库。</p>
+    </div>
+
+    <div class="note warn">
+      <b>Windows 的 cmd 里，分号和单引号都会变成名字的一部分</b>
+      <p>课程示例写的是 <code>mysqladmin -uroot -p123456 drop 'test01';</code>。在 bash 和 PowerShell 里，分号是语句分隔符、单引号会被剥掉，没问题；但在 <strong>cmd.exe</strong> 里，分号不是分隔符、单引号也不剥，实际传给工具的是 <code>'test01';</code>，于是报库不存在。</p>
+      <p>Windows 上照这个写：<code>mysqladmin -uroot -p123456 drop test01</code>，不加引号也不加分号。</p>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>命令</th><th>需要的权限</th><th>缺权限时的报错</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>shutdown</code></td><td><code>SHUTDOWN</code></td><td><code>Access denied; you need (at least one of) the SHUTDOWN privilege(s)</code></td></tr>
+        <tr><td><code>create</code> / <code>drop</code></td><td><code>CREATE</code> / <code>DROP</code>（库级即可）</td><td><code>Access denied for user ... to database</code></td></tr>
+        <tr><td><code>processlist</code></td><td>看自己的线程无需权限；看全部需 <code>PROCESS</code></td><td>只显示自己的线程，不报错</td></tr>
+        <tr><td><code>kill</code> 别人的线程</td><td><code>CONNECTION_ADMIN</code>（旧版 <code>SUPER</code>）</td><td><code>You are not owner of thread N</code></td></tr>
+        <tr><td><code>flush-hosts</code></td><td><code>RELOAD</code>，或对 <code>performance_schema.host_cache</code> 有 <code>DROP</code></td><td><code>Access denied</code></td></tr>
+        <tr><td><code>flush-logs</code> / <code>flush-tables</code> / <code>reload</code></td><td><code>RELOAD</code></td><td><code>Access denied</code></td></tr>
+        <tr><td><code>password</code></td><td>只能改自己；改别人要 <code>ALTER USER</code> 权限</td><td>—</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="s7">7. 截图里四条要打补丁</h2>
+
+    <p>课程录在 8.0 早期，帮助输出里这几行现在还印得出来，但<strong>照抄会出问题</strong>。单独拎出来标注，免得以后翻笔记时踩旧坑。</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 680 282" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+        <text x="340" y="20" text-anchor="middle" font-size="11.5" fill="#8a9099">帮助里还在，但行为已经变了</text>
+
+        <rect x="24" y="32" width="632" height="54" rx="6" fill="#fbfcfd" stroke="#e4e7ec"/>
+        <text x="38" y="52" font-size="12" font-weight="700" font-family="Consolas,monospace" fill="#8a9099">debug</text>
+        <text x="640" y="52" text-anchor="end" font-size="10" fill="#b06a00">8.0.20 起无效</text>
+        <text x="38" y="72" font-size="9.5" fill="#4e5564">往 error log 写调试信息，只在带调试符号的构建上才有意义；官方发行版执行后什么也不发生</text>
+
+        <rect x="24" y="94" width="632" height="54" rx="6" fill="#fbfcfd" stroke="#e4e7ec"/>
+        <text x="38" y="114" font-size="12" font-weight="700" font-family="Consolas,monospace" fill="#8a9099">password 新密码</text>
+        <text x="640" y="114" text-anchor="end" font-size="10" fill="#b06a00">改用 ALTER USER</text>
+        <text x="38" y="134" font-size="9.5" fill="#4e5564">只能改当前登录账号；新密码进命令行历史；--skip-grant-tables 下静默无效</text>
+
+        <rect x="24" y="156" width="632" height="54" rx="6" fill="#fbfcfd" stroke="#e4e7ec"/>
+        <text x="38" y="176" font-size="12" font-weight="700" font-family="Consolas,monospace" fill="#8a9099">start-slave / stop-slave</text>
+        <text x="640" y="176" text-anchor="end" font-size="10" fill="#b06a00">8.0.26 起改名</text>
+        <text x="38" y="196" font-size="9.5" fill="#4e5564">现在叫 start-replica / stop-replica；旧名仍可用，8.4 文档把它标为弃用别名</text>
+
+        <rect x="24" y="218" width="632" height="54" rx="6" fill="#fdecea" stroke="#f5c6c2"/>
+        <text x="38" y="238" font-size="12" font-weight="700" font-family="Consolas,monospace" fill="#a93226">create databasename</text>
+        <text x="640" y="238" text-anchor="end" font-size="10" fill="#a93226">占位符陷阱</text>
+        <text x="38" y="258" font-size="9.5" fill="#4e5564">databasename 是占位符；写 create database 会建出一个名字就叫 database 的库</text>
+      </svg>
+      <figcaption><b>图 6</b>四条版本补丁。前三条是「还能跑但没意义」，最后一条会真的产生一个多余的库。</figcaption>
+    </figure>
+
+    <pre><span class="label">sql</span><code><span class="c">-- 改密码：8.0 的正确写法，能指定任意账号</span>
+<span class="k">ALTER USER</span> <span class="s">'root'</span>@<span class="s">'localhost'</span> <span class="k">IDENTIFIED BY</span> <span class="s">'新密码'</span>;
+
+<span class="c">-- 顺手清掉主机缓存里被拉黑的 IP（看谁被拉黑）</span>
+<span class="k">SELECT</span> ip, host, sum_connect_errors
+<span class="k">FROM</span> <span class="f">performance_schema.host_cache</span>
+<span class="k">ORDER BY</span> sum_connect_errors <span class="k">DESC</span>;</code></pre>
+
+    <div class="note plain">
+      <b>顺便说清 <code>flush-hosts</code> 的处境</b>
+      <p>它自己没被弃用，但它对应的 SQL 语句 <code>FLUSH HOSTS</code> 在 <strong>8.0.23 已弃用、8.4 已移除</strong>。所以在 8.4 上要清主机缓存，要么用 <code>mysqladmin flush-hosts</code>，要么 <code>TRUNCATE TABLE performance_schema.host_cache</code>。这条恰好和 <code>mysqlpump</code> 是同一种情况：客户端命令还在，SQL 语句先没了。</p>
+    </div>
+
+    <h2 id="s8">8. 报错对照</h2>
+
+    <table>
+      <thead>
+        <tr><th>输出</th><th>真实原因</th><th>下一步</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>connect to server at 'localhost' failed</code></td><td>服务没起、端口不对、socket 路径不对</td><td><code>systemctl status mysqld</code>；再 <code>mysqladmin ping</code></td></tr>
+        <tr><td><code>Access denied for user ...</code></td><td>账号、密码、来源主机之一不对</td><td>注意 <code>ping</code> 此时仍返回 0，别被迷惑</td></tr>
+        <tr><td><code>Access denied; you need ... SHUTDOWN privilege(s)</code></td><td>账号缺 <code>SHUTDOWN</code></td><td><code>GRANT SHUTDOWN ON *.* TO ...</code>，或改用 <code>systemctl stop</code></td></tr>
+        <tr><td><code>You are not owner of thread N</code></td><td>杀的是别人的线程，缺 <code>CONNECTION_ADMIN</code></td><td>换高权限账号；确认 ID 没抄错</td></tr>
+        <tr><td><code>ERROR 1129 Host is blocked</code>（连接阶段）</td><td>该 IP 连续握手失败超过 <code>max_connect_errors</code>（默认 100）</td><td><code>mysqladmin flush-hosts</code> 解封，再查为什么一直失败</td></tr>
+        <tr><td><code>mysqladmin: unknown command 'xxx'</code></td><td>命令拼错，或写成了 <code>--status</code></td><td>命令不带横杠；用 <code>mysqladmin --help</code> 对一遍</td></tr>
+        <tr><td><code>Unknown database 'test01;'</code></td><td>cmd 里把分号拼进了库名</td><td>去掉末尾分号和单引号</td></tr>
+      </tbody>
+    </table>
+
+    <div class="note tip">
+      <b>这一页要带走的三句</b>
+      <p>1. 它是「一次连接干一件事」的管理客户端：没有当前库，也不用 <code>quit</code>。<br>
+      2. <code>status</code> 的 <code>QPS avg</code> 是 Questions ÷ Uptime，<strong>不是查询耗时</strong>；耗时看慢日志。<br>
+      3. <code>ping</code> 返回 0 只说明服务活着，密码错了也返回 0；<code>debug</code>、<code>password</code>、<code>slave-*</code> 三条别照抄。</p>
+    </div>
+
+    <section class="quiz">
+      <p class="quiz-head">自测三问<span>先自己答一遍，再点开对答案</span></p>
+      <details>
+        <summary><span class="qno">Q1</span><span class="ask"><code>mysqladmin -uroot -pwrong ping; echo $?</code> 输出 0，说明密码是对的吗？</span><span class="caret" aria-hidden="true"></span></summary>
+        <div class="ans"><p>不能说明。<b>只要服务端能应答，ping 就返回 0</b>，认证被拒也算「活着」。要验证账号能不能用，改用 <code>mysql -e "SELECT 1"</code> 看退出码。</p></div>
+      </details>
+      <details>
+        <summary><span class="qno">Q2</span><span class="ask"><code>Queries per second avg: 3.421</code> 能当当前 QPS 用吗？</span><span class="caret" aria-hidden="true"></span></summary>
+        <div class="ans"><p>不能。它是 Questions ÷ Uptime 的<b>历史平均值</b>，开机越久被稀释得越厉害。要看实时压力，两次采样 <code>SHOW GLOBAL STATUS LIKE 'Questions'</code> 求差，再除以间隔秒数。</p></div>
+      </details>
+      <details>
+        <summary><span class="qno">Q3</span><span class="ask">想安全停库，<code>mysqladmin shutdown</code> 和自己 kill 掉进程有什么区别？</span><span class="caret" aria-hidden="true"></span></summary>
+        <div class="ans"><p><code>shutdown</code> 走正常关闭流程：停止接受新连接、刷脏页、写完 redo、更新统计，InnoDB 干净退出。直接杀进程相当于断电，下次启动要做 crash recovery，极端情况会丢未刷盘的事务。</p></div>
+      </details>
+    </section>
+    <div class="footer">
+      <a href="07-02-mysql.html">← 7.2.1 mysql</a> · <a href="07-04-mysqlbinlog.html">7.2.3 mysqlbinlog →</a> · <a href="07-MySQL管理.html">MySQL 管理</a> · <a href="../index.html">总目录</a>
+    </div>
+
+  </main>
+</div>
+</body>
+</html>

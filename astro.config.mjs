@@ -1,4 +1,5 @@
 import sitemap from "@astrojs/sitemap";
+import staticNotes from "./src/integrations/static-notes.mjs";
 import svelte from "@astrojs/svelte";
 import tailwind from "@astrojs/tailwind";
 import { pluginCollapsibleSections } from "@expressive-code/plugin-collapsible-sections";
@@ -33,6 +34,7 @@ export default defineConfig({
 	base,
 	trailingSlash: "always",
 	integrations: [
+		staticNotes(),
 		tailwind({
 			nesting: true,
 		}),

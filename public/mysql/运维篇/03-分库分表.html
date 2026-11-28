@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>03 分库分表：为什么拆、怎么拆、代价是什么 · 运维篇 · MySQL 笔记</title>
+<link rel="stylesheet" href="../assets/style.css"><link rel="stylesheet" href="../assets/replication.css"><link rel="stylesheet" href="../assets/sharding.css">
+<script src="../assets/replication.js" defer></script>
+</head>
+<body class="replication sharding"><div class="layout">
+
+<nav class="sidebar" aria-label="本页目录">
+  <p class="side-title">本页目录</p>
+  <a href="#why">1. 单库卡在哪</a>
+  <a href="#wait">2. 先别急着拆</a>
+  <a href="#ways">3. 四种拆法</a>
+  <a href="#vertical">4. 垂直：切列</a>
+  <a href="#horizontal">5. 水平：切行</a>
+  <a href="#cost">6. 拆完多出四件事</a>
+  <a href="#key">7. 分片键怎么选</a>
+  <a href="#tech">8. 用什么实现</a>
+  <a href="#decide">9. 一次判断的顺序</a>
+  <a href="#quiz">自测三问</a>
+  <p class="side-title" style="margin-top:22px">当前位置</p>
+  <ul class="nav-tree">
+    <li><a href="../index.html" class="root">↑ 总目录</a>
+      <ul>
+        <li><a href="01-日志.html">01 日志</a></li>
+        <li><a href="02-主从复制.html">02 主从复制</a></li>
+        <li><span class="current">03 分库分表</span>
+          <ul>
+            <li><a href="03-01-MyCat实现.html" class="leaf">03-01 MyCat 实现</a></li>
+          </ul>
+        </li>
+        <li><a href="04-读写分离.html">04 读写分离</a></li>
+      </ul>
+    </li>
+  </ul>
+</nav>
+
+<main class="main">
+<div class="crumb"><a href="../index.html">总目录</a> / 运维篇 / 03 分库分表</div>
+<h1><span class="chapter-no">03</span>分库分表</h1>
+<p class="lede">单库撑不住的时候，把数据切开存。这一页只解决<b>判断</b>：什么时候该拆、四种拆法到底差在哪、拆完会多出哪些麻烦。真动手配 MyCat 在 <a href="03-01-MyCat实现.html">03-01</a>。</p>
+<div class="meta"><span>课程：黑马程序员 MySQL</span><span>环境：MySQL 8.0</span><span>示例：tb_order 单表 1500 万行</span></div>
+
+<section class="quick">
+  <p class="quick-head">一屏速记<span>合上笔记，这 4 条要能自己说出来</span></p>
+  <ol>
+    <li><b>两个问题分清四种拆法：</b>切的是<b>列</b>还是<b>行</b>（垂直 / 水平），切完放<b>不同的库</b>还是<b>同一个库</b>（分库 / 分表）。</li>
+    <li><b>垂直切结构，水平切数据。</b>垂直拆完每份结构不同、合起来是全量；水平拆完每份结构相同、合起来也是全量。</li>
+    <li><b>分表不解决单机瓶颈。</b>十张表还在同一块磁盘上，IO 和 CPU 一点没多——只解决单表太大（索引变浅、DDL 和备份变快）。要加机器必须是分库。</li>
+    <li><b>拆完一定多出四件事：</b>跨库 JOIN、分布式事务、全局唯一 ID、跨分片分页聚合。单库时这四件都是免费的。</li>
+  </ol>
+</section>
+
+<h2 id="why">1. 单库卡在哪</h2>
+<p>数据量涨上来，单库的瓶颈只有两类：<b>IO</b> 和 <b>CPU</b>。它们都受同一件事限制——所有资源只按一台机器算。</p>
+
+<figure class="fig">
+  <img src="../assets/sharding/01-bottleneck.png" width="779" height="220" alt="多个用户请求汇入同一个数据库，数据量不断增长，数据库从小变大，最后变成红色告警状态。">
+  <figcaption><b>图 1</b>问题长这样：所有请求汇进一个库，数据越堆越高，最后撑成红色。课程把原因归成 IO（磁盘、网络）和 CPU（排序、分组、连接、聚合）两类。</figcaption>
+</figure>
+
+<table>
+  <thead><tr><th style="width:16%">瓶颈</th><th style="width:42%">怎么来的</th><th>先看什么指标</th></tr></thead>
+  <tbody>
+    <tr><td><b>磁盘 IO</b></td><td>热点数据多于缓冲池，每次查询都落到磁盘；单表文件越大，索引越深，随机读越多。</td><td>缓冲池命中率、<code>iostat</code> 的 <code>%util</code> 与 <code>await</code></td></tr>
+    <tr><td><b>网络 IO</b></td><td>返回的结果集太大、请求太密，网卡和带宽先到顶。</td><td><code>sar -n DEV</code>、单查询返回行数</td></tr>
+    <tr><td><b>CPU</b></td><td>排序、分组、多表连接、聚合统计都要算；并发一高，CPU 一直跑满。</td><td>慢查询里 <code>Using filesort</code> / <code>Using temporary</code> 的比例</td></tr>
+  </tbody>
+</table>
+
+<p>分片的思路就是把这一台上限，变成 N 台之和：数据分散、请求分散、计算分散。</p>
+
+<figure class="fig">
+  <img src="../assets/sharding/02-idea.png" width="808" height="230" alt="左边是多个请求汇入一个不断变高的数据库；右边同一批请求经过拆分后分流到三台独立数据库。">
+  <figcaption><b>图 2</b>同一批请求、同一份数据，从一个库摊到三个库。这就是分库分表的全部中心思想——<b>让单个库、单张表变小</b>。</figcaption>
+</figure>
+
+<h2 id="wait">2. 先别急着拆</h2>
+<p>分片是所有手段里<b>代价最大</b>的一种：它把「数据库问题」变成了「应用架构问题」。在它之前，还有四件事可以做，而且都能回退。</p>
+
+<table>
+  <thead><tr><th style="width:24%">先试</th><th style="width:36%">它解决什么</th><th>什么时候不够</th></tr></thead>
+  <tbody>
+    <tr><td><b>加索引 / 改 SQL</b></td><td>绝大多数「数据量大就慢」其实是执行计划问题：没走索引、回表太多、深分页。</td><td>索引已经最优，单次查询仍要扫上千万行</td></tr>
+    <tr><td><b>归档冷数据</b></td><td>订单只留最近 1~2 年，历史数据进归档表或归档库。热表立刻小一个量级。</td><td>业务确实要在线查全量历史</td></tr>
+    <tr><td><b>读写分离</b></td><td>读多写少时把查询摊到从库，主库只管写（见 <a href="02-主从复制.html">02</a>）。</td><td>写也多，或者单表大小本身成了问题</td></tr>
+    <tr><td><b>分区表</b></td><td>单机内按范围切成多个物理文件，SQL 基本不用改，还能按分区快速删历史。</td><td>还在同一台机器，磁盘和 CPU 没变多</td></tr>
+  </tbody>
+</table>
+
+<div class="note warn"><b>判断线在哪</b>
+<p>业界常说的「单表 2000 万行」是个经验值，不是硬门槛——它取决于行宽、索引数量和查询模式。真正该看的信号是：<b>加了正确索引、清了冷数据，单表仍在千万级且慢查询集中在这张表</b>。到这一步再考虑拆。</p>
+</div>
+
+<h2 id="ways">3. 四种拆法</h2>
+<p>拆分只有两个维度：<b>按什么切</b>（列 / 行）、<b>切完放哪</b>（不同库 / 同一个库）。两两组合就是四种。</p>
+
+<figure class="fig">
+  <img src="../assets/sharding/03-strategy.png" width="858" height="336" alt="垂直拆分分垂直分库和垂直分表，指向多个数据库；水平拆分分水平分库和水平分表，指向多个数据表。">
+  <figcaption><b>图 3</b>课程的拆分策略总览：上半是垂直（按业务或字段切），下半是水平（按行切）。左右箭头的落点不同——垂直分库落到多个库，垂直分表落到多个表。</figcaption>
+</figure>
+
+<table class="t-split">
+  <thead><tr><th>拆法</th><th>依据</th><th>拆完长什么样</th><th>解决什么</th></tr></thead>
+  <tbody>
+    <tr><td><b>垂直分库</b></td><td>业务</td><td>用户库、订单库、商品库，每个库的表完全不同</td><td>单库表太多、单机扛不住全业务</td></tr>
+    <tr><td><b>垂直分表</b></td><td>字段</td><td>一张宽表拆成主表 + 扩展表，用主键关联</td><td>单行太大、大字段拖慢主表查询</td></tr>
+    <tr><td><b>水平分库</b></td><td>行</td><td>同一张表按规则分到多台机器，结构完全一样</td><td>单机容量和并发到顶（<b>唯一能加机器的一种</b>）</td></tr>
+    <tr><td><b>水平分表</b></td><td>行</td><td>同一张表按规则拆成 tb_order_1/2/3，还在同一个库</td><td>单表太大、索引太深、DDL 太慢</td></tr>
+  </tbody>
+</table>
+
+<h2 id="vertical">4. 垂直：切列</h2>
+
+<h3>垂直分库：按业务分家</h3>
+<p>把一张大而全的库，按业务拆成几个只装自己那摊表的库。它其实就是「微服务化」在数据层的做法。</p>
+
+<figure class="fig">
+  <img src="../assets/sharding/04-vertical-db.png" width="780" height="383" alt="原来一个库里有用户、订单、商品三组表，垂直分库后拆成三个库，每个库只保留本业务的表。">
+  <figcaption><b>图 4</b>垂直分库：表结构不同、数据不同，并集才是全量。拆完每个库可以独立扩容、独立备份。</figcaption>
+</figure>
+
+<p>代价立刻出现：原来一条 JOIN 能查出的「订单 + 用户名」，现在跨两个库。要么在应用里查两次再拼，要么把用户名冗余进订单表。</p>
+
+<h3>垂直分表：把冷字段挪走</h3>
+<p>一张表字段太多、某几个字段又大又少用（详情、富文本、图片地址），就把它们拆到扩展表。主表一行变短，同样一页能放更多行，查询更快。</p>
+
+<div class="splitdemo">
+  <div class="sd-box sd-src">
+    <b>tb_user</b>
+    <span>id · name · sex · 头像 · 个人简介 · 注册来源 · 最后登录 IP …</span>
+  </div>
+  <div class="sd-mid"><span>按字段拆</span></div>
+  <div class="sd-out">
+    <div class="sd-box"><b>tb_user</b><span>id · name · sex（高频、短字段）</span></div>
+    <div class="sd-box ext"><b>tb_user_ext</b><span>id · 头像 · 简介（大字段、低频）</span></div>
+  </div>
+</div>
+
+<p>判断依据只有两条：<b>查得频不频繁</b>、<b>占不占空间</b>。拆完两表用主键一对一关联，查详情时多一次按主键的查询——这是可以接受的代价。</p>
+
+<div class="note plain"><b>课件那张「垂直分表」的图和垂直分库几乎一样</b>
+<p>这里按概念重画了一张。真正的垂直分表是<b>一张表变成两张表</b>（列被切开），不是把表分到三个库——分到三个库那是垂直分库。</p>
+</div>
+
+<h2 id="horizontal">5. 水平：切行</h2>
+
+<h3>水平分库：数据上多台机器</h3>
+<p>同一张逻辑表，按某个字段的规则把<b>不同的行</b>放到不同机器上的同名表里。结构完全一样，单台只存一部分。</p>
+
+<figure class="fig">
+  <img src="../assets/sharding/06-horizontal-db.png" width="594" height="318" alt="原来一个库里的 tb_order 和 tb_orderdetail，水平分库后三台机器上各有一份结构相同的表，各存一部分数据。">
+  <figcaption><b>图 5</b>水平分库：每台的表结构一致，数据互不重复，并集才是全量。这是四种拆法里<b>唯一能真正分摊 IO 和 CPU</b> 的一种。</figcaption>
+</figure>
+
+<h3>水平分表：同一个库里的多张表</h3>
+<p>行数太多但机器还撑得住时，先在一个库里把表切成 tb_order_1 / tb_order_2 / tb_order_3。表名带后缀，结构一致。</p>
+
+<div class="splitdemo">
+  <div class="sd-box sd-src">
+    <b>tb_order</b>
+    <span>1500 万行 · 单表文件接近 100 GB</span>
+  </div>
+  <div class="sd-mid"><span>按 id 取模</span></div>
+  <div class="sd-out">
+    <div class="sd-box"><b>tb_order_1</b><span>id % 3 = 0</span></div>
+    <div class="sd-box ext"><b>tb_order_2 / tb_order_3</b><span>id % 3 = 1 / 2</span></div>
+  </div>
+</div>
+
+<div class="note warn"><b>分表不等于性能提升</b>
+<p>三张表还在同一个 MySQL 实例、同一块磁盘上。查询确实可能更快（索引层数变浅、单表缓存命中率更高），但<b>并发上限和磁盘带宽一点没变</b>。要扩容，必须把这几个表放到不同机器上——那就是水平分库。</p>
+</div>
+
+<p>真实系统里两者常一起用：先按业务垂直分库，订单库再按 user_id 水平分库，每个分片里再按时间水平分表。</p>
+
+<h2 id="cost">6. 拆完多出四件事</h2>
+<p>这四件事在单库时由数据库免费提供，拆完要自己实现。它们比「怎么拆」难得多。</p>
+
+<table>
+  <thead><tr><th style="width:20%">问题</th><th style="width:40%">为什么会出现</th><th>常见解法</th></tr></thead>
+  <tbody>
+    <tr><td><b>跨库 JOIN</b></td><td>两张表的分片键不同，或者根本不在一个库，JOIN 没法下推。</td><td>冗余字段（订单表存 user_name）；按同一分片键切（关联表同分片，即 ER 分片）；应用里查两次再拼。中间件的「跨库 JOIN」是把各节点结果拉回内存合并，数据量大时非常慢。</td></tr>
+    <tr><td><b>分布式事务</b></td><td>一个事务写两个库，本地事务管不到另一个库。</td><td>最优解是设计上避开：让一个事务只落一个分片（比如同一用户的订单和明细同分片）。避不开才上本地消息表、TCC、Seata 这类方案。</td></tr>
+    <tr><td><b>全局唯一 ID</b></td><td>每个分片各自自增，跨分片必然出现重复 ID。</td><td>雪花算法（趋势递增、含机器位）、号段模式（数据库或 Redis 批量发号）。UUID 唯一但无序，做 InnoDB 主键会造成大量页分裂。</td></tr>
+    <tr><td><b>分页与聚合</b></td><td><code>LIMIT 100000,10</code> 要每个分片各取 100010 条，再在中间件里排序取 10 条。</td><td>深分页改成「上次最大 id」的游标翻页；<code>COUNT</code> / <code>SUM</code> 由各分片算部分结果再汇总；报表类查询走单独的汇总库或数仓。</td></tr>
+  </tbody>
+</table>
+
+<div class="note danger"><b>一个判断</b>
+<p>如果这四件事里有三件你现在的业务都要用，那说明这张表<b>不适合按这个键拆</b>。换分片键，或者先不拆。</p>
+</div>
+
+<h2 id="key">7. 分片键怎么选</h2>
+<p>分片键（sharding key）决定了每一行去哪个分片，也决定了以后所有查询的成本。选错比不拆更糟。</p>
+
+<ol class="steps">
+<li><b>覆盖最高频的查询条件</b>
+<p>订单表 90% 的查询都带 <code>user_id</code>，就用 <code>user_id</code>。分片键进了 WHERE，才能定位到一个分片；否则每次都是广播。</p>
+<p>「按订单号查」这类不带 <code>user_id</code> 的查询会打到所有分片——要么接受，要么再建一张「订单号 → user_id」的索引表。</p></li>
+
+<li><b>分布要均匀</b>
+<p>性别、状态、地区这类字段取值少且倾斜，切完必然某个分片特别大。用 <code>user_id</code>、<code>order_id</code> 这种高基数字段。</p></li>
+
+<li><b>值不能变</b>
+<p>分片键一改，这一行就要从一个分片搬到另一个分片——等于手工做一次数据迁移。用注册时间、创建时间这种天然不变的字段，别用等级、归属地这种会变的。</p></li>
+
+<li><b>时间字段要小心</b>
+<p>按 <code>create_time</code> 分片，所有新数据都写进最后一个分片：范围查询很舒服（只查相关月份），但写入全压在一个节点上，成了热点。日志、流水这类「只按时间查、且能按月归档」的数据适合；订单这种要按用户查的不适合。</p></li>
+</ol>
+
+<h2 id="tech">8. 用什么实现</h2>
+<p>分片逻辑总得有个地方执行：要么在应用里，要么在一个代理进程里。</p>
+
+<figure class="fig">
+  <img src="../assets/sharding/08-tech.png" width="796" height="216" alt="左边应用直连一个数据库；右边应用连 MyCat，MyCat 按 id%3 的结果把请求分发到三组数据库。">
+  <figcaption><b>图 6</b>课程里的两种形态。右图是中间件模式：应用只连 MyCat，按 <code>id%3</code> 路由到三组库，应用完全不知道背后有几台。</figcaption>
+</figure>
+
+<table>
+  <thead><tr><th style="width:22%">方案</th><th style="width:16%">形态</th><th>特点</th></tr></thead>
+  <tbody>
+    <tr><td><b>ShardingSphere-JDBC</b><br><small>原 Sharding-JDBC</small></td><td>客户端 jar</td><td>嵌在应用里，拦截并改写 SQL，直连各分片。少一跳网络，性能最好；只支持 Java，要改数据源配置，升级时要跟着应用发版。</td></tr>
+    <tr><td><b>ShardingSphere-Proxy</b></td><td>独立进程</td><td>模拟 MySQL 协议，应用只改连接串。支持多语言，和 MyCat 是同一类东西，社区活跃，功能比 MyCat 全。</td></tr>
+    <tr><td><b>MyCat</b></td><td>独立进程</td><td>同样是代理，配置全在 XML，学习成本低、课程用它演示最直观。1.6 系列多年没有实质更新，MyCat2 是重写版、与 1.x 配置不兼容；新项目一般选 ShardingSphere。</td></tr>
+  </tbody>
+</table>
+
+<p>一句话选型：<b>Java 应用、在意性能 → JDBC；多语言或不想动代码 → Proxy；只为理解原理 → 先按 03-01 把 MyCat 跑通。</b></p>
+
+<h2 id="decide">9. 一次判断的顺序</h2>
+<p>真到要拆的时候，按这个顺序问自己五个问题，别跳步：</p>
+
+<ol class="steps">
+<li><b>量到底多大</b>
+<pre data-copy><code>SELECT table_rows,
+       ROUND(data_length/1024/1024)  AS data_mb,
+       ROUND(index_length/1024/1024) AS index_mb
+FROM information_schema.TABLES
+WHERE table_schema = 'db01' AND table_name = 'tb_order';</code></pre>
+<p class="check"><code>table_rows</code> 是 InnoDB 的<b>估算值</b>，看量级够用；要准确行数还是 <code>SELECT COUNT(*)</code>。真正该看的是 <code>data_mb</code> 和慢查询是否都集中在这张表——只有「行多」不构成理由，行宽、索引、查询模式都得看。</p></li>
+
+<li><b>不拆能不能扛</b>
+<p>按第 2 节过一遍：索引、归档、读写分离、分区表。这些做完还有明显瓶颈，再往下走。</p></li>
+
+<li><b>切列还是切行</b>
+<p>宽表、大字段、单行几 KB → 先垂直分表。行数上千万、单表文件几十 GB → 水平。</p></li>
+
+<li><b>切完的查询还走不走得通</b>
+<p>把线上 Top 20 的 SQL 列出来，看分片键能覆盖几条。覆盖不到一半，说明这个键选错了，回到第 3 步。</p></li>
+
+<li><b>怎么上线</b>
+<p>拆完不是改个配置就完事，数据要迁过去，而且不能停业务。步骤见下面的折叠。</p>
+<details class="extra"><summary>平滑迁移的四步（不停机）</summary>
+<div>
+<p><b>① 双写</b>：应用同时写旧库和新库，新库先不读。</p>
+<p><b>② 迁移存量</b>：按分片键分批把老数据搬过去，一边搬一边比对行数和抽样内容。</p>
+<p><b>③ 切读</b>：灰度让一部分读走新库，观察一段时间；对不上就切回来。</p>
+<p><b>④ 切写、下线旧库</b>：写全部切到新库后，旧库保留只读一段时间再下线。备份别急着删。</p>
+<p>整个过程最容易被忽略的是<b>增量</b>：迁移跑的几个小时里业务还在写，双写就是为了把这部分补上；只做一次性 dump 一定会丢数据。</p>
+</div></details>
+</li>
+</ol>
+
+<h2 id="next">下一步</h2>
+<p>概念清楚之后，用 MyCat 把三台 MySQL 拼成一个逻辑库，看看分片规则怎么落到具体节点、SQL 怎么被路由：</p>
+<div class="page-links">
+  <a href="03-01-MyCat实现.html"><b>03-01 · MyCat 实现</b><small>逻辑库与物理库、三份配置文件、把 tb_order 分成三个节点跑通、常用分片规则与八个坑。</small></a>
+  <a href="02-主从复制.html"><b>02 · 主从复制</b><small>分片之后每个分片仍然要做主从——分片解决容量，复制解决可用性。</small></a>
+</div>
+
+<section class="quiz" id="quiz">
+  <p class="quiz-head">自测三问<span>先自己答，再展开对照</span></p>
+  <details><summary><span class="qno">Q1</span><span class="ask">单表 1 亿行，水平分成 10 张各 1000 万，还放在同一个 MySQL 实例里，性能会明显提升吗？</span><span class="caret" aria-hidden="true"></span></summary>
+  <div class="ans"><p>不会明显提升，<b>磁盘 IO 和 CPU 还是那一台机器的</b>。收益只在「单表变小」这一侧：索引层数变浅、单表 DDL 和备份更快、缓冲池对单表的命中率更高。<br>要真正扩容，必须把这 10 张表分到不同机器上（水平分库），或者先用读写分离把读压力分出去。</p></div></details>
+  <details><summary><span class="qno">Q2</span><span class="ask">用户表和订单表都按 <code>user_id</code> 分片，能保证它们之间的 JOIN 不跨库吗？</span><span class="caret" aria-hidden="true"></span></summary>
+  <div class="ans"><p>能，前提是<b>同一个分片键 + 同一套分片算法</b>：同一个用户的订单和用户资料落在同一个节点，JOIN 可以下推。<br>但「按订单号查订单」这种不带 <code>user_id</code> 的查询仍然会广播到所有节点——分片键保护的是它自己那一类查询。</p></div></details>
+  <details><summary><span class="qno">Q3</span><span class="ask">为什么不能靠「每个分片自增步长不同」（1、3、5…）来解决全局 ID？</span><span class="caret" aria-hidden="true"></span></summary>
+  <div class="ans"><p>扩缩容时会崩：从 3 个分片加到 4 个，步长要重算，已有数据的 ID 序列全乱，新老数据可能撞号。<br>而且步长方案要求分片数固定，和「随时能加机器」这件事直接冲突。用雪花算法或号段发号，把 ID 生成从数据库里拿出来。</p></div></details>
+</section>
+
+<h2 id="sources">资料</h2>
+<p class="refs">官方与文档：<a href="https://shardingsphere.apache.org/document/current/cn/overview/">ShardingSphere 概览</a> · <a href="https://dev.mysql.com/doc/refman/8.0/en/partitioning.html">MySQL 分区表</a> · <a href="https://www.mycat.org.cn/">MyCat 官网</a> · <a href="https://dev.mysql.com/doc/refman/8.0/en/innodb-index-types.html">InnoDB 索引结构</a></p>
+<p class="source">核对日期 2026-11-26。本页是概念与判断，命令只用于观察指标，没有在真实分片集群上执行；MyCat 的具体配置与验证步骤在 03-01。</p>
+
+<div class="footer"><a href="02-主从复制.html">← 02 主从复制</a> · <a href="../index.html">总目录</a> · <a href="03-01-MyCat实现.html">03-01 MyCat 实现 →</a></div>
+</main>
+</div></body></html>
